@@ -1,0 +1,257 @@
+{% extends "meters/base.html" %}
+{% load static %}
+
+{% block title %}สร้างสัญญาใหม่{% endblock %}
+
+{% block content %}
+<div class="py-8">
+
+  {# --- Heading + draft badge --- #}
+  <div class="flex items-center justify-between gap-4 flex-wrap mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">สร้างสัญญาใหม่</h1>
+    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-600">
+      ฉบับร่าง
+    </span>
+  </div>
+
+  {# NOTE: หน้านี้เป็น UI เปล่ายังไม่เชื่อมกับ DB จริง -- ปุ่ม/ช่องกรอกยังไม่ทำงาน #}
+  <form class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+    {# --- ฝั่งซ้าย: ข้อมูลสัญญา --- #}
+    <div class="bg-white border border-gray-200 rounded-xl p-6">
+      <h2 class="text-base font-bold text-gray-900 mb-1">ข้อมูลสัญญา</h2>
+      <p class="text-xs text-gray-400 mb-5">กรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน</p>
+
+      <div class="grid grid-cols-2 gap-4">
+
+        <div class="col-span-1">
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">ปีที่สร้างสัญญา *</label>
+          <input type="number" placeholder="2569"
+                 class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
+        </div>
+
+        <div class="col-span-1">
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">รหัสลูกหนี้ *</label>
+          <div class="relative">
+            <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M21 21l-4.3-4.3"/>
+            </svg>
+            <input type="text" placeholder="ค้นหารหัสลูกหนี้"
+                   class="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
+          </div>
+        </div>
+
+        <div class="col-span-1">
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">ชื่อลูกหนี้</label>
+          <input type="text" placeholder="บริษัท ตัวอย่าง จำกัด"
+                 class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
+        </div>
+
+        <div class="col-span-1">
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">เลขประจำตัวผู้เสียภาษี</label>
+          <input type="text" placeholder="0105559999999"
+                 class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
+        </div>
+
+        <div class="col-span-1">
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">เลขที่สัญญา</label>
+          <input type="text" placeholder="ระบบสร้างให้อัตโนมัติ" disabled
+                 class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-400 cursor-not-allowed">
+        </div>
+
+        <div class="col-span-1">
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">รหัสสัญญา *</label>
+          <input type="text" placeholder="CTR-2569-0001"
+                 class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
+        </div>
+
+        <div class="col-span-1">
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">สถานที่ตั้ง *</label>
+          <select class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
+            <option>เลือกสถานที่ตั้ง</option>
+          </select>
+        </div>
+
+        <div class="col-span-1">
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">Area</label>
+          <select class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
+            <option>เลือก Area</option>
+          </select>
+        </div>
+
+        <div class="col-span-1">
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">SubArea</label>
+          <select class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
+            <option>เลือก SubArea</option>
+          </select>
+        </div>
+
+        <div class="col-span-1">
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">พื้นที่เช่าตามที่ต้องการ</label>
+          <input type="text" placeholder="ระบุรายละเอียดพื้นที่"
+                 class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
+        </div>
+
+      </div>
+    </div>
+
+    {# --- ฝั่งขวา: ค่าน้ำ / ค่าไฟ (แยกกันชัดเจน 1 สัญญามีได้ทั้ง 2 อย่างพร้อมกัน) + เอกสาร --- #}
+    <div class="bg-white border border-gray-200 rounded-xl p-6">
+      <h2 class="text-base font-bold text-gray-900 mb-1">ค่าน้ำ-ค่าไฟ และเอกสาร</h2>
+      <p class="text-xs text-gray-400 mb-5">ติ๊กเปิดใช้งานประเภทที่มีในพื้นที่นี้ เลือกได้มากกว่า 1 อย่าง</p>
+
+      <div class="space-y-4">
+
+        {# ---------- การ์ดค่าน้ำ ---------- #}
+        <div class="border border-sky-100 bg-sky-50/40 rounded-xl p-4" x-data>
+          <label class="flex items-center gap-2 mb-3 cursor-pointer">
+            <input type="checkbox" id="waterEnable"
+                   class="w-4 h-4 rounded border-gray-300 text-sky-500 focus:ring-sky-400">
+            <span class="inline-flex items-center gap-1.5 text-sm font-semibold text-sky-700">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 2.75c3.5 4.2 6 7.7 6 11a6 6 0 11-12 0c0-3.3 2.5-6.8 6-11z"/>
+              </svg>
+              ค่าน้ำประปา
+            </span>
+          </label>
+
+          <div id="waterFields" class="grid grid-cols-2 gap-3 opacity-40 pointer-events-none">
+            <div class="col-span-2">
+              <label class="block text-xs font-medium text-gray-600 mb-1">เลขประจำตัวเครื่องวัดน้ำ</label>
+              <input type="text" placeholder="เช่น W001 หรือปล่อยว่างให้ระบบ Gen ให้"
+                     class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-400">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">เลขอ่านครั้งก่อน</label>
+              <input type="number" step="0.01" placeholder="0.00"
+                     class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-400">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">เลขอ่านครั้งหลัง</label>
+              <input type="number" step="0.01" placeholder="0.00"
+                     class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-400">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">วันที่อ่านเลขมิเตอร์</label>
+              <input type="date"
+                     class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-400">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">จำนวนเงินที่ต้องชำระ</label>
+              <div class="relative">
+                <input type="number" step="0.01" placeholder="0.00"
+                       class="w-full border border-gray-200 rounded-lg px-3 py-2 pr-10 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-400">
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">บาท</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {# ---------- การ์ดค่าไฟ ---------- #}
+        <div class="border border-amber-100 bg-amber-50/40 rounded-xl p-4">
+          <label class="flex items-center gap-2 mb-3 cursor-pointer">
+            <input type="checkbox" id="electricEnable"
+                   class="w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-400">
+            <span class="inline-flex items-center gap-1.5 text-sm font-semibold text-amber-700">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/>
+              </svg>
+              ค่าไฟฟ้า
+            </span>
+          </label>
+
+          <div id="electricFields" class="grid grid-cols-2 gap-3 opacity-40 pointer-events-none">
+            <div class="col-span-2">
+              <label class="block text-xs font-medium text-gray-600 mb-1">เลขประจำตัวเครื่องวัดไฟฟ้า</label>
+              <input type="text" placeholder="เลขเครื่องวัดจริงจากการไฟฟ้า"
+                     class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400">
+            </div>
+            <div class="col-span-2">
+              <label class="block text-xs font-medium text-gray-600 mb-1">ระบบไฟฟ้า</label>
+              <select class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400">
+                <option>เลือกระบบไฟฟ้า</option>
+                <option>1 เฟส</option>
+                <option>3 เฟส</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">เลขอ่านครั้งก่อน</label>
+              <input type="number" step="0.01" placeholder="0.00"
+                     class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">เลขอ่านครั้งหลัง</label>
+              <input type="number" step="0.01" placeholder="0.00"
+                     class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">วันที่อ่านเลขมิเตอร์</label>
+              <input type="date"
+                     class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">จำนวนเงินที่ต้องชำระ</label>
+              <div class="relative">
+                <input type="number" step="0.01" placeholder="0.00"
+                       class="w-full border border-gray-200 rounded-lg px-3 py-2 pr-10 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400">
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">บาท</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">เอกสารประกอบ</label>
+          <div class="border border-dashed border-gray-300 rounded-lg py-8 flex flex-col items-center justify-center text-center hover:border-brand-400 hover:bg-brand-50/30 transition-colors cursor-pointer">
+            <svg class="w-6 h-6 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9m0 0l-3 3m3-3l3 3M6 20.25h12A2.25 2.25 0 0020.25 18v-9a2.25 2.25 0 00-2.25-2.25H15l-1.5-2.25h-3L9 6.75H6A2.25 2.25 0 003.75 9v9A2.25 2.25 0 006 20.25z"/>
+            </svg>
+            <span class="text-sm text-gray-500">แนบไฟล์ 1-3 ไฟล์</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    {# --- Bottom actions --- #}
+    <div class="lg:col-span-2 flex items-center justify-end gap-3 pt-2">
+      <button type="button"
+              class="px-5 py-2.5 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">
+        ยกเลิก
+      </button>
+      <button type="button"
+              class="px-5 py-2.5 rounded-lg text-sm font-medium text-brand-700 bg-brand-50 hover:bg-brand-100">
+        บันทึกฉบับร่าง
+      </button>
+      <button type="button"
+              class="px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600">
+        ส่งเรื่อง
+      </button>
+    </div>
+
+  </form>
+
+</div>
+
+<script>
+  function wireToggle(checkboxId, fieldsId){
+    const checkbox = document.getElementById(checkboxId);
+    const fields = document.getElementById(fieldsId);
+    const inputs = fields.querySelectorAll('input, select');
+
+    function sync(){
+      if (checkbox.checked){
+        fields.classList.remove('opacity-40','pointer-events-none');
+        inputs.forEach(el => el.disabled = false);
+      } else {
+        fields.classList.add('opacity-40','pointer-events-none');
+        inputs.forEach(el => el.disabled = true);
+      }
+    }
+    checkbox.addEventListener('change', sync);
+    sync();
+  }
+  wireToggle('waterEnable', 'waterFields');
+  wireToggle('electricEnable', 'electricFields');
+</script>
+{% endblock %}

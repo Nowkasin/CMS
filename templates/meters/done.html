@@ -1,0 +1,136 @@
+{% extends "meters/base.html" %}
+{% load static %}
+
+{% block extra_css %}
+  {% include "meters/_tailwind.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 font-sans">
+  <div class="max-w-4xl mx-auto px-6 py-10">
+
+    <div class="text-xs text-gray-400 mb-2 flex items-center gap-1.5">
+      <span>หน้าแรก</span><span>›</span><span>ประวัติค่าน้ำ-ค่าไฟ</span>
+    </div>
+
+    <div class="flex items-center justify-between mb-8">
+      <h1 class="text-2xl font-bold text-gray-900">ค่าน้ำ-ค่าไฟ</h1>
+      <a href="{% url 'restart' %}"
+         class="inline-flex items-center gap-1.5 bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+        สร้างรายการใหม่
+      </a>
+    </div>
+
+    {% include "meters/_stepper.html" %}
+
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 mb-6 text-center">
+      <div class="w-14 h-14 mx-auto mb-4 rounded-full bg-brand-50 flex items-center justify-center">
+        <svg class="w-7 h-7 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+        </svg>
+      </div>
+      <h2 class="text-lg font-bold text-gray-900 mb-1">นำเข้าข้อมูลเรียบร้อยแล้ว</h2>
+      <p class="text-sm text-gray-500">
+        ไฟล์ {{ committed.filename }} · รอบบิล {{ committed.billing_period }} ถูกบันทึกลงฐานข้อมูลเรียบร้อย
+      </p>
+    </div>
+
+    <div class="grid grid-cols-3 gap-4 mb-6">
+      <div class="bg-brand-500 rounded-xl p-5 text-center">
+        <div class="text-2xl font-bold text-white">{{ committed.stats.meter_ok }}</div>
+        <div class="text-xs text-brand-100 mt-1">รายการสำเร็จ</div>
+      </div>
+      <div class="border border-gray-100 rounded-xl p-5 text-center">
+        <div class="text-2xl font-bold text-gray-700">{{ committed.stats.skipped }}</div>
+        <div class="text-xs text-gray-400 mt-1">รายการข้าม</div>
+      </div>
+      <div class="border border-gray-100 rounded-xl p-5 text-center">
+        <div class="text-2xl font-bold {% if committed.stats.errors > 0 %}text-red-500{% else %}text-gray-700{% endif %}">{{ committed.stats.errors }}</div>
+        <div class="text-xs text-gray-400 mt-1">รายการผิดพลาด</div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-sm font-bold text-gray-900">รายละเอียดผลการนำเข้า</h3>
+        <button type="button" id="btnDownloadCsv"
+                class="text-xs font-medium border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 inline-flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+          </svg>
+          ดาวน์โหลดรายงาน (.csv)
+        </button>
+      </div>
+
+      <div class="border border-gray-100 rounded-xl overflow-hidden">
+        <table class="w-full text-sm" id="resultTable">
+          <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
+            <tr>
+              <th class="text-left px-4 py-2.5">ลำดับ</th>
+              <th class="text-left px-4 py-2.5">รหัสสัญญา</th>
+              <th class="text-left px-4 py-2.5">SubArea</th>
+              <th class="text-left px-4 py-2.5">ประเภท</th>
+              <th class="text-left px-4 py-2.5">เลขมิเตอร์</th>
+              <th class="text-left px-4 py-2.5">สถานะ</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-50">
+            {% for r in committed.rows %}
+            <tr>
+              <td class="px-4 py-2.5 text-gray-400 font-mono text-xs">{{ r.idx }}</td>
+              <td class="px-4 py-2.5 font-mono text-xs">{{ r.contract_code|default:"—" }}</td>
+              <td class="px-4 py-2.5 font-mono text-xs">{{ r.subarea_id }}</td>
+              <td class="px-4 py-2.5">
+                <span class="text-xs font-semibold px-2 py-0.5 rounded-full {% if r.type_cd == 9 %}bg-cyan-50 text-cyan-600{% else %}bg-amber-50 text-amber-600{% endif %}">
+                  {{ r.type_label }}
+                </span>
+              </td>
+              <td class="px-4 py-2.5 font-mono text-xs">{{ r.meter_no|default:"—" }}</td>
+              <td class="px-4 py-2.5">
+                {% if r.final_status == 'success' %}
+                  <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-brand-50 text-brand-600">สำเร็จ</span>
+                {% elif r.final_status == 'skip' %}
+                  <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">ข้าม</span>
+                {% else %}
+                  <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-500">ผิดพลาด</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="flex items-center justify-between mt-8 pt-6 border-t border-gray-100">
+        <a href="{% url 'dashboard' %}" class="text-sm text-gray-500 hover:text-gray-700">ไปที่แดชบอร์ด</a>
+        <a href="{% url 'restart' %}"
+           class="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition">
+          นำเข้ารายการใหม่
+        </a>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  document.getElementById('btnDownloadCsv')?.addEventListener('click', () => {
+    const rows = [['ลำดับ','รหัสสัญญา','SubArea','ประเภท','เลขมิเตอร์','สถานะ']];
+    document.querySelectorAll('#resultTable tbody tr').forEach(tr => {
+      const cells = Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim());
+      rows.push(cells);
+    });
+    const csv = rows.map(r => r.map(c => `"${c.replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob(["\ufeff" + csv], {type: 'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'utility_import_report.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+</script>
+{% endblock %}

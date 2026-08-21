@@ -1,0 +1,58 @@
+{% load static %}<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}ทะเบียนมิเตอร์น้ำ-ไฟ x สัญญา{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          brand: {
+            50: '#ECFBF5', 100: '#D1F5E6', 500: '#006767',
+            600: '#0C8F5E', 700: '#0A7A4F',
+          },
+        },
+        fontFamily: {
+          sans: ['Inter', 'sans-serif'],
+        },
+      },
+    },
+  };
+</script>
+<style>
+  /* กันหน้าไม่ให้ชนกับ .wrap เดิม (จำกัดความกว้าง 1180px) */
+  .wrap{ max-width: none; padding: 0; }
+</style>
+
+{% block extra_css %}{% endblock %}
+</head>
+<body>
+<nav class="w-full bg-white border-b border-gray-200 px-6 py-3 flex gap-2">
+  <a href="/"
+     class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
+            {% if request.path == '/' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
+    อัปโหลดไฟล์
+  </a>
+   <a href="/create_contract/"
+     class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
+            {% if request.path == '/create_contract/' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
+    สร้างสัญญา
+  </a>
+  <a href="/dashboard/"
+     class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
+            {% if request.path == '/dashboard/' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
+    แดชบอร์ด
+  </a>
+</nav>
+
+<div class="wrap px-6 py-8">
+  {% block content %}{% endblock %}
+</div>
+</body>
+</html>

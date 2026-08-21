@@ -1,0 +1,194 @@
+{% extends "meters/base.html" %}
+{% load static %}
+
+
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 font-sans">
+  <div class="max-w-3xl mx-auto px-6 py-10">
+
+    <div class="text-xs text-gray-400 mb-2 flex items-center gap-1.5">
+      <span>หน้าแรก</span><span>›</span><span>ประวัติค่าน้ำ-ค่าไฟ</span>
+    </div>
+
+    <div class="flex items-center justify-between mb-8">
+      <h1 class="text-2xl font-bold text-gray-900">ค่าน้ำ-ค่าไฟ</h1>
+      <a href="{% url 'create_contract' %}"
+         class="inline-flex items-center gap-1.5 bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+        สร้างรายการใหม่
+      </a>
+    </div>
+
+    {% include "meters/stepper.html" %}
+
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 mb-6">
+
+      <div class="flex items-center gap-3 mb-1">
+        <span class="text-[11px] font-bold tracking-wide text-brand-600 bg-brand-50 px-2 py-0.5 rounded">STEP 01</span>
+        <h2 class="text-lg font-bold text-gray-900">อัปโหลดข้อมูลค่าน้ำ-ค่าไฟ</h2>
+      </div>
+      <p class="text-sm text-gray-500 mb-6">อัปโหลดไฟล์ Excel ที่รวมข้อมูลค่าน้ำ-ค่าไฟในรอบบิลเดียวกัน</p>
+
+      <form method="post" enctype="multipart/form-data" id="uploadForm">
+        {% csrf_token %}
+
+        <!-- รอบบิล -->
+        <div class="mb-6">
+          <div class="text-sm font-semibold text-gray-700 mb-2">รอบบิลที่ดำเนินการ</div>
+          <div class="flex gap-2">
+            <select name="billing_month" class="border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-700">
+              {% for m in thai_months %}
+                <option value="{{ forloop.counter }}" {% if forloop.counter == current_month_idx %}selected{% endif %}>{{ m }}</option>
+              {% endfor %}
+            </select>
+            <select name="billing_year" class="border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-700">
+              {% for y in year_options %}
+                <option value="{{ y }}" {% if y == current_year_be %}selected{% endif %}>{{ y }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- อัปโหลดไฟล์ -->
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-sm font-semibold text-gray-700">อัปโหลดไฟล์ Excel</div>
+          <a href="#" class="text-xs text-brand-600 hover:underline inline-flex items-center gap-1">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            ดาวน์โหลด Template ค่าน้ำ-ค่าไฟ
+          </a>
+        </div>
+
+        <div id="dropzone"
+             class="relative border-2 border-dashed border-gray-300 hover:border-brand-400 hover:bg-gray-50 rounded-xl px-6 py-10 text-center transition">
+
+          {{ form.excel_file }}
+
+          <div id="dzEmpty">
+            <div class="w-11 h-11 mx-auto mb-3 rounded-full bg-brand-50 flex items-center justify-center">
+              <svg class="w-5 h-5 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 8.25L12 3.75m0 0L7.5 8.25M12 3.75V16.5" />
+              </svg>
+            </div>
+            <div class="text-sm font-medium text-gray-700 mb-1">คลิกหรือลากไฟล์ Excel มาวางตรงนี้</div>
+            <div class="text-xs text-gray-400">รองรับไฟล์ .xlsx ขนาดไม่เกิน 10MB</div>
+          </div>
+
+          <div id="dzFile" class="hidden">
+            <div class="w-11 h-11 mx-auto mb-3 rounded-full bg-brand-50 flex items-center justify-center">
+              <svg class="w-5 h-5 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6 12.75l-3 3m0 0l-3-3m3 3V9" />
+              </svg>
+            </div>
+            <div class="text-sm font-semibold text-gray-800" id="dzFileName"></div>
+            <div class="flex items-center justify-center gap-2 mt-4">
+              <button type="button" id="btnChangeFile"
+                      class="text-xs font-medium text-gray-600 border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50">
+                เปลี่ยนไฟล์
+              </button>
+              <button type="button" id="btnRemoveFile"
+                      class="text-xs font-medium text-red-500 border border-red-200 rounded-lg px-3 py-1.5 hover:bg-red-50">
+                🗑 ลบไฟล์
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {% if form.excel_file.errors %}
+          <div class="text-sm text-red-500 mt-2">{{ form.excel_file.errors.0 }}</div>
+        {% endif %}
+
+        <div class="text-xs text-gray-400 text-center mt-3">ระบบจะยังไม่บันทึกข้อมูลจนกว่าจะยืนยันใน Step 3</div>
+
+        <div class="flex items-center justify-between mt-8 pt-6 border-t border-gray-100">
+          <span class="text-sm text-gray-300 inline-flex items-center gap-1 cursor-not-allowed">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+            </svg>
+            ยกเลิกรายการ
+          </span>
+          <button type="submit" id="btnSubmit"
+                  class="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition">
+            อัปโหลดและตรวจสอบข้อมูล
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+            </svg>
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="bg-white border border-gray-100 rounded-xl p-4">
+        <div class="flex items-center gap-2 mb-1.5">
+          <svg class="w-4 h-4 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span class="text-sm font-semibold text-gray-800">ความถูกต้องของข้อมูล</span>
+        </div>
+        <p class="text-xs text-gray-400 leading-relaxed">ระบบจะตรวจสอบพื้นที่และรหัสสัญญาในไฟล์กับฐานข้อมูลก่อนให้ยืนยันนำเข้า</p>
+      </div>
+      <div class="bg-white border border-gray-100 rounded-xl p-4">
+        <div class="flex items-center gap-2 mb-1.5">
+          <svg class="w-4 h-4 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+          </svg>
+          <span class="text-sm font-semibold text-gray-800">การนำเข้าซ้ำ</span>
+        </div>
+        <p class="text-xs text-gray-400 leading-relaxed">มิเตอร์เลขเดียวกันที่เคยลงทะเบียนในพื้นที่แล้ว จะใช้ Meter_id เดิมซ้ำ ไม่สร้างรายการใหม่</p>
+      </div>
+      <div class="bg-white border border-gray-100 rounded-xl p-4">
+        <div class="flex items-center gap-2 mb-1.5">
+          <svg class="w-4 h-4 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span class="text-sm font-semibold text-gray-800">ยังไม่บันทึกจนกว่าจะยืนยัน</span>
+        </div>
+        <p class="text-xs text-gray-400 leading-relaxed">ข้อมูลจะถูกเขียนลงฐานข้อมูลจริงก็ต่อเมื่อกด "ยืนยันนำเข้าข้อมูล" ใน Step 3 เท่านั้น</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const fileInput = document.querySelector('#uploadForm input[type="file"]');
+  const dzEmpty = document.getElementById('dzEmpty');
+  const dzFile = document.getElementById('dzFile');
+  const dzFileName = document.getElementById('dzFileName');
+  const dropzone = document.getElementById('dropzone');
+
+  function showFile(file){
+    dzFileName.textContent = file.name;
+    dzEmpty.classList.add('hidden');
+    dzFile.classList.remove('hidden');
+  }
+  function resetDropzone(){
+    fileInput.value = '';
+    dzEmpty.classList.remove('hidden');
+    dzFile.classList.add('hidden');
+  }
+
+  fileInput?.addEventListener('change', () => { if (fileInput.files[0]) showFile(fileInput.files[0]); });
+  document.getElementById('btnChangeFile')?.addEventListener('click', () => fileInput.click());
+  document.getElementById('btnRemoveFile')?.addEventListener('click', resetDropzone);
+  dropzone?.addEventListener('click', (e) => {
+    if (e.target.closest('#btnChangeFile') || e.target.closest('#btnRemoveFile')) return;
+    fileInput.click();
+  });
+  ['dragover','dragenter'].forEach(ev => dropzone?.addEventListener(ev, (e) => {
+    e.preventDefault(); dropzone.classList.add('border-brand-500');
+  }));
+  ['dragleave','drop'].forEach(ev => dropzone?.addEventListener(ev, (e) => {
+    e.preventDefault(); dropzone.classList.remove('border-brand-500');
+  }));
+  dropzone?.addEventListener('drop', (e) => {
+    const f = e.dataTransfer.files[0];
+    if (f){ fileInput.files = e.dataTransfer.files; showFile(f); }
+  });
+</script>
+{% endblock %}
