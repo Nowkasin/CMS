@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="min-h-screen bg-gray-50 font-sans">
-  <div class="max-w-4xl mx-auto px-6 py-10">
+  <div class="max-w-3xl mx-auto px-6 py-10">
 
     <div class="text-xs text-gray-400 mb-2 flex items-center gap-1.5">
       <span>หน้าแรก</span><span>›</span><span>ประวัติค่าน้ำ-ค่าไฟ</span>
@@ -26,131 +26,90 @@
     <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 mb-6">
 
       <div class="flex items-center gap-3 mb-1">
-        <span class="text-[11px] font-bold tracking-wide text-brand-600 bg-brand-50 px-2 py-0.5 rounded">STEP 02</span>
-        <h2 class="text-lg font-bold text-gray-900">การตรวจสอบข้อมูลก่อนนำเข้า</h2>
+        <span class="text-[11px] font-bold tracking-wide text-brand-600 bg-brand-50 px-2 py-0.5 rounded">STEP 03</span>
+        <h2 class="text-lg font-bold text-gray-900">ตรวจสอบและยืนยันครั้งสุดท้ายก่อนบันทึกเข้าระบบ</h2>
       </div>
-      <p class="text-sm text-gray-500 mb-4">
-        ไฟล์ <span class="font-medium text-gray-700">{{ staged.filename }}</span> ·
-        รอบบิล {{ staged.billing_period }}
-      </p>
+      <p class="text-sm text-gray-500 mb-6">ข้อมูลด้านล่างจะถูกเขียนลงฐานข้อมูลจริงทันทีที่กด "ยืนยันนำเข้าข้อมูล"</p>
+
+      <div class="grid grid-cols-2 gap-4 mb-6">
+        <div class="border border-gray-100 rounded-xl p-4">
+          <div class="text-xs text-gray-400 mb-1">ไฟล์</div>
+          <div class="text-sm font-medium text-gray-800">{{ staged.filename|default:"—" }}</div>
+        </div>
+        <div class="border border-gray-100 rounded-xl p-4">
+          <div class="text-xs text-gray-400 mb-1">รอบบิล</div>
+          <div class="text-sm font-medium text-gray-800">{{ staged.billing_period|default:"—" }}</div>
+        </div>
+        <div class="border border-gray-100 rounded-xl p-4">
+          <div class="text-xs text-gray-400 mb-1">รายการที่พร้อมนำเข้า</div>
+          <div class="text-sm font-medium text-brand-600">{{ staged.summary.ok|default:0 }} รายการ</div>
+        </div>
+        <div class="bg-brand-500 rounded-xl p-4">
+          <div class="text-xs text-brand-100 mb-1">รวมทั้งหมด</div>
+          <div class="text-lg font-bold text-white">{{ staged.summary.total|default:0 }} รายการ</div>
+        </div>
+      </div>
+
+      {% if staged.summary.skip > 0 %}
+      <div class="text-xs text-gray-500 mb-6">
+        หมายเหตุ: มี {{ staged.summary.skip }} รายการที่ระบบจะข้าม (ไม่มีมิเตอร์ในพื้นที่นั้น) จะไม่ถูกสร้างเป็นทะเบียนมิเตอร์
+      </div>
+      {% endif %}
 
       {% if staged.summary.error > 0 %}
-      <div class="flex items-center gap-2 bg-red-50 border border-red-100 text-red-600 text-sm rounded-lg px-4 py-3 mb-5">
+      <div class="flex items-center gap-2 bg-red-50 border border-red-100 text-red-600 text-sm rounded-lg px-4 py-3 mb-6">
         <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
         </svg>
-        พบ {{ staged.summary.error }} รายการที่มีปัญหา — กรุณาแก้ไขในไฟล์ Excel แล้วอัปโหลดใหม่ ก่อนดำเนินการต่อ
+        ยังมี {{ staged.summary.error }} รายการที่มีปัญหาอยู่ — ย้อนกลับไปแก้ไขที่หน้าตรวจสอบข้อมูลก่อน
       </div>
       {% endif %}
 
-      <!-- ค้นหา/กรอง -->
-      <form method="get" class="flex flex-wrap items-center gap-2 mb-4">
-        <a href="?type=all{% if search %}&q={{ search }}{% endif %}"
-           class="text-xs px-3 py-1.5 rounded-full border {% if active_filter == 'all' %}bg-gray-900 text-white border-gray-900{% else %}border-gray-200 text-gray-600{% endif %}">ทั้งหมด</a>
-        <a href="?type=9{% if search %}&q={{ search }}{% endif %}"
-           class="text-xs px-3 py-1.5 rounded-full border {% if active_filter == '9' %}bg-gray-900 text-white border-gray-900{% else %}border-gray-200 text-gray-600{% endif %}">น้ำ</a>
-        <a href="?type=8{% if search %}&q={{ search }}{% endif %}"
-           class="text-xs px-3 py-1.5 rounded-full border {% if active_filter == '8' %}bg-gray-900 text-white border-gray-900{% else %}border-gray-200 text-gray-600{% endif %}">ไฟฟ้า</a>
-        <input type="hidden" name="type" value="{{ active_filter }}">
-        <input type="text" name="q" value="{{ search }}" placeholder="ค้นหา รหัสสัญญา / SubArea / เลขมิเตอร์"
-               class="flex-1 min-w-[180px] border border-gray-200 rounded-lg px-3 py-1.5 text-sm">
-        <button type="submit" class="text-xs font-medium border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50">ค้นหา</button>
-      </form>
-
-      <!-- ตาราง -->
-      <div class="border border-gray-100 rounded-xl overflow-hidden">
-        <table class="w-full text-sm">
-          <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
-            <tr>
-              <th class="text-left px-4 py-2.5">ลำดับ</th>
-              <th class="text-left px-4 py-2.5">ปีที่ทำสัญญา</th>
-              <th class="text-left px-4 py-2.5">รหัสสัญญา</th>
-              <th class="text-left px-4 py-2.5">ชื่อลูกหนี้</th>
-              <th class="text-left px-4 py-2.5">SubArea</th>
-              <th class="text-left px-4 py-2.5">ประเภท</th>
-              <th class="text-left px-4 py-2.5">เลขมิเตอร์</th>
-              <th class="text-left px-4 py-2.5">สถานะ</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-50">
-            {% for r in page_obj %}
-            <tr class="{% if r.status == 'error' %}bg-red-50{% endif %}">
-              <td class="px-4 py-2.5 text-gray-400 font-mono text-xs">{{ r.idx }}</td>
-              <td class="px-4 py-2.5 font-mono text-xs">{{ r.contract_year|default:"—" }}</td>
-              <td class="px-4 py-2.5 font-mono text-xs">{{ r.contract_code|default:"—" }}</td>
-              <td class="px-4 py-2.5 text-xs">{{ r.customer_name|default:"—" }}</td>
-              <td class="px-4 py-2.5 font-mono text-xs">{{ r.subarea_id }}</td>
-              <td class="px-4 py-2.5">
-                <span class="text-xs font-semibold px-2 py-0.5 rounded-full {% if r.type_cd == 9 %}bg-cyan-50 text-cyan-600{% else %}bg-amber-50 text-amber-600{% endif %}">
-                  {{ r.type_label }}
-                </span>
-              </td>
-              <td class="px-4 py-2.5 font-mono text-xs">{{ r.meter_no|default:"—" }}</td>
-              <td class="px-4 py-2.5">
-                {% if r.status == 'ok' %}
-                  <span class="text-xs font-medium text-brand-600">พร้อมนำเข้า</span>
-                {% elif r.status == 'skip' %}
-                  <span class="text-xs font-medium text-gray-400">ข้าม</span>
-                {% else %}
-                  <span class="text-xs font-medium text-red-500 inline-flex items-center gap-1">
-                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m0 3.75h.007M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    {{ r.message }}
-                  </span>
-                {% endif %}
-              </td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="8" class="text-center text-gray-400 text-sm py-10">ไม่พบข้อมูลที่ค้นหา</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Pagination -->
-      {% if page_obj.paginator.num_pages > 1 %}
-      <div class="flex items-center justify-center gap-1 mt-4">
-        {% if page_obj.has_previous %}
-          <a href="?type={{ active_filter }}&q={{ search }}&page={{ page_obj.previous_page_number }}"
-             class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">‹</a>
-        {% endif %}
-        <span class="text-xs text-gray-500 px-2">หน้า {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
-        {% if page_obj.has_next %}
-          <a href="?type={{ active_filter }}&q={{ search }}&page={{ page_obj.next_page_number }}"
-             class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">›</a>
-        {% endif %}
+      {% if error %}
+      <div class="bg-red-50 border border-red-100 text-red-600 text-sm rounded-lg px-4 py-3 mb-4">
+        {{ error }}
       </div>
       {% endif %}
 
-      <div class="text-xs text-gray-400 mt-3">
-        รวม {{ total_filtered }} รายการ (พร้อมนำเข้า {{ staged.summary.ok }} · ข้าม {{ staged.summary.skip }} · ผิดพลาด {{ staged.summary.error }})
-      </div>
+      <form method="post" id="confirmForm">
+        {% csrf_token %}
+        <label class="flex items-start gap-2.5 text-sm text-gray-700 cursor-pointer mb-8">
+          <input type="checkbox" name="confirm" id="confirmCheckbox"
+                 class="mt-0.5 w-4 h-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500">
+          ฉันได้ตรวจสอบข้อมูลแล้ว และยืนยันว่าข้อมูลถูกต้องครบถ้วนก่อนบันทึกเข้าระบบ
+        </label>
 
-      <!-- Bottom nav -->
-      <div class="flex items-center justify-between mt-8 pt-6 border-t border-gray-100">
-        <a href="{% url 'step1' %}" class="text-sm text-gray-500 hover:text-gray-700 inline-flex items-center gap-1">
-          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-          </svg>
-          ย้อนกลับ
-        </a>
-        {% if staged.summary.error > 0 %}
-          <span class="inline-flex items-center gap-2 bg-gray-200 text-gray-400 text-sm font-semibold px-5 py-2.5 rounded-lg cursor-not-allowed">
-            ถัดไป (แก้ไขข้อผิดพลาดก่อน)
-          </span>
-        {% else %}
-          <a href="{% url 'step3' %}"
-             class="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition">
-            ถัดไป
+        <div class="flex items-center justify-between pt-6 border-t border-gray-100">
+          <a href="{% url 'step2' %}" class="text-sm text-gray-500 hover:text-gray-700 inline-flex items-center gap-1">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
             </svg>
+            ย้อนกลับ
           </a>
-        {% endif %}
-      </div>
+          <button type="submit" id="btnConfirm" disabled
+                  class="inline-flex items-center gap-2 bg-gray-200 text-gray-400 text-sm font-semibold px-5 py-2.5 rounded-lg transition">
+            ยืนยันนำเข้าข้อมูล
+          </button>
+        </div>
+      </form>
     </div>
 
   </div>
 </div>
+
+<script>
+  const checkbox = document.getElementById('confirmCheckbox');
+  const btn = document.getElementById('btnConfirm');
+  checkbox.addEventListener('change', () => {
+    if (checkbox.checked){
+      btn.disabled = false;
+      btn.classList.remove('bg-gray-200','text-gray-400');
+      btn.classList.add('bg-brand-500','hover:bg-brand-600','text-white');
+    } else {
+      btn.disabled = true;
+      btn.classList.add('bg-gray-200','text-gray-400');
+      btn.classList.remove('bg-brand-500','hover:bg-brand-600','text-white');
+    }
+  });
+</script>
 {% endblock %}

@@ -8,15 +8,25 @@ STATUS_MAP = {
     'ยกเลิกสัญญา': '5', 'รอปิดสัญญา': '8', 'ปิดสัญญา': '9',
 }
 
-COL = {
-    'YEAR': 0, 'CUSTOMER_NAME': 2, 'CONTRACT_NO': 4, 'CONTRACT_CODE': 5,
-    'LOCATION': 8, 'LOCATION_NAME': 9,
-    'AREA': 10, 'AREA_NAME': 11, 'SUBAREA': 12, 'SUBAREA_NAME': 13, 'STATUS': 15,
-    'CONFIRM': 16, 'METER_NO': 19,
+COL_KEYS = {
+    'YEAR': ['ปีที่สร้างสัญญา'],
+    'CUSTOMER_NAME': ['ชื่อลูกหนี้'],
+    'TAX_ID': ['เลข13หลัก'],
+    'CONTRACT_NO': ['เลขที่สัญญา'],
+    'CONTRACT_CODE': ['รหัสสัญญา'],
+    'LOCATION': ['Location_id'],       # อาจไม่มีในบางไฟล์ -- ต้องเช็ค None ก่อนใช้
+    'LOCATION_NAME': ['สถานที่ตั้ง'],
+    'AREA': ['Area_id'],
+    'AREA_NAME': ['พื้นที่ตามที่ตั้งพื้นที่เช่า'],
+    'SUBAREA': ['SubArea_id'],
+    'SUBAREA_NAME': ['พื้นที่ย่อยตามที่ตั้งพื้นที่เช่า'],
+    'STATUS': ['สถานะสัญญา'],
+    'CONFIRM': ['ยืนยันพื้นที่ที่คิดค่า'],
+    'METER_NO': ['เลขประจำเครื่องวัด'],
+    'PHASE': ['ระบบไฟฟ้า'],
 }
-COL_PHASE = 20
 
-DEFAULT_USER = 'web_upload'  # เปลี่ยนเป็น username จริงของผู้ใช้ที่ login ได้ ถ้ามีระบบ login แล้ว
+DEFAULT_USER = 'web_upload'
 
 
 def get_db_connection():
@@ -31,29 +41,66 @@ def get_db_connection():
     return pyodbc.connect(conn_str)
 
 
-def find_subarea(location_id, area_id, subarea_id):
+def build_column_map(header_row):
+    col_map = {}
+    for field, keywords in COL_KEYS.items():
+        for i, header in enumerate(header_row):
+            if header and all(kw in str(header) for kw in keywords):
+                col_map[field] = i
+                break
+    return col_map
+
+
+def find_subarea(area_id, subarea_id, location_id=None):
+    """
+    หาพื้นที่ในฐานข้อมูล คืนค่าเป็น row (Location_id, Area_id, SubArea_id, SubArea_name)
+    หรือ None -- เวลาไม่มี location_id ส่งเข้ามา ต้องเอา Location_id จาก row ที่เจอนี้ไปใช้ต่อ
+    ตอนบันทึกจริง (sp_Contract_Meter_Save ต้องการ @Location_id แบบ NOT NULL เสมอ)
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        if location_id:
+            cursor.execute(
+                """
+                SELECT Location_id, Area_id, SubArea_id, SubArea_name
+                FROM dbo.Contract_location_subarea_ms
+                WHERE Location_id = ? AND Area_id = ? AND SubArea_id = ?
+                """,
+                location_id, area_id, subarea_id,
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT Location_id, Area_id, SubArea_id, SubArea_name
+                FROM dbo.Contract_location_subarea_ms
+                WHERE Area_id = ? AND SubArea_id = ?
+                """,
+                area_id, subarea_id,
+            )
+        return cursor.fetchone()
+    finally:
+        conn.close()
+
+
+def find_contract_by_code(contract_code):
+    """
+    เช็คว่ารหัสสัญญานี้มีอยู่จริงใน Contract_hrd_tr หรือไม่ (ก่อนหน้านี้ parse_excel_staged
+    เช็คแค่ว่า contract_code ไม่ว่างเปล่า ไม่เคยเช็คว่ามีอยู่จริงในระบบเลย ทำให้รหัสสัญญาที่
+    พิมพ์ผิด/ยังไม่ได้สร้าง หลุดผ่าน step 2 ไปเป็น 'ok' แล้วเพิ่ง error ตอน commit จริงแทน)
+    """
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
         cursor.execute(
-            """
-            SELECT Location_id, Area_id, SubArea_id, SubArea_name
-            FROM dbo.Contract_location_subarea_ms
-            WHERE Location_id = ? AND Area_id = ? AND SubArea_id = ?
-            """,
-            location_id, area_id, subarea_id,
+            "SELECT Contract_id, Contract_code FROM dbo.Contract_hrd_tr WHERE Contract_code = ?",
+            contract_code,
         )
         return cursor.fetchone()
     finally:
         conn.close()
 
 
-# ---------------------------------------------------------------------------
-# หาชีท "สัญญา" ของน้ำ/ไฟ แบบเจาะจง -- ต้องขึ้นต้นด้วย "สัญญาปี" และมีคำ keyword
-# (น้ำ/ไฟ) อยู่ในชื่อ กันไปจับชีทอื่นที่บังเอิญมีคำว่าน้ำ/ไฟปนอยู่ผิดๆ เช่น
-# 'มิเตอร์น้ำ35ตัว' หรือ 'มิเตอร์ไฟฟ้า63ตัว' ซึ่งไม่ใช่ชีทสัญญาและมีคอลัมน์คนละแบบ
-# ถ้าเจอมากกว่า 1 ชีทที่เข้าเงื่อนไข ให้ error ทันทีแทนที่จะเดาเอาอันแรก
-# ---------------------------------------------------------------------------
 def find_contract_sheet(sheetnames, keyword):
     candidates = [n for n in sheetnames if n.startswith('สัญญาปี') and keyword in n]
     if len(candidates) > 1:
@@ -64,10 +111,6 @@ def find_contract_sheet(sheetnames, keyword):
     return candidates[0] if candidates else None
 
 
-# ---------------------------------------------------------------------------
-# STEP 1: parse ไฟล์ Excel เป็นรายการ "staged" เท่านั้น -- ไม่เขียนข้อมูลลง DB
-# ใช้ find_subarea (read-only) เพื่อตรวจสอบล่วงหน้าว่าแถวไหนจะ error ตอนบันทึกจริง
-# ---------------------------------------------------------------------------
 def parse_excel_staged(uploaded_file):
     wb = load_workbook(uploaded_file, data_only=True)
     water_sheet = find_contract_sheet(wb.sheetnames, 'น้ำ')
@@ -80,28 +123,47 @@ def parse_excel_staged(uploaded_file):
         if not sheet_name:
             return
         type_label = 'น้ำ' if type_cd == 9 else 'ไฟฟ้า'
-        for row in wb[sheet_name].iter_rows(min_row=2, values_only=True):
-            if not row or len(row) <= max(COL.values()):
+
+        ws = wb[sheet_name]
+        header_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True))
+        col = build_column_map(header_row)
+
+        required = ['SUBAREA', 'AREA', 'CONTRACT_NO', 'CONTRACT_CODE', 'CONFIRM', 'METER_NO']
+        missing = [f for f in required if f not in col]
+        if missing:
+            raise ValueError(
+                f"ชีท '{sheet_name}' หาคอลัมน์ไม่เจอ: {missing} "
+                f"กรุณาตรวจสอบชื่อ header แถวแรกของชีทนี้"
+            )
+        has_location = 'LOCATION' in col
+
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            if not row:
                 continue
 
-            subarea_id, loc_id, area_id = row[COL['SUBAREA']], row[COL['LOCATION']], row[COL['AREA']]
-            if not subarea_id or not loc_id or not area_id:
+            subarea_id = row[col['SUBAREA']]
+            area_id = row[col['AREA']]
+            loc_id = row[col['LOCATION']] if has_location else None
+            if not subarea_id or not area_id:
                 continue
-            loc_id, area_id, subarea_id = str(loc_id), str(area_id), str(subarea_id)
+            area_id, subarea_id = str(area_id), str(subarea_id)
+            loc_id = str(loc_id) if loc_id else None
 
-            contract_id = row[COL['CONTRACT_NO']]
-            contract_code = row[COL['CONTRACT_CODE']]
-            confirm_flag = row[COL['CONFIRM']]
-            meter_no_raw = row[COL['METER_NO']]
+            contract_id = row[col['CONTRACT_NO']]
+            contract_code = row[col['CONTRACT_CODE']]
+            confirm_flag = row[col['CONFIRM']]
+            meter_no_raw = row[col['METER_NO']]
 
             counter['idx'] += 1
             entry = {
                 'idx': counter['idx'],
                 'type_cd': type_cd, 'type_label': type_label,
-                'contract_year': row[COL['YEAR']],
-                'customer_name': row[COL['CUSTOMER_NAME']],
+                'contract_year': row[col['YEAR']] if 'YEAR' in col else None,
+                'customer_name': row[col['CUSTOMER_NAME']] if 'CUSTOMER_NAME' in col else None,
+                'tax_id': row[col['TAX_ID']] if 'TAX_ID' in col else None,
                 'location_id': loc_id, 'area_id': area_id,
-                'subarea_id': subarea_id, 'subarea_name': row[COL['SUBAREA_NAME']],
+                'subarea_id': subarea_id,
+                'subarea_name': row[col['SUBAREA_NAME']] if 'SUBAREA_NAME' in col else None,
                 'contract_id': contract_id, 'contract_code': contract_code,
                 'meter_no': None, 'meter_no_status': None, 'phase_type': None,
                 'status': 'ok', 'message': '',
@@ -113,24 +175,39 @@ def parse_excel_staged(uploaded_file):
                 rows_out.append(entry)
                 continue
 
-            if not find_subarea(loc_id, area_id, subarea_id):
+            # --- เช็คพื้นที่ + แก้บั๊ก Location_id เป็น None ---
+            subarea_match = find_subarea(area_id, subarea_id, loc_id)
+            if not subarea_match:
+                where = f'{loc_id}/{area_id}/{subarea_id}' if loc_id else f'{area_id}/{subarea_id}'
                 entry['status'] = 'error'
-                entry['message'] = f'ไม่พบพื้นที่ {loc_id}/{area_id}/{subarea_id} ในฐานข้อมูล'
+                entry['message'] = f'ไม่พบพื้นที่ {where} ในฐานข้อมูล'
                 rows_out.append(entry)
                 continue
 
+            if not loc_id:
+                loc_id = str(subarea_match[0])
+                entry['location_id'] = loc_id
+
+            # อ่านเลขมิเตอร์/เฟสจากไฟล์ก่อนเสมอ ไม่ว่าจะเช็ครหัสสัญญาผ่านหรือไม่
+            # (แถวไหน error ก็ยังเห็นข้อมูลจริงจากไฟล์ในตาราง review ได้ ไม่ใช่ว่างเปล่า)
+            meter_no = None if meter_no_raw in (None, 'มิเตอร์ไม่มีเลข (GEN เลข)') else str(meter_no_raw)
+            entry['meter_no'] = meter_no
+            entry['meter_no_status'] = 'รอ Gen เลข' if meter_no is None else 'ปกติ'
+            if type_cd == 8 and 'PHASE' in col and row[col['PHASE']]:
+                entry['phase_type'] = '3เฟส' if '3' in str(row[col['PHASE']]) else '1เฟส'
+
+            # --- เช็ครหัสสัญญาต้องมีอยู่จริงในระบบ (ของเดิมเช็คแค่ไม่ว่างเปล่า) ---
             if not contract_code:
                 entry['status'] = 'error'
                 entry['message'] = 'ไม่พบรหัสสัญญาในแถวนี้'
                 rows_out.append(entry)
                 continue
 
-            meter_no = None if meter_no_raw in (None, 'มิเตอร์ไม่มีเลข (GEN เลข)') else str(meter_no_raw)
-            entry['meter_no'] = meter_no
-            entry['meter_no_status'] = 'รอ Gen เลข' if meter_no is None else 'ปกติ'
-
-            if type_cd == 8 and len(row) > COL_PHASE and row[COL_PHASE]:
-                entry['phase_type'] = '3เฟส' if '3' in str(row[COL_PHASE]) else '1เฟส'
+            if not find_contract_by_code(contract_code):
+                entry['status'] = 'error'
+                entry['message'] = f"ไม่พบรหัสสัญญา '{contract_code}' ในระบบ"
+                rows_out.append(entry)
+                continue
 
             rows_out.append(entry)
 
@@ -152,9 +229,6 @@ def parse_excel_staged(uploaded_file):
     }
 
 
-# ---------------------------------------------------------------------------
-# STEP 3: เขียนข้อมูลจริงลง DB (เรียก stored procedure) เฉพาะตอนกด "ยืนยันนำเข้า"
-# ---------------------------------------------------------------------------
 def sp_meter_save(cursor, location_id, area_id, subarea_id, type_cd, meter_no,
                    meter_no_status, user_id, logs, phase_type=None):
     cursor.execute(
@@ -172,7 +246,7 @@ def sp_meter_save(cursor, location_id, area_id, subarea_id, type_cd, meter_no,
         location_id, area_id, subarea_id, type_cd, meter_no, meter_no_status, phase_type, user_id
     )
     row = cursor.fetchone()
-    meter_id = row[0] if row else None
+    meter_id = int(row[0]) if row else None
     cls = 'water' if type_cd == 9 else 'electric'
     logs.append((cls, f"EXEC sp_Contract_Meter_Save  @SubArea_id='{subarea_id}', "
                        f"@Meter_type_cd={type_cd}, @Meter_no={meter_no!r}  -> Meter_id={meter_id}"))
@@ -197,11 +271,6 @@ def sp_bind_to_contract(cursor, contract_code, location_id, area_id, subarea_id,
 
 
 def commit_staged_rows(rows, user_id):
-    """
-    รับ rows ที่ parse+ตรวจสอบแล้วจาก parse_excel_staged (เก็บอยู่ใน session)
-    วนเรียก SP จริงเฉพาะแถวที่ status == 'ok' เท่านั้น
-    คืนค่า logs / stats / rows (แนบ final_status ต่อแถว ใช้แสดงหน้า step4)
-    """
     logs = []
     stats = {'meter_ok': 0, 'skipped': 0, 'errors': 0}
     result_rows = []
@@ -255,22 +324,7 @@ def commit_staged_rows(rows, user_id):
     return {'logs': logs, 'stats': stats, 'rows': result_rows}
 
 
-# ---------------------------------------------------------------------------
-# Dashboard (อ่านอย่างเดียว)
-# ---------------------------------------------------------------------------
 def fetch_subareas():
-    """
-    ตารางรวมสำหรับหน้า dashboard -- เริ่มจาก Contract_meter_ms (ทะเบียนมิเตอร์) เป็นหลัก
-    แล้ว LEFT JOIN ออกไปหาสัญญาที่ผูกอยู่ (ถ้ามี) เพื่อให้ "มิเตอร์ที่ยังไม่ถูกผูกกับสัญญาไหนเลย"
-    ยังโผล่ในตาราง (เป็นแถว Pending) แทนที่จะหายไปเงียบๆ แบบตอนใช้ INNER JOIN จาก Contract_meter_tr
-    ก่อนหน้านี้ -- ทำให้ตัวเลขรวมในตารางตรงกับตัวเลขสถิติที่การ์ดด้านบน (fetch_dashboard_stats)
-    ซึ่งนับจากทะเบียนมิเตอร์ทั้งหมดเหมือนกัน
-
-    ถ้าต้องการรายละเอียดของสัญญาเดียว ให้ใช้ fetch_contract_meter_detail() แทน (เรียก SP ตรงๆ)
-
-    หมายเหตุ: ยังไม่มีคอลัมน์ชื่อลูกหนี้ ต้องหาจากตารางลูกค้าแยก (เช่น Contract_Customer_SAP_ms)
-    เพิ่มทีหลังถ้าต้องการโชว์ชื่อลูกหนี้ในตาราง
-    """
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -297,11 +351,6 @@ def fetch_subareas():
 
 
 def fetch_contract_meter_detail(contract_id=None, contract_code=None):
-    """
-    หน้ารายละเอียดของสัญญาเดียว -- เรียก sp_Contract_Meter_SelectByContract ตรงๆ
-    ตามเจตนาเดิมของ SP (ดึงทีละสัญญา ไม่ใช้กับหน้า dashboard ที่โชว์ทุกสัญญาพร้อมกัน)
-    ระบุ contract_id หรือ contract_code อย่างใดอย่างหนึ่ง
-    """
     if contract_id is None and contract_code is None:
         raise ValueError('ต้องระบุ contract_id หรือ contract_code อย่างใดอย่างหนึ่ง')
 

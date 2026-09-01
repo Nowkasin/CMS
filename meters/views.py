@@ -151,5 +151,18 @@ def dashboard(request):
     }
     return render(request, 'meters/dashboard.html', context)
 
+
 def create_contract(request):
-    return render(request, 'meters/create_contract.html')
+    """
+    ใช้ template เดียวกันทั้งตอนสร้างสัญญาใหม่และแก้ไขสัญญาเดิม
+    is_edit=True เมื่อมี ?contract_code=... ส่งมาทาง query string (เช่นกดปุ่ม "แก้ไข"
+    จาก dashboard) -- ใช้ query string แทน URL path เพราะรหัสสัญญาบางตัวมี '/' อยู่ในตัวเอง
+    (เช่น 'B1/2568') ซึ่งชนกับโครงสร้าง URL path segment ถ้าใส่เป็น path parameter
+    ตอนนี้ยังเป็น UI เปล่า -- ยังไม่ query ข้อมูลเดิมมา pre-fill และยังไม่บันทึกจริง
+    """
+    contract_code = request.GET.get('contract_code')
+    context = {
+        'contract_code': contract_code,
+        'is_edit': bool(contract_code),
+    }
+    return render(request, 'meters/create_contract.html', context)

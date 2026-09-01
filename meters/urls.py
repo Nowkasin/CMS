@@ -10,4 +10,5 @@ urlpatterns = [
     path('restart/', views.restart, name='restart'),
     path('dashboard/', views.dashboard, name='dashboard'),
     path('create_contract/', views.create_contract, name='create_contract'),
+    path('contracts/edit/', views.create_contract, name='edit_contract'),
 ]

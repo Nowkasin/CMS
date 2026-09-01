@@ -1,10 +1,6 @@
 {% extends "meters/base.html" %}
 {% load static %}
 
-{% block extra_css %}
-  {% include "meters/_tailwind.html" %}
-{% endblock %}
-
 {% block content %}
 <div class="min-h-screen bg-gray-50 font-sans">
   <div class="max-w-4xl mx-auto px-6 py-10">
@@ -24,7 +20,7 @@
       </a>
     </div>
 
-    {% include "meters/_stepper.html" %}
+    {% include "meters/stepper.html" %}
 
     <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 mb-6 text-center">
       <div class="w-14 h-14 mx-auto mb-4 rounded-full bg-brand-50 flex items-center justify-center">
@@ -95,7 +91,12 @@
                 {% elif r.final_status == 'skip' %}
                   <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">ข้าม</span>
                 {% else %}
-                  <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-500">ผิดพลาด</span>
+                  <div>
+                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-500">ผิดพลาด</span>
+                    {% if r.message %}
+                      <div class="text-xs text-red-400 mt-1">{{ r.message }}</div>
+                    {% endif %}
+                  </div>
                 {% endif %}
               </td>
             </tr>
