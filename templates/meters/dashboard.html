@@ -154,7 +154,7 @@
             </td>
             <td class="px-5 py-3 text-right">
               {% if s.contract_code %}
-                <a href="{% url 'edit_contract' %}?contract_code={{ s.contract_code|urlencode }}"
+                <a href="{% url 'edit_meter' s.SubArea_id %}"
                    title="แก้ไข"
                    class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-gray-200 text-gray-500 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-200 transition-colors">
                   <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">

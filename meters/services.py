@@ -56,6 +56,10 @@ def find_subarea(area_id, subarea_id, location_id=None):
     หาพื้นที่ในฐานข้อมูล คืนค่าเป็น row (Location_id, Area_id, SubArea_id, SubArea_name)
     หรือ None -- เวลาไม่มี location_id ส่งเข้ามา ต้องเอา Location_id จาก row ที่เจอนี้ไปใช้ต่อ
     ตอนบันทึกจริง (sp_Contract_Meter_Save ต้องการ @Location_id แบบ NOT NULL เสมอ)
+
+    ใช้ LTRIM(RTRIM(...)) ทุกฝั่งเทียบ เพราะเจอมาแล้วว่า Contract_hrd_tr.Contract_code
+    บางแถวมีอักขระแฝงต่อท้าย (ดู find_contract_by_code) เผื่อ Location_id/Area_id/
+    SubArea_id มีปัญหาเดียวกันได้เหมือนกัน กันไว้ก่อนทั้งหมด
     """
     conn = get_db_connection()
     try:
@@ -65,7 +69,9 @@ def find_subarea(area_id, subarea_id, location_id=None):
                 """
                 SELECT Location_id, Area_id, SubArea_id, SubArea_name
                 FROM dbo.Contract_location_subarea_ms
-                WHERE Location_id = ? AND Area_id = ? AND SubArea_id = ?
+                WHERE LTRIM(RTRIM(Location_id)) = LTRIM(RTRIM(?))
+                  AND LTRIM(RTRIM(Area_id)) = LTRIM(RTRIM(?))
+                  AND LTRIM(RTRIM(SubArea_id)) = LTRIM(RTRIM(?))
                 """,
                 location_id, area_id, subarea_id,
             )
@@ -74,7 +80,8 @@ def find_subarea(area_id, subarea_id, location_id=None):
                 """
                 SELECT Location_id, Area_id, SubArea_id, SubArea_name
                 FROM dbo.Contract_location_subarea_ms
-                WHERE Area_id = ? AND SubArea_id = ?
+                WHERE LTRIM(RTRIM(Area_id)) = LTRIM(RTRIM(?))
+                  AND LTRIM(RTRIM(SubArea_id)) = LTRIM(RTRIM(?))
                 """,
                 area_id, subarea_id,
             )
@@ -85,15 +92,19 @@ def find_subarea(area_id, subarea_id, location_id=None):
 
 def find_contract_by_code(contract_code):
     """
-    เช็คว่ารหัสสัญญานี้มีอยู่จริงใน Contract_hrd_tr หรือไม่ (ก่อนหน้านี้ parse_excel_staged
-    เช็คแค่ว่า contract_code ไม่ว่างเปล่า ไม่เคยเช็คว่ามีอยู่จริงในระบบเลย ทำให้รหัสสัญญาที่
-    พิมพ์ผิด/ยังไม่ได้สร้าง หลุดผ่าน step 2 ไปเป็น 'ok' แล้วเพิ่ง error ตอน commit จริงแทน)
+    เช็คว่ารหัสสัญญานี้มีอยู่จริงใน Contract_hrd_tr หรือไม่
+
+    ใช้ TRIM ทั้ง 2 ฝั่งก่อนเทียบ เพราะเจอแล้วว่าบางแถวใน Contract_hrd_tr
+    มีอักขระที่มองไม่เห็น (ช่องว่างเกิน/ขึ้นบรรทัดใหม่) ติดอยู่ท้ายค่า Contract_code
+    (เช่น 'AI5-AI6/2569' จริงๆ เก็บเป็น 'AI5-AI6/2569 ' ในฐานข้อมูล) ทำให้เทียบแบบ
+    exact match ตรงๆ ไม่เจอ ทั้งที่ข้อมูลมีอยู่จริง
     """
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT Contract_id, Contract_code FROM dbo.Contract_hrd_tr WHERE Contract_code = ?",
+            "SELECT Contract_id, Contract_code FROM dbo.Contract_hrd_tr "
+            "WHERE LTRIM(RTRIM(Contract_code)) = LTRIM(RTRIM(?))",
             contract_code,
         )
         return cursor.fetchone()
@@ -146,11 +157,12 @@ def parse_excel_staged(uploaded_file):
             loc_id = row[col['LOCATION']] if has_location else None
             if not subarea_id or not area_id:
                 continue
-            area_id, subarea_id = str(area_id), str(subarea_id)
-            loc_id = str(loc_id) if loc_id else None
+            area_id, subarea_id = str(area_id).strip(), str(subarea_id).strip()
+            loc_id = str(loc_id).strip() if loc_id else None
 
             contract_id = row[col['CONTRACT_NO']]
             contract_code = row[col['CONTRACT_CODE']]
+            contract_code = str(contract_code).strip() if contract_code else contract_code
             confirm_flag = row[col['CONFIRM']]
             meter_no_raw = row[col['METER_NO']]
 
@@ -203,11 +215,17 @@ def parse_excel_staged(uploaded_file):
                 rows_out.append(entry)
                 continue
 
-            if not find_contract_by_code(contract_code):
+            contract_match = find_contract_by_code(contract_code)
+            if not contract_match:
                 entry['status'] = 'error'
                 entry['message'] = f"ไม่พบรหัสสัญญา '{contract_code}' ในระบบ"
                 rows_out.append(entry)
                 continue
+
+            # ใช้ Contract_id จริงจาก DB (ตัวเลข ไม่มีปัญหาเรื่องช่องว่าง/อักขระแฝงแบบข้อความ)
+            # แทน contract_code ตอนผูกกับสัญญาจริงใน commit_staged_rows -- กันปัญหาเดิม
+            # ซ้ำอีกรอบตอน SP เทียบ Contract_code แบบ exact match ภายใน
+            entry['db_contract_id'] = contract_match[0]
 
             rows_out.append(entry)
 
@@ -230,10 +248,15 @@ def parse_excel_staged(uploaded_file):
 
 
 def sp_meter_save(cursor, location_id, area_id, subarea_id, type_cd, meter_no,
-                   meter_no_status, user_id, logs, phase_type=None):
+                   meter_no_status, user_id, logs, phase_type=None, meter_id=None):
+    """
+    meter_id=None (ค่าเริ่มต้น) -> SP จะ INSERT มิเตอร์ใหม่ (ใช้ตอน import จากไฟล์ Excel)
+    meter_id=<เลขจริง> -> SP จะ UPDATE มิเตอร์ตัวนั้นแทน (ใช้ตอนแก้ไขจากหน้า dashboard)
+    """
     cursor.execute(
         """
         EXEC dbo.sp_Contract_Meter_Save
+            @Meter_id        = ?,
             @Location_id     = ?,
             @Area_id         = ?,
             @SubArea_id      = ?,
@@ -243,30 +266,36 @@ def sp_meter_save(cursor, location_id, area_id, subarea_id, type_cd, meter_no,
             @Phase_type      = ?,
             @UserId          = ?
         """,
-        location_id, area_id, subarea_id, type_cd, meter_no, meter_no_status, phase_type, user_id
+        meter_id, location_id, area_id, subarea_id, type_cd, meter_no, meter_no_status, phase_type, user_id
     )
     row = cursor.fetchone()
-    meter_id = int(row[0]) if row else None
+    result_meter_id = int(row[0]) if row else meter_id
     cls = 'water' if type_cd == 9 else 'electric'
-    logs.append((cls, f"EXEC sp_Contract_Meter_Save  @SubArea_id='{subarea_id}', "
-                       f"@Meter_type_cd={type_cd}, @Meter_no={meter_no!r}  -> Meter_id={meter_id}"))
-    return meter_id
+    action = 'UPDATE' if meter_id else 'INSERT'
+    logs.append((cls, f"EXEC sp_Contract_Meter_Save ({action})  @SubArea_id='{subarea_id}', "
+                       f"@Meter_type_cd={type_cd}, @Meter_no={meter_no!r}  -> Meter_id={result_meter_id}"))
+    return result_meter_id
 
 
-def sp_bind_to_contract(cursor, contract_code, location_id, area_id, subarea_id, meter_id, user_id, logs):
+def sp_bind_to_contract(cursor, contract_id, location_id, area_id, subarea_id, meter_id, user_id, logs):
+    """
+    ใช้ @Contract_id (ตัวเลข) แทน @Contract_code (ข้อความ) เพราะพบว่าบาง Contract_code
+    ในฐานข้อมูลมีช่องว่าง/อักขระแฝงต่อท้าย ทำให้ SP เทียบแบบ exact match ไม่เจอ
+    ถึงแม้จะ TRIM ตรวจสอบผ่านตอน parse แล้วก็ตาม -- ตัวเลขไม่มีปัญหานี้
+    """
     cursor.execute(
         """
         EXEC dbo.sp_Contract_Meter_BindToContract
-            @Contract_code = ?,
+            @Contract_id   = ?,
             @Location_id   = ?,
             @Area_id       = ?,
             @SubArea_id    = ?,
             @Meter_id_list = ?,
             @UserId        = ?
         """,
-        contract_code, location_id, area_id, subarea_id, str(meter_id), user_id
+        contract_id, location_id, area_id, subarea_id, str(meter_id), user_id
     )
-    logs.append(('bind', f"EXEC sp_Contract_Meter_BindToContract  @Contract_code='{contract_code}', "
+    logs.append(('bind', f"EXEC sp_Contract_Meter_BindToContract  @Contract_id={contract_id}, "
                           f"@Meter_id_list='{meter_id}'"))
 
 
@@ -304,9 +333,9 @@ def commit_staged_rows(rows, user_id):
                 row_result['meter_id'] = meter_id
                 row_result['final_status'] = 'success'
 
-                if r['contract_code'] and meter_id:
+                if r.get('db_contract_id') and meter_id:
                     sp_bind_to_contract(
-                        cursor, r['contract_code'], r['location_id'], r['area_id'],
+                        cursor, r['db_contract_id'], r['location_id'], r['area_id'],
                         r['subarea_id'], meter_id, user_id, logs,
                     )
             except Exception as exc:
@@ -363,6 +392,114 @@ def fetch_contract_meter_detail(contract_id=None, contract_code=None):
         )
         columns = [c[0] for c in cursor.description]
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+def fetch_subarea_meters(subarea_id):
+    """
+    ดึงข้อมูลพื้นที่ + มิเตอร์น้ำ/ไฟที่มีอยู่ (ถ้ามี) ของ SubArea นี้ ใช้เปิดหน้าแก้ไขจาก dashboard
+    คืนค่า None ถ้าไม่พบ SubArea นี้เลย
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT s.Location_id, s.Area_id, s.SubArea_id, s.SubArea_name, a.Area_name
+            FROM dbo.Contract_location_subarea_ms s
+            LEFT JOIN dbo.Contract_location_area_ms a ON a.Area_id = s.Area_id
+            WHERE s.SubArea_id = ?
+            """,
+            subarea_id,
+        )
+        subarea_row = cursor.fetchone()
+        if not subarea_row:
+            return None
+        columns = [c[0] for c in cursor.description]
+        result = dict(zip(columns, subarea_row))
+
+        cursor.execute(
+            """
+            SELECT Meter_id, Meter_type_cd, Meter_no, Meter_no_status, Phase_type
+            FROM dbo.Contract_meter_ms
+            WHERE SubArea_id = ? AND UseOrNot = 1
+            """,
+            subarea_id,
+        )
+        columns2 = [c[0] for c in cursor.description]
+        meters = [dict(zip(columns2, r)) for r in cursor.fetchall()]
+        result['water'] = next((m for m in meters if m['Meter_type_cd'] == 9), None)
+        result['electric'] = next((m for m in meters if m['Meter_type_cd'] == 8), None)
+        return result
+    finally:
+        conn.close()
+
+
+def save_subarea_meters(location_id, area_id, subarea_id, user_id,
+                         water_enabled, water_meter_id, water_meter_no,
+                         electric_enabled, electric_meter_id, electric_meter_no, electric_phase):
+    """
+    บันทึกมิเตอร์น้ำ/ไฟของ SubArea นี้จากหน้าแก้ไขใน dashboard -- update ทันที (ไม่มีหน้ายืนยันเพิ่ม)
+    ถ้ามี *_meter_id อยู่แล้ว (เคยมีมิเตอร์ประเภทนี้อยู่ก่อน) จะเป็นการ UPDATE ตัวเดิม
+    ถ้ายังไม่มี (*_meter_id เป็น None) จะเป็นการ INSERT มิเตอร์ใหม่ให้พื้นที่นี้
+
+    คืนค่า (logs, result_meter_ids) โดย result_meter_ids = {'water': <meter_id หรือ None>, 'electric': <meter_id หรือ None>}
+    -- ต้องคืน meter_id กลับไปด้วย เพราะถ้าเพิ่งมีการ INSERT มิเตอร์ใหม่ (ไม่เคยมี water_meter_id/electric_meter_id
+    มาก่อน) ผู้เรียกจะไม่รู้เลขนั้นเลยถ้าไม่ส่งกลับมา แล้วจะเอาไปบันทึกเลขอ่านมิเตอร์ต่อให้ถูกตัวไม่ได้
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        logs = []
+        result_meter_ids = {'water': None, 'electric': None}
+
+        if water_enabled:
+            meter_no_status = 'รอ Gen เลข' if not water_meter_no else 'ปกติ'
+            result_meter_ids['water'] = sp_meter_save(
+                cursor, location_id, area_id, subarea_id, 9, water_meter_no or None,
+                meter_no_status, user_id, logs, phase_type=None, meter_id=water_meter_id,
+            )
+
+        if electric_enabled:
+            meter_no_status = 'รอ Gen เลข' if not electric_meter_no else 'ปกติ'
+            result_meter_ids['electric'] = sp_meter_save(
+                cursor, location_id, area_id, subarea_id, 8, electric_meter_no or None,
+                meter_no_status, user_id, logs, phase_type=electric_phase, meter_id=electric_meter_id,
+            )
+
+        conn.commit()
+        return logs, result_meter_ids
+    finally:
+        conn.close()
+
+
+def fetch_readings_for_meters(meter_ids, billing_year_be, billing_month):
+    """
+    ดึงเลขอ่านก่อน-หลังของมิเตอร์หลายตัว (ระบุเป็น list) ในรอบบิลหนึ่งๆ
+    คืนค่าเป็น dict {meter_id: {'Reading_before':.., 'Reading_after':..}} -- ไม่มี key ถ้ามิเตอร์นั้น
+    ยังไม่เคยมีการบันทึกเลขอ่านในรอบบิลนี้เลย
+    ใช้กับหน้า edit_meter ที่ต้องโชว์เลขอ่านของมิเตอร์น้ำ+ไฟ 2 ตัวพร้อมกันในรอบบิลที่เลือก
+    """
+    meter_ids = [m for m in meter_ids if m]
+    if not meter_ids:
+        return {}
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        placeholders = ','.join('?' for _ in meter_ids)
+        cursor.execute(
+            f"""
+            SELECT Meter_id, Reading_before, Reading_after
+            FROM dbo.Contract_meter_reading_tr
+            WHERE Billing_year_be = ? AND Billing_month = ? AND Meter_id IN ({placeholders})
+            """,
+            billing_year_be, billing_month, *meter_ids,
+        )
+        columns = [c[0] for c in cursor.description]
+        rows = [dict(zip(columns, r)) for r in cursor.fetchall()]
+        return {r['Meter_id']: r for r in rows}
     finally:
         conn.close()
 
@@ -425,5 +562,32 @@ def fetch_dashboard_stats():
         columns = [c[0] for c in cursor.description]
         row = cursor.fetchone()
         return dict(zip(columns, row)) if row else {}
+    finally:
+        conn.close()
+
+
+def save_meter_reading(meter_id, billing_year_be, billing_month, reading_before, reading_after, user_id):
+    """
+    บันทึกเลขอ่านก่อน-หลังของมิเตอร์ 1 ตัว ในรอบบิลหนึ่ง (upsert)
+    ผ่าน sp_Contract_Meter_Reading_Save -- คืนค่า Reading_id ที่บันทึก
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            EXEC dbo.sp_Contract_Meter_Reading_Save
+                @Meter_id        = ?,
+                @Billing_year_be = ?,
+                @Billing_month   = ?,
+                @Reading_before  = ?,
+                @Reading_after   = ?,
+                @UserId          = ?
+            """,
+            meter_id, billing_year_be, billing_month, reading_before, reading_after, user_id,
+        )
+        row = cursor.fetchone()
+        conn.commit()
+        return int(row[0]) if row else None
     finally:
         conn.close()

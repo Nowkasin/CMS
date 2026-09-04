@@ -1,0 +1,176 @@
+{% extends "meters/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 font-sans">
+  <div class="max-w-2xl mx-auto px-6 py-10">
+
+    <div class="text-xs text-gray-400 mb-2 flex items-center gap-1.5">
+      <span>แดชบอร์ด</span><span>›</span><span>แก้ไขมิเตอร์</span>
+    </div>
+
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">แก้ไขมิเตอร์ — {{ subarea.SubArea_id }}</h1>
+        <p class="text-sm text-gray-500 mt-1">{{ subarea.Area_name|default:"—" }} · {{ subarea.SubArea_name|default:"—" }}</p>
+      </div>
+    </div>
+
+    {# --- เลือกรอบบิล (GET -- เปลี่ยนแล้วโหลดหน้าใหม่ทันที เพื่อดึงเลขอ่านของรอบนั้นมาแสดง) --- #}
+    <form method="get" class="bg-white border border-gray-200 rounded-xl p-4 mb-4 flex flex-wrap items-end gap-3">
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">รอบบิล — เดือน</label>
+        <select name="month" onchange="this.form.submit()"
+                class="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700">
+          {% for m in thai_months %}
+            <option value="{{ forloop.counter }}" {% if forloop.counter == billing_month %}selected{% endif %}>{{ m }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">ปี</label>
+        <select name="year" onchange="this.form.submit()"
+                class="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700">
+          {% for y in year_options %}
+            <option value="{{ y }}" {% if y == billing_year %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <p class="text-xs text-gray-400 pb-2">เลขอ่านก่อน-หลังด้านล่างเป็นของรอบบิลนี้โดยเฉพาะ เปลี่ยนเดือน-ปีเพื่อดู/แก้ของรอบอื่น</p>
+    </form>
+
+    <form method="post" class="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
+      {% csrf_token %}
+      <input type="hidden" name="billing_month" value="{{ billing_month }}">
+      <input type="hidden" name="billing_year" value="{{ billing_year }}">
+
+      {# ---------- การ์ดค่าน้ำ ---------- #}
+      <div class="border border-sky-100 bg-sky-50/40 rounded-xl p-4">
+        <label class="flex items-center gap-2 mb-3 cursor-pointer">
+          <input type="checkbox" id="waterEnable" name="water_enable"
+                 {% if subarea.water %}checked{% endif %}
+                 class="w-4 h-4 rounded border-gray-300 text-sky-500 focus:ring-sky-400">
+          <span class="inline-flex items-center gap-1.5 text-sm font-semibold text-sky-700">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 2.75c3.5 4.2 6 7.7 6 11a6 6 0 11-12 0c0-3.3 2.5-6.8 6-11z"/>
+            </svg>
+            ค่าน้ำประปา
+            {% if subarea.water %}
+              <span class="text-xs font-normal text-sky-500">(Meter_id #{{ subarea.water.Meter_id }})</span>
+            {% else %}
+              <span class="text-xs font-normal text-gray-400">(ยังไม่มีมิเตอร์)</span>
+            {% endif %}
+          </span>
+        </label>
+
+        <div id="waterFields" class="grid grid-cols-1 gap-3 {% if not subarea.water %}opacity-40 pointer-events-none{% endif %}">
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">เลขประจำตัวเครื่องวัดน้ำ</label>
+            <input type="text" name="water_meter_no" value="{{ subarea.water.Meter_no|default:'' }}"
+                   placeholder="เว้นว่างได้ ระบบจะ Gen เลขให้ (W001...)"
+                   {% if not subarea.water %}disabled{% endif %}
+                   class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-400">
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">เลขอ่านก่อน (รอบนี้)</label>
+              <input type="number" name="water_reading_before"
+                     value="{{ water_reading.Reading_before|default_if_none:'' }}"
+                     {% if not subarea.water %}disabled{% endif %}
+                     class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-400">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">เลขอ่านหลัง (รอบนี้)</label>
+              <input type="number" name="water_reading_after"
+                     value="{{ water_reading.Reading_after|default_if_none:'' }}"
+                     {% if not subarea.water %}disabled{% endif %}
+                     class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-400">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# ---------- การ์ดค่าไฟ ---------- #}
+      <div class="border border-amber-100 bg-amber-50/40 rounded-xl p-4">
+        <label class="flex items-center gap-2 mb-3 cursor-pointer">
+          <input type="checkbox" id="electricEnable" name="electric_enable"
+                 {% if subarea.electric %}checked{% endif %}
+                 class="w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-400">
+          <span class="inline-flex items-center gap-1.5 text-sm font-semibold text-amber-700">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/>
+            </svg>
+            ค่าไฟฟ้า
+            {% if subarea.electric %}
+              <span class="text-xs font-normal text-amber-500">(Meter_id #{{ subarea.electric.Meter_id }})</span>
+            {% else %}
+              <span class="text-xs font-normal text-gray-400">(ยังไม่มีมิเตอร์)</span>
+            {% endif %}
+          </span>
+        </label>
+
+        <div id="electricFields" class="grid grid-cols-1 gap-3 {% if not subarea.electric %}opacity-40 pointer-events-none{% endif %}">
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">เลขประจำตัวเครื่องวัดไฟฟ้า</label>
+            <input type="text" name="electric_meter_no" value="{{ subarea.electric.Meter_no|default:'' }}"
+                   placeholder="เลขเครื่องวัดจริงจากการไฟฟ้า"
+                   {% if not subarea.electric %}disabled{% endif %}
+                   class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">ระบบไฟฟ้า</label>
+            <select name="electric_phase" {% if not subarea.electric %}disabled{% endif %}
+                    class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400">
+              <option value="">ไม่ระบุ</option>
+              <option value="1เฟส" {% if subarea.electric.Phase_type == "1เฟส" %}selected{% endif %}>1 เฟส</option>
+              <option value="3เฟส" {% if subarea.electric.Phase_type == "3เฟส" %}selected{% endif %}>3 เฟส</option>
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">เลขอ่านก่อน (รอบนี้)</label>
+              <input type="number" name="electric_reading_before"
+                     value="{{ electric_reading.Reading_before|default_if_none:'' }}"
+                     {% if not subarea.electric %}disabled{% endif %}
+                     class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">เลขอ่านหลัง (รอบนี้)</label>
+              <input type="number" name="electric_reading_after"
+                     value="{{ electric_reading.Reading_after|default_if_none:'' }}"
+                     {% if not subarea.electric %}disabled{% endif %}
+                     class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between pt-4 border-t border-gray-100">
+        <a href="{% url 'dashboard' %}" class="text-sm text-gray-500 hover:text-gray-700">ยกเลิก</a>
+        <button type="submit"
+                class="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition">
+          บันทึกการแก้ไข
+        </button>
+      </div>
+    </form>
+
+  </div>
+</div>
+
+<script>
+  function wireToggle(checkboxId, fieldsId){
+    const checkbox = document.getElementById(checkboxId);
+    const fields = document.getElementById(fieldsId);
+    const inputs = fields.querySelectorAll('input, select');
+    function sync(){
+      const on = checkbox.checked;
+      fields.classList.toggle('opacity-40', !on);
+      fields.classList.toggle('pointer-events-none', !on);
+      inputs.forEach(el => el.disabled = !on);
+    }
+    checkbox.addEventListener('change', sync);
+  }
+  wireToggle('waterEnable', 'waterFields');
+  wireToggle('electricEnable', 'electricFields');
+</script>
+{% endblock %}
