@@ -11,4 +11,6 @@ urlpatterns = [
     path('restart/', views.restart, name='restart'),
     path('dashboard/', views.dashboard, name='dashboard'),
     path('dashboard/edit/<str:subarea_id>/', views.edit_meter, name='edit_meter'),
+    path('dashboard/export/', views.export_meters_excel, name='export_meters'),
+    
 ]

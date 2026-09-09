@@ -1,43 +1,37 @@
 """
-Django settings สำหรับโปรเจกต์ contract_meter_django
+Django settings สำหรับโปรเจกต์ CMS
 
-ค่าที่ sensitive ทั้งหมด (secret key, รหัสผ่าน DB, host) อ่านจากไฟล์ .env
-ผ่าน django-environ ไม่ hardcode ไว้ในโค้ดเด็ดขาด
+หมายเหตุสถาปัตยกรรม: ข้อมูลธุรกิจจริง (มิเตอร์/สัญญา/พื้นที่) ไม่ได้ผ่าน Django ORM
+แต่คุยกับ SQL Server ตรงๆ ผ่าน pyodbc ใน meters/services.py (อ่านค่าเชื่อมต่อจาก .env
+ด้วย python-decouple) ดังนั้น DATABASES ด้านล่างนี้ใช้ SQLite แยกต่างหาก
+มีไว้แค่สำหรับกลไกภายในของ Django เอง (Session สำหรับเก็บข้อมูล staged
+ระหว่าง step ของ wizard) เท่านั้น ไม่เกี่ยวกับข้อมูลจริง
 """
 from pathlib import Path
-import environ
+from decouple import config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-env = environ.Env(
-    DJANGO_DEBUG=(bool, False),
-)
-env_file = BASE_DIR / '.env'
-if env_file.exists():
-    environ.Env.read_env(str(env_file))
-
-SECRET_KEY = env('DJANGO_SECRET_KEY')
-DEBUG = env.bool('DJANGO_DEBUG', default=False)
-ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
+SECRET_KEY = config('DJANGO_SECRET_KEY')
+DEBUG = config('DJANGO_DEBUG', default=False, cast=bool)
+ALLOWED_HOSTS = config('DJANGO_ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
 
 INSTALLED_APPS = [
     'django.contrib.contenttypes',
-    'django.contrib.sessions',
+    'django.contrib.sessions',   # จำเป็น: ใช้เก็บข้อมูล staged ระหว่าง step ของ wizard
     'django.contrib.staticfiles',
     'meters',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',  # จำเป็นสำหรับ request.session
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
 
-# template อยู่ที่ระดับโปรเจกต์ (templates/meters/*.html) ไม่ใช่ข้างใน meters/ app
-# package โดยตรง จึงต้องระบุ DIRS ให้ชัดเจน (APP_DIRS อย่างเดียวหาไม่เจอ)
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -54,20 +48,14 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 # -----------------------------------------------------------------------
-# ฐานข้อมูล: ต่อ SQL Server จริง (SWU_contract) ผ่าน mssql-django
-# ทุกค่าอ่านจาก .env ทั้งหมด ไม่มีค่า default ที่เป็นความลับอยู่ในนี้
+# DB ของ Django เอง (ใช้แค่เก็บ session) - ไม่ใช่ SQL Server ธุรกิจจริง
+# ข้อมูลจริงต่อผ่าน pyodbc ใน meters/services.py แยกต่างหาก อ่านค่าจาก .env
+# (DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_ODBC_DRIVER)
 # -----------------------------------------------------------------------
 DATABASES = {
     'default': {
-        'ENGINE': 'mssql',
-        'NAME': env('DB_NAME'),
-        'USER': env('DB_USER'),
-        'PASSWORD': env('DB_PASSWORD'),
-        'HOST': env('DB_HOST'),
-        'PORT': env('DB_PORT', default='1433'),
-        'OPTIONS': {
-            'driver': env('DB_ODBC_DRIVER', default='ODBC Driver 17 for SQL Server'),
-        },
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
@@ -76,8 +64,6 @@ TIME_ZONE = 'Asia/Bangkok'
 USE_I18N = True
 USE_TZ = True
 
-# ไฟล์ static อยู่ที่ระดับโปรเจกต์เช่นกัน (static/meters/css, static/meters/js)
-# ไม่ใช่ข้างใน meters/ app package โดยตรง จึงต้องระบุ STATICFILES_DIRS ให้ชัดเจน
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
@@ -85,12 +71,7 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+SESSION_COOKIE_AGE = 60 * 60 * 2  # 2 ชั่วโมง พอสำหรับทำ wizard ให้จบ
 
-# -----------------------------------------------------------------------
-# Session: จำกัดอายุไว้ไม่ให้ session ทดสอบเก่าค้างอยู่นาน (ที่เจอปัญหาไปก่อนหน้านี้
-# ว่าเข้า /review/ หรือ /confirm/ ตรงๆ แล้วมีข้อมูลทดสอบเก่าค้างอยู่)
-# หมดอายุอัตโนมัติเมื่อปิดเบราว์เซอร์ และอย่างช้าไม่เกิน 8 ชั่วโมงแม้ไม่ปิดเบราว์เซอร์
-# -----------------------------------------------------------------------
-SESSION_EXPIRE_AT_BROWSER_CLOSE = True
-SESSION_COOKIE_AGE = 60 * 60 * 1  # 1 ชั่วโมง
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

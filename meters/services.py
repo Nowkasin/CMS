@@ -1,6 +1,6 @@
 # meters/services.py
 import pyodbc
-from django.conf import settings
+from decouple import config
 from openpyxl import load_workbook
 
 STATUS_MAP = {
@@ -30,13 +30,36 @@ DEFAULT_USER = 'web_upload'
 
 
 def get_db_connection():
-    db = settings.DATABASES['default']
+    """
+    ต่อ SQL Server ธุรกิจจริงผ่าน pyodbc โดยอ่านค่าเชื่อมต่อจาก .env โดยตรง
+    (ไม่ใช่จาก settings.DATABASES['default'] ซึ่งเป็น sqlite ที่ใช้แค่เก็บ session ของ Django เอง)
+    ตัวแปรที่ต้องมีใน .env: DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD, DB_ODBC_DRIVER
+    """
+    driver = config('DB_ODBC_DRIVER', default='ODBC Driver 17 for SQL Server')
+    host = config('DB_HOST')
+    port = config('DB_PORT', default='1433')
+    name = config('DB_NAME')
+    user = config('DB_USER')
+    password = config('DB_PASSWORD')
+
+    missing = [k for k, v in {
+        'DB_HOST': host, 'DB_NAME': name, 'DB_USER': user, 'DB_PASSWORD': password,
+    }.items() if not v]
+    if missing:
+        raise RuntimeError(
+            f"ค่าเชื่อมต่อ SQL Server ขาดหายไปใน .env: {', '.join(missing)} "
+            f"กรุณาตรวจสอบไฟล์ .env ที่ root โปรเจกต์"
+        )
+
+    # escape ปีกกาใน password กัน connection string พังถ้ารหัสผ่านมี { หรือ } อยู่จริง
+    safe_password = str(password).replace('}', '}}')
+
     conn_str = (
-        f"DRIVER={{{db['OPTIONS'].get('driver', 'ODBC Driver 17 for SQL Server')}}};"
-        f"SERVER={db['HOST']},{db.get('PORT') or '1433'};"
-        f"DATABASE={db['NAME']};"
-        f"UID={db['USER']};"
-        f"PWD={db['PASSWORD']};"
+        f"DRIVER={{{driver}}};"
+        f"SERVER={host},{port};"
+        f"DATABASE={name};"
+        f"UID={user};"
+        f"PWD={{{safe_password}}};"
     )
     return pyodbc.connect(conn_str)
 
@@ -353,11 +376,28 @@ def commit_staged_rows(rows, user_id):
     return {'logs': logs, 'stats': stats, 'rows': result_rows}
 
 
-def fetch_subareas():
+def _to_sql_like_pattern(search):
+    """
+    แปลงคำค้นแบบที่คนคุ้นเคย (Excel/Windows) เป็น SQL LIKE pattern:
+      ?  -> ตัวอักษรใดก็ได้ 1 ตัว   (SQL: _)
+      *  -> ตัวอักษรใดก็ได้ 0 ตัวขึ้นไป (SQL: %)
+    ต้อง escape % และ _ ตัวจริงที่ผู้ใช้พิมพ์มาก่อน ไม่งั้นถ้าเลขสัญญามี % หรือ _ อยู่จริง
+    จะถูกตีความเป็น wildcard ของ SQL ไปโดยไม่ตั้งใจ
+    """
+    escaped = search.replace('[', '[[]').replace('%', '[%]').replace('_', '[_]')
+    escaped = escaped.replace('?', '_').replace('*', '%')
+    return f"%{escaped}%"
+
+
+def fetch_subareas(search=None):
+    """
+    search: ถ้าระบุ -- กรองเฉพาะแถวที่ contract_code ตรงกับคำค้น
+            รองรับ wildcard แบบ Excel: ? = 1 ตัวอักษรใดก็ได้, * = กี่ตัวก็ได้
+    """
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("""
+        sql = """
             SELECT
                 m.Location_id,
                 m.Area_id,
@@ -365,14 +405,23 @@ def fetch_subareas():
                 s.SubArea_name,
                 MAX(CASE WHEN m.Meter_type_cd = 9 THEN m.Meter_no END) AS water_meter_no,
                 MAX(CASE WHEN m.Meter_type_cd = 8 THEN m.Meter_no END) AS electric_meter_no,
-                MAX(c.Contract_code) AS contract_code
+                MAX(c.Contract_code) AS contract_code,
+                MAX(cu.Customer_id) AS customer_id,
+                MAX(cu.CompanyName) AS customer_name
             FROM Contract_meter_ms m
             LEFT JOIN Contract_location_subarea_ms s ON s.SubArea_id = m.SubArea_id
             LEFT JOIN Contract_meter_tr t ON t.Meter_id = m.Meter_id AND t.UseOrNot = 1
             LEFT JOIN Contract_hrd_tr c ON c.Contract_id = t.Contract_id
+            LEFT JOIN Contract_customer_tr cu ON cu.Contract_id = c.Contract_id
             GROUP BY m.Location_id, m.Area_id, m.SubArea_id, s.SubArea_name
-            ORDER BY m.Location_id, m.Area_id, m.SubArea_id
-        """)
+        """
+        params = []
+        if search:
+            sql += " HAVING MAX(c.Contract_code) LIKE ? ESCAPE '['"
+            params.append(_to_sql_like_pattern(search))
+        sql += " ORDER BY m.Location_id, m.Area_id, m.SubArea_id"
+
+        cursor.execute(sql, params)
         columns = [c[0] for c in cursor.description]
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
     finally:
@@ -431,6 +480,32 @@ def fetch_subarea_meters(subarea_id):
         meters = [dict(zip(columns2, r)) for r in cursor.fetchall()]
         result['water'] = next((m for m in meters if m['Meter_type_cd'] == 9), None)
         result['electric'] = next((m for m in meters if m['Meter_type_cd'] == 8), None)
+
+        # ยืนยันจาก schema จริงแล้ว: ตาราง Contract_hrd_tr ไม่มีคอลัมน์ "เลขที่สัญญา" แยกต่างหาก
+        # (มีแค่ Contract_id ซึ่งเป็น PK, int กับ Contract_code) -- "เลขที่สัญญา" ที่ผู้ใช้กรอกใน
+        # Excel ตอน import (ดู parse_excel_staged/CONTRACT_NO) หมายถึง Contract_id ตัวนี้เอง
+        cursor.execute(
+            """
+            SELECT TOP 1 c.Contract_code, c.Contract_id, cu.Customer_id, cu.CompanyName
+            FROM dbo.Contract_meter_tr t
+            JOIN dbo.Contract_hrd_tr c ON c.Contract_id = t.Contract_id
+            LEFT JOIN dbo.Contract_customer_tr cu ON cu.Contract_id = c.Contract_id
+            WHERE t.SubArea_id = ? AND t.UseOrNot = 1
+            """,
+            subarea_id,
+        )
+        contract_row = cursor.fetchone()
+        if contract_row:
+            result['contract_code'] = contract_row[0]
+            result['contract_no'] = contract_row[1]
+            result['customer_id'] = contract_row[2]
+            result['customer_name'] = contract_row[3]
+        else:
+            result['contract_code'] = None
+            result['contract_no'] = None
+            result['customer_id'] = None
+            result['customer_name'] = None
+
         return result
     finally:
         conn.close()
@@ -545,6 +620,69 @@ def fetch_meters(type_filter=None, search=None):
         return rows
     finally:
         conn.close()
+
+
+def build_subareas_workbook(rows):
+    """
+    สร้าง Excel workbook (openpyxl) จากรายการ SubArea + มิเตอร์น้ำ/ไฟ ที่ได้จาก fetch_subareas()
+    จัดฟอร์แมตหัวตาราง สี border ความกว้างคอลัมน์ และ auto-filter ให้พร้อมใช้งานทันที
+    ใช้กับปุ่ม "ส่งออก Excel" บนหน้า dashboard -- คืนค่าเป็น Workbook object (ผู้เรียกเป็นคน save ต่อ)
+    """
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'มิเตอร์น้ำ-ไฟ'
+
+    headers = [
+        'เลขที่สัญญา (SubArea)', 'รหัสสัญญา', 'รหัสลูกหนี้', 'ชื่อลูกหนี้',
+        'พื้นที่', 'สถานที่ตั้ง', 'เลขมิเตอร์น้ำ', 'เลขมิเตอร์ไฟฟ้า', 'สถานะ',
+    ]
+
+    header_fill = PatternFill(start_color='1F2937', end_color='1F2937', fill_type='solid')
+    header_font = Font(color='FFFFFF', bold=True, size=11)
+    thin = Side(style='thin', color='D1D5DB')
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    ws.append(headers)
+    for col_idx in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        cell.border = border
+    ws.row_dimensions[1].height = 22
+    ws.freeze_panes = 'A2'
+
+    for r in rows:
+        status = 'มีสัญญา' if r.get('contract_code') else 'ยังไม่ผูกสัญญา'
+        ws.append([
+            r.get('SubArea_id') or '',
+            r.get('contract_code') or '',
+            r.get('customer_id') or '',
+            r.get('customer_name') or '',
+            r.get('Area_id') or '',
+            r.get('SubArea_name') or '',
+            r.get('water_meter_no') or '',
+            r.get('electric_meter_no') or '',
+            status,
+        ])
+
+    last_row = ws.max_row
+    for row in ws.iter_rows(min_row=2, max_row=last_row, max_col=len(headers)):
+        for cell in row:
+            cell.border = border
+            cell.alignment = Alignment(vertical='center')
+
+    widths = [20, 16, 14, 28, 16, 22, 16, 16, 16]
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+    ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{last_row}"
+
+    return wb
 
 
 def fetch_dashboard_stats():
