@@ -34,20 +34,35 @@
 </head>
 <body>
 <nav class="w-full bg-white border-b border-gray-200 px-6 py-3 flex gap-2">
-  <a href="/"
+  <a href="{% url 'step1' %}"
+    target="_blank"
      class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
             {% if request.path == '/' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
     อัปโหลดไฟล์
+  </a>
+
+  <a href="{% url 'download_form' %}"
+    target="_blank"
+     class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
+            {% if request.path == '/download_form/' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
+    ดาวน์โหลด Excel
   </a>
    <!-- <a href="/create_contract/"
      class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
             {% if request.path == '/create_contract/' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
     สร้างสัญญา
   </a> -->
-  <a href="/dashboard/"
+  <a href="{% url 'dashboard' %}"
+    target="_blank"
      class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
-            {% if request.path == '/dashboard/' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
+            {% if request.path|slice:':11' == '/dashboard/' or request.path == '/dashboard' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
     แดชบอร์ด
+  </a>
+  <a href="{% url 'termination_search' %}"
+      target="_blank"
+     class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
+            {% if request.path|slice:':13' == '/termination/' or request.path == '/termination' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
+    ยกเลิกสัญญา
   </a>
 </nav>
 

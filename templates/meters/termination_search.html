@@ -1,0 +1,69 @@
+{% extends "meters/base.html" %}
+{% load static %}
+
+{% block title %}ยกเลิกสัญญา{% endblock %}
+
+{% block content %}
+<div class="py-8 max-w-xl mx-auto">
+
+  <div class="text-sm text-gray-400 mb-1">
+    <a href="{% url 'dashboard' %}" class="hover:text-brand-600">แดชบอร์ด</a>
+    <span class="mx-1">›</span>
+    <span class="text-gray-500">ยกเลิกสัญญา</span>
+  </div>
+
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">ยกเลิกสัญญา</h1>
+    <p class="text-sm text-gray-500 mt-1">ค้นหาสัญญาด้วยรหัสสัญญา หรือชื่อลูกค้า เพื่อเข้าไปจัดการข้อมูลยกเลิก</p>
+  </div>
+
+  {% if error %}
+  <div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-4">
+    {{ error }}
+  </div>
+  {% endif %}
+
+  <form method="post" class="bg-white border border-gray-200 rounded-xl p-6 flex flex-col gap-4">
+    {% csrf_token %}
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1.5">รหัสสัญญา หรือ ชื่อลูกค้า</label>
+      <input type="text" name="contract_code" autofocus
+             value="{{ contract_code }}"
+             placeholder="เช่น AI5-AI6/2569 หรือ บริษัท เอบีซี จำกัด"
+             class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
+      <p class="text-xs text-gray-400 mt-1.5">จำรหัสสัญญาไม่ได้ก็พิมพ์บางส่วนของชื่อบริษัทลูกค้าแทนได้</p>
+    </div>
+    <div class="flex justify-end gap-3">
+      <a href="{% url 'dashboard' %}"
+         class="px-5 py-2.5 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">
+        ยกเลิก
+      </a>
+      <button type="submit"
+              class="px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600">
+        ค้นหา
+      </button>
+    </div>
+  </form>
+
+  {% if matches %}
+  <div class="bg-white border border-gray-200 rounded-xl mt-4 overflow-hidden">
+    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide px-5 pt-4 pb-2">
+      พบ {{ matches|length }} รายการ -- เลือกสัญญาที่ต้องการ
+    </p>
+    <div class="divide-y divide-gray-100">
+      {% for m in matches %}
+      <a href="{% url 'termination_detail' m.Contract_id %}"
+         class="flex items-center justify-between gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
+        <div>
+          <div class="text-sm font-medium text-gray-800">{{ m.Contract_code|default:"—" }}</div>
+          <div class="text-xs text-gray-400 mt-0.5">{{ m.CompanyName|default:"ไม่มีชื่อลูกค้า" }}</div>
+        </div>
+        <span class="text-brand-500 text-sm">เลือก ›</span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

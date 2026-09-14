@@ -3,7 +3,13 @@
 
 {% block content %}
 <div class="py-8">
-
+  {% if reading_errors %}
+  <div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-4 space-y-1">
+    {% for err in reading_errors %}
+      <div>{{ err }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
   <div class="text-sm text-gray-400 mb-1">
     <a href="{% url 'dashboard' %}" class="hover:text-brand-600">แดชบอร์ด</a>
     <span class="mx-1">›</span>
@@ -76,6 +82,11 @@
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1.5">ชื่อลูกหนี้</label>
             <input type="text" value="{{ subarea.customer_name|default:'—' }}" disabled
+                   class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 cursor-not-allowed">
+          </div>
+            <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">สถานที่</label>
+            <input type="text" value="{{ subarea.Location_name|default:'—' }}" disabled
                    class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 cursor-not-allowed">
           </div>
           <div>

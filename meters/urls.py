@@ -12,5 +12,16 @@ urlpatterns = [
     path('dashboard/', views.dashboard, name='dashboard'),
     path('dashboard/edit/<str:subarea_id>/', views.edit_meter, name='edit_meter'),
     path('dashboard/export/', views.export_meters_excel, name='export_meters'),
-    
+
+    # --- ยกเลิกสัญญา (ของใหม่) ---
+    path('termination/', views.termination_search, name='termination_search'),
+    path('termination/<int:contract_id>/', views.termination_detail, name='termination_detail'),
+    path(
+        'termination/<int:contract_id>/toggle/<str:period>/',
+        views.termination_toggle_installment,
+        name='termination_toggle',
+    ),
+        # --- ดาวน์โหลด Excel รายชื่อสัญญา + เลขอ่านมิเตอร์ ---
+    path('download/', views.download_form, name='download_form'),
+    path('download/excel/', views.download_excel, name='download_excel'),
 ]

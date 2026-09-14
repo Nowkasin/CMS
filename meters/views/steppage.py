@@ -1,13 +1,12 @@
-# meters/views.py
+# meters/views/wizard.py
 import datetime
 
 from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.core.paginator import Paginator
-from django.http import HttpResponse
 
-from . import services
-from .forms import ExcelUploadForm
+from .. import services
+from ..forms import ExcelUploadForm
 
 DEFAULT_USER = 'web_upload'
 STEP_LABELS = ['อัปโหลดไฟล์', 'ตรวจสอบข้อมูล', 'ยืนยันนำเข้า', 'เสร็จสิ้น']
@@ -192,115 +191,3 @@ def restart(request):
     request.session.pop('staged', None)
     request.session.pop('committed', None)
     return redirect('step1')
-
-
-def edit_meter(request, subarea_id):
-    """
-    หน้าแก้ไขมิเตอร์น้ำ/ไฟของ SubArea หนึ่งๆ จาก dashboard -- เป็นการ update ข้อมูลจริงใน DB
-    ทันทีที่กดบันทึก (ต่างจาก edit_staged_row ที่แก้แค่ข้อมูลใน session ก่อน commit)
-
-    รวมการกรอกเลขอ่านมิเตอร์ก่อน-หลังของรอบบิลที่เลือกไว้ในหน้าเดียวกันด้วย (เลือกเดือน-ปีได้
-    ผ่าน query string ?year=&month= -- ค่าเริ่มต้นเป็นเดือน-ปีปัจจุบัน) เก็บลง Contract_meter_reading_tr
-    ซึ่งเป็นตารางแยกต่างหาก ไม่ยุ่งกับระบบ Installment เดิมของมหาลัย
-    """
-    data = services.fetch_subarea_meters(subarea_id)
-    if not data:
-        return redirect('dashboard')
-
-    year_be = int(request.GET.get('year') or request.POST.get('billing_year') or _current_year_be())
-    month = int(request.GET.get('month') or request.POST.get('billing_month') or datetime.date.today().month)
-
-    if request.method == 'POST':
-        water_enabled = request.POST.get('water_enable') == 'on'
-        electric_enabled = request.POST.get('electric_enable') == 'on'
-
-        _logs, result_meter_ids = services.save_subarea_meters(
-            location_id=data['Location_id'], area_id=data['Area_id'], subarea_id=data['SubArea_id'],
-            user_id=DEFAULT_USER,
-            water_enabled=water_enabled,
-            water_meter_id=data['water']['Meter_id'] if data['water'] else None,
-            water_meter_no=request.POST.get('water_meter_no', '').strip() or None,
-            electric_enabled=electric_enabled,
-            electric_meter_id=data['electric']['Meter_id'] if data['electric'] else None,
-            electric_meter_no=request.POST.get('electric_meter_no', '').strip() or None,
-            electric_phase=request.POST.get('electric_phase') or None,
-        )
-
-        # บันทึกเลขอ่านก่อน-หลัง เฉพาะประเภทที่เปิดใช้งานและมี meter_id แล้วเท่านั้น
-        # (ถ้าปิดใช้งานน้ำ/ไฟ หรือยังไม่มีมิเตอร์ ก็ไม่มีที่ให้ผูกเลขอ่าน ข้ามไป)
-        if water_enabled and result_meter_ids['water']:
-            before_raw = request.POST.get('water_reading_before', '').strip()
-            after_raw = request.POST.get('water_reading_after', '').strip()
-            if before_raw or after_raw:
-                services.save_meter_reading(
-                    result_meter_ids['water'], year_be, month,
-                    int(before_raw) if before_raw else None,
-                    int(after_raw) if after_raw else None,
-                    DEFAULT_USER,
-                )
-
-        if electric_enabled and result_meter_ids['electric']:
-            before_raw = request.POST.get('electric_reading_before', '').strip()
-            after_raw = request.POST.get('electric_reading_after', '').strip()
-            if before_raw or after_raw:
-                services.save_meter_reading(
-                    result_meter_ids['electric'], year_be, month,
-                    int(before_raw) if before_raw else None,
-                    int(after_raw) if after_raw else None,
-                    DEFAULT_USER,
-                )
-
-        return redirect(f"{reverse('edit_meter', args=[subarea_id])}?year={year_be}&month={month}")
-
-    readings = services.fetch_readings_for_meters(
-        [data['water']['Meter_id'] if data['water'] else None,
-         data['electric']['Meter_id'] if data['electric'] else None],
-        year_be, month,
-    )
-    water_reading = readings.get(data['water']['Meter_id']) if data['water'] else None
-    electric_reading = readings.get(data['electric']['Meter_id']) if data['electric'] else None
-
-    context = {
-        'subarea': data,
-        'water_reading': water_reading,
-        'electric_reading': electric_reading,
-        'thai_months': THAI_MONTHS,
-        'billing_month': month,
-        'billing_year': year_be,
-        'year_options': [_current_year_be() - 1, _current_year_be(), _current_year_be() + 1],
-    }
-    return render(request, 'meters/edit_meter.html', context)
-
-
-def dashboard(request):
-    type_filter = request.GET.get('type', 'all')
-    search = request.GET.get('q', '')
-    context = {
-        'stats': services.fetch_dashboard_stats(),
-        'meters': services.fetch_meters(type_filter, search),
-        'subareas': services.fetch_subareas(search),
-        'active_filter': type_filter,
-        'search': search,
-    }
-    return render(request, 'meters/dashboard.html', context)
-
-
-def export_meters_excel(request):
-    """
-    ปุ่ม "ส่งออก Excel" บนหน้า dashboard -- ใช้ query เดียวกับที่ตาราง dashboard ใช้แสดงผล
-    (fetch_subareas + search) เพื่อให้ข้อมูลที่ export ตรงกับสิ่งที่ผู้ใช้เห็นบนจอตอนกดปุ่ม
-    หมายเหตุ: type_filter (?type=8/9) ยังไม่ได้ผูกกับ fetch_subareas() ในหน้า dashboard เอง
-    (ตารางบนจอไม่ได้กรองตาม type อยู่แล้วในตอนนี้) จึง export ไม่กรองตาม type ด้วยเหมือนกัน
-    เพื่อให้ผลลัพธ์ตรงกับที่เห็นจริงบนตาราง
-    """
-    search = request.GET.get('q', '')
-    subareas = services.fetch_subareas(search)
-    wb = services.build_subareas_workbook(subareas)
-
-    response = HttpResponse(
-        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
-    filename = f"meters_{datetime.date.today().strftime('%Y%m%d')}.xlsx"
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
-    wb.save(response)
-    return response
