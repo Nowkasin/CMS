@@ -24,4 +24,7 @@ urlpatterns = [
         # --- ดาวน์โหลด Excel รายชื่อสัญญา + เลขอ่านมิเตอร์ ---
     path('download/', views.download_form, name='download_form'),
     path('download/excel/', views.download_excel, name='download_excel'),
+        path('meters/', views.meter_list, name='meter_list'),
+    path('meters/new/', views.meter_form, name='meter_new'),
+    path('meters/<int:meter_id>/edit/', views.meter_form, name='meter_edit'),
 ]

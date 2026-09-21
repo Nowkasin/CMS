@@ -1,0 +1,201 @@
+{% extends "meters/base.html" %}
+{% load static %}
+
+{% block title %}{% if meter_id %}แก้ไขมิเตอร์{% else %}เพิ่มมิเตอร์ใหม่{% endif %}{% endblock %}
+
+{% block content %}
+<div class="py-8 max-w-xl mx-auto">
+
+  <div class="text-sm text-gray-400 mb-1">
+    <a href="{% url 'dashboard' %}" class="hover:text-brand-600">แดชบอร์ด</a>
+    <span class="mx-1">›</span>
+    <a href="{% url 'meter_list' %}" class="hover:text-brand-600">จัดการมิเตอร์</a>
+    <span class="mx-1">›</span>
+    <span class="text-gray-500">{% if meter_id %}แก้ไข #{{ meter_id }}{% else %}เพิ่มใหม่{% endif %}</span>
+  </div>
+
+  <div class="flex items-center justify-between gap-4 flex-wrap mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">
+      {% if meter_id %}แก้ไขมิเตอร์ #{{ meter_id }}{% else %}เพิ่มมิเตอร์ใหม่{% endif %}
+    </h1>
+    {% if meter_id %}
+      {% if meter.UseOrNot %}
+        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-brand-50 text-brand-600">เปิดใช้งานอยู่</span>
+      {% else %}
+        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">ปิดใช้งานอยู่</span>
+      {% endif %}
+    {% endif %}
+  </div>
+
+  {% if errors %}
+  <div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-4 space-y-1">
+    {% for err in errors %}<div>{{ err }}</div>{% endfor %}
+  </div>
+  {% endif %}
+
+  <form id="meterForm" method="post" class="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
+    {% csrf_token %}
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1.5">พื้นที่ย่อย (SubArea)</label>
+      <select name="subarea_id"
+              class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
+        <option value="">-- เลือก SubArea --</option>
+        {% for s in subareas %}
+          <option value="{{ s.SubArea_id }}" {% if meter.SubArea_id == s.SubArea_id %}selected{% endif %}>
+            {{ s.SubArea_id }} — {{ s.SubArea_name|default:"—" }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1.5">ประเภทมิเตอร์</label>
+      <select name="meter_type_cd"
+              class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
+        <option value="9" {% if meter.Meter_type_cd == 9 %}selected{% endif %}>น้ำ</option>
+        <option value="8" {% if meter.Meter_type_cd == 8 %}selected{% endif %}>ไฟ</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1.5">เลขประจำเครื่องวัด</label>
+      <input type="text" name="meter_no" value="{{ meter.Meter_no|default:'' }}"
+             placeholder="เว้นว่างได้ ระบบจะ Gen เลขให้"
+             class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1.5">ระบบไฟฟ้า (กรอกเฉพาะมิเตอร์ไฟ)</label>
+      <select name="phase_type"
+              class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
+        <option value="">ไม่ระบุ</option>
+        <option value="1เฟส" {% if meter.Phase_type == "1เฟส" %}selected{% endif %}>1 เฟส</option>
+        <option value="3เฟส" {% if meter.Phase_type == "3เฟส" %}selected{% endif %}>3 เฟส</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1.5">หมายเหตุ</label>
+      <textarea name="meter_remark" rows="2"
+                placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"
+                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">{{ meter.Meter_remark|default:'' }}</textarea>
+    </div>
+
+    {# --- สถานะการใช้งาน: hidden field เก็บค่าจริง ปุ่มด้านล่างเป็นตัวเปลี่ยนค่านี้ --- #}
+    <input type="hidden" name="use_or_not" id="useOrNotField"
+           value="{% if meter.UseOrNot or not meter_id %}1{% else %}0{% endif %}">
+
+    <div class="flex items-center justify-between gap-3 pt-2 border-t border-gray-100 mt-2 pt-4">
+      <div>
+        {% if meter_id and meter.UseOrNot %}
+          <button type="button" id="openDisableBtn"
+                  class="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors">
+            ปิดใช้งาน
+          </button>
+        {% elif meter_id and not meter.UseOrNot %}
+          <button type="button" id="enableBtn"
+                  class="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 transition-colors">
+            เปิดใช้งาน
+          </button>
+        {% endif %}
+      </div>
+      <div class="flex gap-3">
+        <a href="{% url 'meter_list' %}"
+           class="px-5 py-2.5 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">
+          ยกเลิก
+        </a>
+        <button type="submit"
+                class="px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600">
+          บันทึก
+        </button>
+      </div>
+    </div>
+  </form>
+
+</div>
+
+{# --- Custom confirm modal สำหรับปิดใช้งาน (fade + scale animation) --- #}
+<div id="confirmModal" class="fixed inset-0 z-50 hidden items-center justify-center">
+  <div id="confirmBackdrop"
+       class="absolute inset-0 bg-black/50 opacity-0 transition-opacity duration-200"></div>
+
+  <div id="confirmBox"
+       class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6 scale-90 opacity-0 transition-all duration-200">
+    <div class="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
+      <svg class="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
+      </svg>
+    </div>
+    <h3 class="text-center text-base font-bold text-gray-900 mb-1">ยืนยันการปิดใช้งาน</h3>
+    <p class="text-center text-sm text-gray-500 mb-6">ต้องการปิดใช้งานมิเตอร์นี้ใช่หรือไม่?</p>
+    <div class="flex gap-3">
+      <button type="button" id="confirmNo"
+              class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">
+        ไม่ต้องการ
+      </button>
+      <button type="button" id="confirmYes"
+              class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors">
+        ต้องการ
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const form = document.getElementById('meterForm');
+    const hiddenField = document.getElementById('useOrNotField');
+
+    // --- ปุ่มเปิดใช้งาน: ไม่ต้อง confirm เพราะไม่เสี่ยง ตั้งค่าแล้ว submit ทันที ---
+    const enableBtn = document.getElementById('enableBtn');
+    if (enableBtn) {
+      enableBtn.addEventListener('click', function () {
+        hiddenField.value = '1';
+        form.submit();
+      });
+    }
+
+    // --- ปุ่มปิดใช้งาน: ต้อง confirm ผ่าน modal ก่อน ---
+    const openBtn = document.getElementById('openDisableBtn');
+    if (openBtn) {
+      const modal = document.getElementById('confirmModal');
+      const backdrop = document.getElementById('confirmBackdrop');
+      const box = document.getElementById('confirmBox');
+      const btnNo = document.getElementById('confirmNo');
+      const btnYes = document.getElementById('confirmYes');
+
+      function openModal() {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        requestAnimationFrame(() => {
+          backdrop.classList.remove('opacity-0');
+          backdrop.classList.add('opacity-100');
+          box.classList.remove('opacity-0', 'scale-90');
+          box.classList.add('opacity-100', 'scale-100');
+        });
+      }
+
+      function closeModal() {
+        backdrop.classList.remove('opacity-100');
+        backdrop.classList.add('opacity-0');
+        box.classList.remove('opacity-100', 'scale-100');
+        box.classList.add('opacity-0', 'scale-90');
+        setTimeout(() => {
+          modal.classList.add('hidden');
+          modal.classList.remove('flex');
+        }, 200);
+      }
+
+      openBtn.addEventListener('click', openModal);
+      btnNo.addEventListener('click', closeModal);
+      backdrop.addEventListener('click', closeModal);
+      btnYes.addEventListener('click', () => {
+        hiddenField.value = '0';
+        closeModal();
+        form.submit();
+      });
+    }
+  })();
+</script>
+{% endblock %}

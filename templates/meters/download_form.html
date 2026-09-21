@@ -4,7 +4,7 @@
 {% block title %}ดาวน์โหลด Excel{% endblock %}
 
 {% block content %}
-<div class="py-8 max-w-xl mx-auto">
+<div class="py-8">
 
   <div class="text-sm text-gray-400 mb-1">
     <a href="{% url 'dashboard' %}" class="hover:text-brand-600">แดชบอร์ด</a>
@@ -14,11 +14,11 @@
 
   <div class="mb-6">
     <h1 class="text-2xl font-bold text-gray-900">ดาวน์โหลด Excel</h1>
-    <p class="text-sm text-gray-500 mt-1">เลือกเดือน-ปี เพื่อดาวน์โหลดรายชื่อสัญญาพร้อมเลขอ่านมิเตอร์น้ำ-ไฟของรอบบิลนั้น</p>
+    <p class="text-sm text-gray-500 mt-1">เลือกเดือน-ปี ค้นหา แล้วติ๊กรายการที่ต้องการก่อนดาวน์โหลด</p>
   </div>
 
-  <form method="get" action="{% url 'download_excel' %}"
-        class="bg-white border border-gray-200 rounded-xl p-6 flex flex-col gap-4">
+  {# --- ฟอร์มค้นหา (GET) --- #}
+  <form method="get" class="bg-white border border-gray-200 rounded-xl p-6 flex flex-col gap-4 max-w-xl mb-6">
     <div class="grid grid-cols-2 gap-3">
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1.5">เดือน</label>
@@ -46,10 +46,169 @@
       </a>
       <button type="submit"
               class="px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600">
-        ดาวน์โหลด Excel
+        ค้นหา
       </button>
     </div>
   </form>
 
+  {% if searched %}
+  {# --- ฟอร์มติ๊กเลือก + ดาวน์โหลด (POST) --- #}
+  <form method="post" action="{% url 'download_excel' %}">
+    {% csrf_token %}
+    <input type="hidden" name="month" value="{{ billing_month }}">
+    <input type="hidden" name="year" value="{{ billing_year }}">
+
+    {# --- ตารางรวมน้ำ-ไฟ (1 แถว = 1 สัญญา + 1 พื้นที่ย่อย) --- #}
+    <div class="bg-white border border-gray-200 rounded-xl p-6 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-base font-bold text-gray-900">รายการสัญญา ({{ combined_rows|length }} รายการ)</h2>
+        {% if combined_rows %}
+        <label class="text-xs text-gray-500 flex items-center gap-1.5 cursor-pointer">
+          <input type="checkbox" id="selectAllRows">
+          เลือกทั้งหมด
+        </label>
+        {% endif %}
+      </div>
+
+      {% if combined_rows %}
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-xs text-left">
+          <thead>
+            <tr class="border-b border-gray-100">
+              <th class="px-3 py-2 align-bottom" rowspan="2"></th>
+              <th class="px-3 py-2 font-semibold text-gray-500 align-bottom" rowspan="2">รหัสสัญญา</th>
+              <th class="px-3 py-2 font-semibold text-gray-500 align-bottom" rowspan="2">ชื่อลูกหนี้</th>
+              <th class="px-3 py-2 font-semibold text-gray-500 align-bottom" rowspan="2">SubArea</th>
+              <th class="px-3 py-2 font-semibold text-sky-700 text-center bg-sky-50/60" colspan="4">
+                <span class="inline-flex items-center gap-1">
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 2.75c3.5 4.2 6 7.7 6 11a6 6 0 11-12 0c0-3.3 2.5-6.8 6-11z"/>
+                  </svg>
+                  ค่าน้ำประปา
+                </span>
+              </th>
+              <th class="px-3 py-2 font-semibold text-amber-700 text-center bg-amber-50/60" colspan="4">
+                <span class="inline-flex items-center gap-1">
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/>
+                  </svg>
+                  ค่าไฟฟ้า
+                </span>
+              </th>
+            </tr>
+            <tr class="border-b border-gray-100">
+              <th class="px-3 py-2 font-medium text-gray-400 bg-sky-50/40">เลขมิเตอร์</th>
+              <th class="px-3 py-2 font-medium text-gray-400 bg-sky-50/40">อ่านก่อน</th>
+              <th class="px-3 py-2 font-medium text-gray-400 bg-sky-50/40">อ่านหลัง</th>
+              <th class="px-3 py-2 font-medium text-gray-400 bg-sky-50/40">จำนวนเงิน</th>
+              <th class="px-3 py-2 font-medium text-gray-400 bg-amber-50/40">เลขมิเตอร์</th>
+              <th class="px-3 py-2 font-medium text-gray-400 bg-amber-50/40">อ่านก่อน</th>
+              <th class="px-3 py-2 font-medium text-gray-400 bg-amber-50/40">อ่านหลัง</th>
+              <th class="px-3 py-2 font-medium text-gray-400 bg-amber-50/40">จำนวนเงิน</th>
+            </tr>
+          </thead>
+          <tbody id="rowsBody">
+            {% for r in combined_rows %}
+            <tr class="row-clickable border-b border-gray-50 hover:bg-gray-50 cursor-pointer">
+              <td class="px-3 py-2"><input type="checkbox" class="row-check" name="selected_rows" value="{{ r.row_key }}"></td>
+              <td class="px-3 py-2 text-gray-700">{{ r.Contract_code|default:"—" }}</td>
+              <td class="px-3 py-2 text-gray-700">{{ r.CompanyName|default:"—" }}</td>
+              <td class="px-3 py-2 text-gray-700">{{ r.SubArea_id|default:"—" }}</td>
+
+              {# --- ค่าน้ำ --- #}
+              {% if r.water %}
+              <td class="px-3 py-2 text-gray-700 bg-sky-50/20">{{ r.water.Meter_no|default:"—" }}</td>
+              <td class="px-3 py-2 text-gray-700 bg-sky-50/20">{{ r.water.Contract_read_number_before|default:"—" }}</td>
+              <td class="px-3 py-2 text-gray-700 bg-sky-50/20">{{ r.water.Contract_read_number_after|default:"—" }}</td>
+              <td class="px-3 py-2 text-gray-700 bg-sky-50/20">{{ r.water.Contract_Installment_amt|default:"—" }}</td>
+              {% else %}
+              <td class="px-3 py-2 text-gray-300 bg-sky-50/20 text-center" colspan="4">— ไม่มีมิเตอร์น้ำ —</td>
+              {% endif %}
+
+              {# --- ค่าไฟ --- #}
+              {% if r.electric %}
+              <td class="px-3 py-2 text-gray-700 bg-amber-50/20">{{ r.electric.Meter_no|default:"—" }}</td>
+              <td class="px-3 py-2 text-gray-700 bg-amber-50/20">{{ r.electric.Contract_read_number_before|default:"—" }}</td>
+              <td class="px-3 py-2 text-gray-700 bg-amber-50/20">{{ r.electric.Contract_read_number_after|default:"—" }}</td>
+              <td class="px-3 py-2 text-gray-700 bg-amber-50/20">{{ r.electric.Contract_Installment_amt|default:"—" }}</td>
+              {% else %}
+              <td class="px-3 py-2 text-gray-300 bg-amber-50/20 text-center" colspan="4">— ไม่มีมิเตอร์ไฟ —</td>
+              {% endif %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center text-gray-400 text-sm py-8">ไม่พบข้อมูลของเดือน-ปีนี้</div>
+      {% endif %}
+    </div>
+
+    <div class="flex justify-end pt-2">
+      <button type="submit"
+              class="px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600">
+        ดาวน์โหลด Excel ที่เลือก
+      </button>
+    </div>
+  </form>
+  {% endif %}
+
 </div>
+
+{% if searched and combined_rows %}
+<style>
+  tr.row-clickable.row-selected {
+    background-color: #eff6ff; /* brand-50 โทนอ่อน ให้เห็นชัดว่าแถวไหนถูกเลือกอยู่ */
+  }
+</style>
+<script>
+  (function () {
+    const body = document.getElementById('rowsBody');
+    const selectAll = document.getElementById('selectAllRows');
+
+    function syncRowHighlight(row) {
+      const checkbox = row.querySelector('.row-check');
+      row.classList.toggle('row-selected', checkbox.checked);
+    }
+
+    function syncSelectAllState() {
+      if (!selectAll) return;
+      const checks = body.querySelectorAll('.row-check');
+      const checkedCount = body.querySelectorAll('.row-check:checked').length;
+      selectAll.checked = checks.length > 0 && checkedCount === checks.length;
+      selectAll.indeterminate = checkedCount > 0 && checkedCount < checks.length;
+    }
+
+    // คลิกที่ไหนในแถวก็ toggle checkbox ได้ (ยกเว้นคลิกที่ checkbox เอง กันติ๊กซ้อนสองรอบ)
+    body.querySelectorAll('tr.row-clickable').forEach(function (row) {
+      const checkbox = row.querySelector('.row-check');
+      syncRowHighlight(row);
+
+      row.addEventListener('click', function (e) {
+        if (e.target === checkbox) return;
+        checkbox.checked = !checkbox.checked;
+        syncRowHighlight(row);
+        syncSelectAllState();
+      });
+
+      checkbox.addEventListener('change', function () {
+        syncRowHighlight(row);
+        syncSelectAllState();
+      });
+    });
+
+    if (selectAll) {
+      selectAll.addEventListener('change', function () {
+        body.querySelectorAll('.row-check').forEach(function (c) {
+          c.checked = selectAll.checked;
+          syncRowHighlight(c.closest('tr'));
+        });
+      });
+    }
+
+    syncSelectAllState();
+  })();
+</script>
+{% endif %}
+
 {% endblock %}

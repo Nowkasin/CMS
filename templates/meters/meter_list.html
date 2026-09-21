@@ -1,0 +1,100 @@
+{% extends "meters/base.html" %}
+{% load static %}
+
+{% block title %}จัดการมิเตอร์{% endblock %}
+
+{% block content %}
+<div class="py-8">
+
+  <div class="text-sm text-gray-400 mb-1">
+    <a href="{% url 'dashboard' %}" class="hover:text-brand-600">แดชบอร์ด</a>
+    <span class="mx-1">›</span>
+    <span class="text-gray-500">จัดการมิเตอร์</span>
+  </div>
+
+  <div class="flex items-center justify-between gap-4 flex-wrap mb-4">
+    <h1 class="text-2xl font-bold text-gray-900">จัดการมิเตอร์</h1>
+    <a href="{% url 'meter_new' %}"
+       class="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600">
+      + เพิ่มมิเตอร์ใหม่
+    </a>
+  </div>
+
+  {# --- แท็บสถานะ --- #}
+  <div class="flex gap-2 mb-4">
+    <a href="?status=active&type={{ active_filter }}&q={{ search }}"
+       class="px-3 py-1.5 rounded-lg text-sm font-medium
+              {% if status_filter == 'active' %}bg-brand-500 text-white{% else %}text-gray-600 bg-white border border-gray-200 hover:bg-gray-50{% endif %}">
+      ใช้งานอยู่
+    </a>
+    <a href="?status=inactive&type={{ active_filter }}&q={{ search }}"
+       class="px-3 py-1.5 rounded-lg text-sm font-medium
+              {% if status_filter == 'inactive' %}bg-brand-500 text-white{% else %}text-gray-600 bg-white border border-gray-200 hover:bg-gray-50{% endif %}">
+      ปิดใช้งาน
+    </a>
+    <a href="?status=all&type={{ active_filter }}&q={{ search }}"
+       class="px-3 py-1.5 rounded-lg text-sm font-medium
+              {% if status_filter == 'all' %}bg-brand-500 text-white{% else %}text-gray-600 bg-white border border-gray-200 hover:bg-gray-50{% endif %}">
+      ทั้งหมด
+    </a>
+  </div>
+
+  <form method="get" class="flex flex-wrap gap-3 mb-4">
+    <input type="hidden" name="status" value="{{ status_filter }}">
+    <select name="type" onchange="this.form.submit()"
+            class="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700">
+      <option value="all" {% if active_filter == 'all' %}selected{% endif %}>ทุกประเภท</option>
+      <option value="9" {% if active_filter == '9' %}selected{% endif %}>น้ำ</option>
+      <option value="8" {% if active_filter == '8' %}selected{% endif %}>ไฟ</option>
+    </select>
+    <input type="text" name="q" value="{{ search }}" placeholder="ค้นหา SubArea / เลขมิเตอร์ / รหัสสัญญา"
+           class="flex-1 min-w-[200px] border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
+    <button type="submit"
+            class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">
+      ค้นหา
+    </button>
+  </form>
+
+  <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+    <table class="min-w-full text-sm text-left">
+      <thead>
+        <tr class="border-b border-gray-100 bg-gray-50">
+          <th class="px-4 py-2.5 font-semibold text-gray-500">Meter_id</th>
+          <th class="px-4 py-2.5 font-semibold text-gray-500">SubArea_id</th>
+          <th class="px-4 py-2.5 font-semibold text-gray-500">ประเภท</th>
+          <th class="px-4 py-2.5 font-semibold text-gray-500">เลขมิเตอร์</th>
+          <th class="px-4 py-2.5 font-semibold text-gray-500">สถานะเลข</th>
+          <th class="px-4 py-2.5 font-semibold text-gray-500">การใช้งาน</th>
+          <th class="px-4 py-2.5 font-semibold text-gray-500">สัญญาที่ผูกอยู่</th>
+          <th class="px-4 py-2.5"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {% for m in meters %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-2.5 text-gray-700">{{ m.Meter_id }}</td>
+          <td class="px-4 py-2.5 text-gray-700">{{ m.SubArea_id }}</td>
+          <td class="px-4 py-2.5 text-gray-700">{% if m.Meter_type_cd == 9 %}น้ำ{% else %}ไฟ{% endif %}</td>
+          <td class="px-4 py-2.5 text-gray-700">{{ m.Meter_no|default:"—" }}</td>
+          <td class="px-4 py-2.5 text-gray-500">{{ m.Meter_no_status|default:"—" }}</td>
+          <td class="px-4 py-2.5">
+            {% if m.UseOrNot %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-brand-50 text-brand-600">เปิดใช้งาน</span>
+            {% else %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-500">ปิดใช้งาน</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2.5 text-gray-500">{{ m.bound_contracts|join:", "|default:"—" }}</td>
+          <td class="px-4 py-2.5 text-right">
+            <a href="{% url 'meter_edit' m.Meter_id %}" class="text-brand-600 hover:underline text-xs font-medium">แก้ไข</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">ไม่พบมิเตอร์</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+{% endblock %}

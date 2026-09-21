@@ -1,18 +1,17 @@
-# meters/services/meters.py
-"""
-แกนกลางของระบบมิเตอร์น้ำ-ไฟ: ดึง/บันทึกข้อมูล SubArea, มิเตอร์, การผูกกับสัญญา,
-เลขอ่านมิเตอร์ต่อรอบบิล, สถิติหน้า dashboard และ commit ข้อมูลที่ parse มาจาก Excel
-"""
 from .db import get_db_connection
 
 DEFAULT_USER = 'web_upload'
 
 
 def sp_meter_save(cursor, location_id, area_id, subarea_id, type_cd, meter_no,
-                   meter_no_status, user_id, logs, phase_type=None, meter_id=None):
+                   meter_no_status, user_id, logs, phase_type=None, meter_id=None,
+                   meter_remark=None, use_or_not=1):
     """
     meter_id=None (ค่าเริ่มต้น) -> SP จะ INSERT มิเตอร์ใหม่ (ใช้ตอน import จากไฟล์ Excel)
     meter_id=<เลขจริง> -> SP จะ UPDATE มิเตอร์ตัวนั้นแทน (ใช้ตอนแก้ไขจากหน้า dashboard)
+
+    use_or_not (default 1 = เปิดใช้งาน) -- ส่งต่อไป @UseOrNot ของ SP ตรงๆ ผู้เรียกเดิมที่ไม่ส่ง
+    พารามิเตอร์นี้ยังทำงานเหมือนเดิมทุกอย่าง (SP มี default @UseOrNot = 1 อยู่แล้ว)
     """
     cursor.execute(
         """
@@ -25,9 +24,12 @@ def sp_meter_save(cursor, location_id, area_id, subarea_id, type_cd, meter_no,
             @Meter_no        = ?,
             @Meter_no_status = ?,
             @Phase_type      = ?,
+            @Meter_remark    = ?,
+            @UseOrNot        = ?,
             @UserId          = ?
         """,
-        meter_id, location_id, area_id, subarea_id, type_cd, meter_no, meter_no_status, phase_type, user_id
+        meter_id, location_id, area_id, subarea_id, type_cd, meter_no, meter_no_status,
+        phase_type, meter_remark, use_or_not, user_id
     )
     row = cursor.fetchone()
     result_meter_id = int(row[0]) if row else meter_id
@@ -177,9 +179,7 @@ def fetch_contract_meter_detail(contract_id=None, contract_code=None):
 
 def fetch_subarea_meters(subarea_id):
     """
-    ดึงข้อมูลพื้นที่ + มิเตอร์น้ำ/ไฟที่มีอยู่ (ถ้ามี) ของ SubArea นี้ ใช้เปิดหน้าแก้ไขจาก dashboard
-    คืนค่า None ถ้าไม่พบ SubArea นี้เลย
-    """
+    ดึงข้อมูลพื้นที่ + มิเตอร์น้ำ/ไฟที่มีอยู่ (ถ้ามี) """
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -323,14 +323,17 @@ def fetch_readings_for_meters(meter_ids, billing_year_be, billing_month):
         conn.close()
 
 
-def fetch_meters(type_filter=None, search=None):
+def fetch_meters(type_filter=None, search=None, status_filter='active'):
+    """
+    status_filter: 'active' (default, UseOrNot=1), 'inactive' (UseOrNot=0), 'all' (ไม่กรอง)
+    """
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
         sql = """
             SELECT
                 m.Meter_id, m.SubArea_id, m.Meter_type_cd,
-                m.Meter_no, m.Meter_no_status,
+                m.Meter_no, m.Meter_no_status, m.UseOrNot,
                 STRING_AGG(c.Contract_code, ', ') AS bound_contracts
             FROM Contract_meter_ms m
             LEFT JOIN Contract_meter_tr t ON t.Meter_id = m.Meter_id
@@ -338,6 +341,10 @@ def fetch_meters(type_filter=None, search=None):
             WHERE 1=1
         """
         params = []
+        if status_filter == 'active':
+            sql += " AND m.UseOrNot = 1"
+        elif status_filter == 'inactive':
+            sql += " AND m.UseOrNot = 0"
         if type_filter in ('8', '9'):
             sql += " AND m.Meter_type_cd = ?"
             params.append(int(type_filter))
@@ -353,7 +360,7 @@ def fetch_meters(type_filter=None, search=None):
             )"""
             like = f"%{search}%"
             params += [like, like, like]
-        sql += " GROUP BY m.Meter_id, m.SubArea_id, m.Meter_type_cd, m.Meter_no, m.Meter_no_status"
+        sql += " GROUP BY m.Meter_id, m.SubArea_id, m.Meter_type_cd, m.Meter_no, m.Meter_no_status, m.UseOrNot"
         sql += " ORDER BY m.Meter_id DESC"
 
         cursor.execute(sql, params)
@@ -419,5 +426,56 @@ def save_meter_reading(meter_id, billing_year_be, billing_month, reading_before,
         rows_updated = cursor.rowcount
         conn.commit()
         return rows_updated
+    finally:
+        conn.close()
+
+
+def fetch_meter_by_id(meter_id):
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT m.Meter_id, m.Location_id, m.Area_id, m.SubArea_id, m.Meter_type_cd,
+                   m.Meter_no, m.Meter_no_status, m.Phase_type, m.Meter_remark, m.UseOrNot,
+                   s.SubArea_name
+            FROM dbo.Contract_meter_ms m
+            LEFT JOIN dbo.Contract_location_subarea_ms s ON s.SubArea_id = m.SubArea_id
+            WHERE m.Meter_id = ?
+            """,
+            meter_id,
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+        columns = [c[0] for c in cursor.description]
+        return dict(zip(columns, row))
+    finally:
+        conn.close()
+
+
+def save_standalone_meter(subarea_id, meter_type_cd, meter_no, phase_type, user_id, meter_id=None,meter_remark=None, use_or_not=1):
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT Location_id, Area_id FROM dbo.Contract_location_subarea_ms WHERE SubArea_id = ?",
+            subarea_id,
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise ValueError(f"ไม่พบ SubArea_id '{subarea_id}' ในระบบ")
+        location_id, area_id = row[0], row[1]
+
+        meter_no_status = 'รอ Gen เลข' if not meter_no else 'ปกติ'
+        logs = []
+        result_meter_id = sp_meter_save(
+            cursor, location_id, area_id, subarea_id, meter_type_cd, meter_no or None,
+            meter_no_status, user_id, logs, phase_type=phase_type, meter_id=meter_id,
+            meter_remark=meter_remark, use_or_not=use_or_not,
+        )
+        conn.commit()
+        return result_meter_id
     finally:
         conn.close()
