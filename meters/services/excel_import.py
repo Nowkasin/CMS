@@ -6,6 +6,7 @@
 from openpyxl import load_workbook
 
 from .db import get_db_connection
+from .meters import find_existing_meter
 
 STATUS_MAP = {
     'สัญญา': '1', 'ต่อสัญญา': '3', 'ไม่ต่อสัญญา': '4',
@@ -102,6 +103,22 @@ def find_contract_by_code(contract_code):
         conn.close()
 
 
+def find_registered_meter(subarea_id, meter_type_cd, meter_no):
+    """
+    เช็คตอน parse ว่ามิเตอร์แถวนี้ลงทะเบียนไว้ในระบบแล้วหรือยัง เพื่อบอกผู้ใช้ใน Step 2
+    ว่าจะเป็นการอัปเดตตัวเดิม ไม่ใช่สร้างใหม่ (ใช้ logic จับคู่ชุดเดียวกับตอน commit จริง
+    -- find_existing_meter ใน meters.py -- เพื่อให้ผลที่โชว์ตรงกับที่จะเกิดขึ้นจริง)
+    คืนค่า Meter_id เดิม หรือ None
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        found = find_existing_meter(cursor, subarea_id, meter_type_cd, meter_no)
+        return found[0] if found else None
+    finally:
+        conn.close()
+
+
 def find_contract_sheet(sheetnames, keyword):
     candidates = [n for n in sheetnames if n.startswith('สัญญาปี') and keyword in n]
     if len(candidates) > 1:
@@ -119,6 +136,8 @@ def parse_excel_staged(uploaded_file):
 
     rows_out = []
     counter = {'idx': 0}
+    # จำ key ที่เจอแล้วในไฟล์นี้ -> ใช้ตรวจแถวซ้ำกันเองภายในไฟล์ (ข้ามทั้ง 2 ชีทน้ำ/ไฟ)
+    seen_in_file = {}
 
     def handle_sheet(sheet_name, type_cd):
         if not sheet_name:
@@ -217,6 +236,27 @@ def parse_excel_staged(uploaded_file):
             # ซ้ำอีกรอบตอน SP เทียบ Contract_code แบบ exact match ภายใน
             entry['db_contract_id'] = contract_match[0]
 
+            # --- เช็คซ้ำ 2 แบบ ให้ผู้ใช้เห็นก่อนกดยืนยันใน Step 3 ---
+            dup_key = (subarea_id, type_cd, entry['meter_no'])
+
+            # 1) ซ้ำกันเองในไฟล์ที่อัปโหลดมา -> ข้ามแถวหลัง (แถวแรกครอบคลุมอยู่แล้ว)
+            if dup_key in seen_in_file:
+                entry['status'] = 'skip'
+                entry['message'] = (
+                    f"ซ้ำกับแถวที่ {seen_in_file[dup_key]} ในไฟล์นี้ (พื้นที่/ประเภท/เลขเครื่องวัดเดียวกัน) -- ข้ามแถวนี้"
+                )
+                rows_out.append(entry)
+                continue
+            seen_in_file[dup_key] = entry['idx']
+
+            # 2) มีอยู่ในทะเบียนมิเตอร์แล้ว -> ยังนำเข้าต่อได้ แต่จะเป็นการอัปเดตตัวเดิม
+            #    (commit_staged_rows จะส่ง Meter_id เดิมเข้า SP ให้เข้า branch UPDATE)
+            existing_meter_id = find_registered_meter(subarea_id, type_cd, entry['meter_no'])
+            if existing_meter_id:
+                entry['status'] = 'duplicate'
+                entry['existing_meter_id'] = existing_meter_id
+                entry['message'] = f"มีมิเตอร์นี้ในระบบแล้ว (Meter_id #{existing_meter_id}) จะอัปเดตตัวเดิม ไม่สร้างใหม่"
+
             rows_out.append(entry)
 
     handle_sheet(water_sheet, 9)
@@ -225,6 +265,7 @@ def parse_excel_staged(uploaded_file):
     summary = {
         'total': len(rows_out),
         'ok': sum(1 for r in rows_out if r['status'] == 'ok'),
+        'duplicate': sum(1 for r in rows_out if r['status'] == 'duplicate'),
         'skip': sum(1 for r in rows_out if r['status'] == 'skip'),
         'error': sum(1 for r in rows_out if r['status'] == 'error'),
     }

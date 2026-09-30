@@ -51,11 +51,32 @@
 
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1.5">ประเภทมิเตอร์</label>
-      <select name="meter_type_cd"
-              class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
-        <option value="9" {% if meter.Meter_type_cd == 9 %}selected{% endif %}>น้ำ</option>
-        <option value="8" {% if meter.Meter_type_cd == 8 %}selected{% endif %}>ไฟ</option>
-      </select>
+      {% if meter_id %}
+        {% comment %}
+          แก้ไขมิเตอร์เดิม: ประเภทล็อกไว้ตามของตัวมันเอง เปลี่ยนไม่ได้
+          เหตุผล: Meter_seq ถูกรันมาแล้วแบบแยกตามประเภทในแต่ละพื้นที่ (UQ_Contract_meter_ms
+          คุม SubArea_id + Meter_type_cd + Meter_seq) และเลขน้ำที่ระบบ gen ให้ (W001...)
+          ก็ผูกกับประเภทน้ำ ถ้าสลับประเภททีหลังข้อมูลจะขัดกันเอง
+          view ก็บังคับใช้ค่าจากฐานข้อมูลอีกชั้น ไม่เชื่อค่าที่ POST มา
+        {% endcomment %}
+        <div class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-600 flex items-center justify-between">
+          <span class="font-medium">
+            {% if meter.Meter_type_cd == 9 %}น้ำ{% else %}ไฟ{% endif %}
+          </span>
+          <span class="text-xs text-gray-400">แก้ไขประเภทไม่ได้</span>
+        </div>
+        <p class="text-xs text-gray-400 mt-1">
+          มิเตอร์ตัวนี้เป็นมิเตอร์{% if meter.Meter_type_cd == 9 %}น้ำ{% else %}ไฟ{% endif %}
+          ถ้าต้องการมิเตอร์อีกประเภทในพื้นที่เดียวกัน ให้
+          <a href="{% url 'meter_new' %}" class="text-brand-600 hover:underline">เพิ่มมิเตอร์ใหม่</a> แทน
+        </p>
+      {% else %}
+        <select name="meter_type_cd" id="meterTypeSelect"
+                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
+          <option value="9" {% if meter.Meter_type_cd == 9 %}selected{% endif %}>น้ำ</option>
+          <option value="8" {% if meter.Meter_type_cd == 8 %}selected{% endif %}>ไฟ</option>
+        </select>
+      {% endif %}
     </div>
 
     <div>
@@ -65,15 +86,29 @@
              class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
     </div>
 
-    <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1.5">ระบบไฟฟ้า (กรอกเฉพาะมิเตอร์ไฟ)</label>
+    {% comment %}
+      ช่องระบบไฟฟ้าใช้กับมิเตอร์ไฟเท่านั้น
+      - ตอนแก้ไข: รู้ประเภทแน่นอนแล้ว ถ้าเป็นมิเตอร์น้ำจะไม่แสดงช่องนี้เลย
+      - ตอนเพิ่มใหม่: แสดงไว้แต่ซ่อน/โชว์ตามประเภทที่เลือก (ดู meter_form.js)
+      ฝั่ง view บังคับ phase_type = None ให้มิเตอร์น้ำอีกชั้น ไม่ว่าจะ POST อะไรมา
+    {% endcomment %}
+    {% if not meter_id or meter.Meter_type_cd == 8 %}
+    <div id="phaseField" {% if not meter_id and meter.Meter_type_cd != 8 %}class="hidden"{% endif %}>
+      <label class="block text-sm font-medium text-gray-700 mb-1.5">ระบบไฟฟ้า (เฉพาะมิเตอร์ไฟ)</label>
       <select name="phase_type"
               class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
         <option value="">ไม่ระบุ</option>
-        <option value="1เฟส" {% if meter.Phase_type == "1เฟส" %}selected{% endif %}>1 เฟส</option>
-        <option value="3เฟส" {% if meter.Phase_type == "3เฟส" %}selected{% endif %}>3 เฟส</option>
+        {% for opt in phase_options %}
+          <option value="{{ opt.Phase_type }}" {% if meter.Phase_type == opt.Phase_type %}selected{% endif %}>
+            {{ opt.Phase_desc|default:opt.Phase_type }}{% if opt.is_obsolete %} (ปิดใช้งานแล้ว){% endif %}
+          </option>
+        {% endfor %}
       </select>
+      <p class="text-xs text-gray-400 mt-1">
+        ตัวเลือกมาจาก <a href="{% url 'phase_list' %}" class="text-brand-600 hover:underline">Master ระบบไฟฟ้า</a>
+      </p>
     </div>
+    {% endif %}
 
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1.5">หมายเหตุ</label>
@@ -82,9 +117,15 @@
                 class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">{{ meter.Meter_remark|default:'' }}</textarea>
     </div>
 
-    {# --- สถานะการใช้งาน: hidden field เก็บค่าจริง ปุ่มด้านล่างเป็นตัวเปลี่ยนค่านี้ --- #}
+    {% comment %}
+      สถานะการใช้งาน: hidden field เก็บค่าจริง ปุ่มด้านล่างเป็นตัวเปลี่ยนค่านี้
+      ค่าต้องเป็น 'on' / '' (ค่าว่าง) ให้ตรงกับที่ view อ่าน คือ
+      request.POST.get('use_or_not') == 'on'
+      เดิมส่งเป็น '1'/'0' ซึ่งไม่เท่ากับ 'on' เลย ทำให้บันทึกทีไรมิเตอร์ถูกปิดใช้งานทุกครั้ง
+      และปุ่ม "เปิดใช้งาน" กดแล้วไม่มีผล
+    {% endcomment %}
     <input type="hidden" name="use_or_not" id="useOrNotField"
-           value="{% if meter.UseOrNot or not meter_id %}1{% else %}0{% endif %}">
+           value="{% if meter.UseOrNot or not meter_id %}on{% endif %}">
 
     <div class="flex items-center justify-between gap-3 pt-2 border-t border-gray-100 mt-2 pt-4">
       <div>
@@ -142,60 +183,5 @@
   </div>
 </div>
 
-<script>
-  (function () {
-    const form = document.getElementById('meterForm');
-    const hiddenField = document.getElementById('useOrNotField');
-
-    // --- ปุ่มเปิดใช้งาน: ไม่ต้อง confirm เพราะไม่เสี่ยง ตั้งค่าแล้ว submit ทันที ---
-    const enableBtn = document.getElementById('enableBtn');
-    if (enableBtn) {
-      enableBtn.addEventListener('click', function () {
-        hiddenField.value = '1';
-        form.submit();
-      });
-    }
-
-    // --- ปุ่มปิดใช้งาน: ต้อง confirm ผ่าน modal ก่อน ---
-    const openBtn = document.getElementById('openDisableBtn');
-    if (openBtn) {
-      const modal = document.getElementById('confirmModal');
-      const backdrop = document.getElementById('confirmBackdrop');
-      const box = document.getElementById('confirmBox');
-      const btnNo = document.getElementById('confirmNo');
-      const btnYes = document.getElementById('confirmYes');
-
-      function openModal() {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        requestAnimationFrame(() => {
-          backdrop.classList.remove('opacity-0');
-          backdrop.classList.add('opacity-100');
-          box.classList.remove('opacity-0', 'scale-90');
-          box.classList.add('opacity-100', 'scale-100');
-        });
-      }
-
-      function closeModal() {
-        backdrop.classList.remove('opacity-100');
-        backdrop.classList.add('opacity-0');
-        box.classList.remove('opacity-100', 'scale-100');
-        box.classList.add('opacity-0', 'scale-90');
-        setTimeout(() => {
-          modal.classList.add('hidden');
-          modal.classList.remove('flex');
-        }, 200);
-      }
-
-      openBtn.addEventListener('click', openModal);
-      btnNo.addEventListener('click', closeModal);
-      backdrop.addEventListener('click', closeModal);
-      btnYes.addEventListener('click', () => {
-        hiddenField.value = '0';
-        closeModal();
-        form.submit();
-      });
-    }
-  })();
-</script>
+<script src="{% static 'meters/js/meter_form.js' %}" defer></script>
 {% endblock %}

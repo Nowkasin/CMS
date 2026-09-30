@@ -1,0 +1,151 @@
+{% extends "meters/base.html" %}
+{% load static %}
+
+{% block title %}{% if phase_id %}แก้ไขระบบไฟฟ้า{% else %}เพิ่มระบบไฟฟ้าใหม่{% endif %}{% endblock %}
+
+{% block content %}
+<div class="py-8 max-w-2xl">
+
+  <div class="text-sm text-gray-400 mb-1">
+    <a href="{% url 'phase_list' %}" class="hover:text-brand-600">Master ระบบไฟฟ้า</a>
+    <span class="mx-1">›</span>
+    <span class="text-gray-500">{% if phase_id %}แก้ไข{% else %}เพิ่มใหม่{% endif %}</span>
+  </div>
+
+  <h1 class="text-2xl font-bold text-gray-900 mb-6">
+    {% if phase_id %}แก้ไขระบบไฟฟ้า{% else %}เพิ่มระบบไฟฟ้าใหม่{% endif %}
+  </h1>
+
+  {% if errors %}
+  <div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-4 space-y-1">
+    {% for err in errors %}
+      <div>{{ err }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if phase_id and meters_using %}
+  {% comment %}
+    เตือนเมื่อรายการนี้มีมิเตอร์ผูกอยู่ -- ค่า Phase_type ถูกเก็บเป็นข้อความใน
+    Contract_meter_ms.Phase_type ถ้าแก้ชื่อที่นี่ ข้อมูลเดิมในตารางมิเตอร์จะยังเป็นค่าเก่า
+    ระบบไม่ตามไปอัปเดตให้ (ตั้งใจ เพื่อไม่ให้แก้ไขในหน้า master ไปเขียนทับข้อมูลมิเตอร์จำนวนมาก)
+  {% endcomment %}
+  <div class="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-4 py-3 mb-4">
+    ระบบไฟฟ้านี้มีมิเตอร์ใช้อยู่ <strong>{{ meters_using }} รายการ</strong> —
+    ถ้าแก้ชื่อในช่อง "ระบบไฟฟ้า" ข้อมูลที่บันทึกไว้ในทะเบียนมิเตอร์จะยังเป็นชื่อเดิม
+    ระบบจะไม่ตามไปแก้ให้ และถ้าปิดใช้งาน ชื่อนี้จะไม่ขึ้นให้เลือกในหน้าจัดการมิเตอร์อีก
+    (ข้อมูลมิเตอร์เดิมยังอยู่ ไม่ได้ถูกลบ)
+  </div>
+  {% endif %}
+
+  <form method="post" id="phaseForm" class="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
+    {% csrf_token %}
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1.5">
+        ระบบไฟฟ้า <span class="text-red-500">*</span>
+      </label>
+      <input type="text" name="phase_type" value="{{ phase.Phase_type|default:'' }}"
+             maxlength="{{ max_len }}" required autocomplete="off"
+             placeholder="เช่น 1เฟส"
+             class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
+      <p class="text-xs text-gray-400 mt-1">
+        ค่านี้คือค่าที่บันทึกลงทะเบียนมิเตอร์จริง ใส่ได้ไม่เกิน {{ max_len }} อักขระ และต้องไม่ซ้ำกับรายการอื่น
+      </p>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1.5">คำบรรยาย</label>
+      <input type="text" name="phase_desc" value="{{ phase.Phase_desc|default:'' }}"
+             maxlength="100" autocomplete="off"
+             placeholder="เช่น ระบบไฟฟ้า 1 เฟส"
+             class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
+      <p class="text-xs text-gray-400 mt-1">ใช้แสดงบนหน้าจอเท่านั้น ไม่ได้บันทึกลงทะเบียนมิเตอร์</p>
+    </div>
+
+    {% if phase_id %}
+    <div class="grid grid-cols-2 gap-4 pt-2 border-t border-gray-100">
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">ผู้บันทึก / วันที่บันทึก</label>
+        <p class="text-sm text-gray-600">
+          {{ phase.UserEntry|default:"—" }}
+          <span class="text-gray-400">· {{ phase.DateEntry|date:"d/m/Y H:i"|default:"—" }}</span>
+        </p>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">ผู้แก้ไข / วันที่แก้ไข</label>
+        <p class="text-sm text-gray-600">
+          {{ phase.UserUpdate|default:"—" }}
+          <span class="text-gray-400">· {{ phase.DateUpdate|date:"d/m/Y H:i"|default:"—" }}</span>
+        </p>
+      </div>
+    </div>
+    {% endif %}
+
+    {% comment %}
+      สถานะการใช้งาน: hidden field เก็บค่าจริง ปุ่มด้านล่างเป็นตัวเปลี่ยนค่านี้
+      (แพตเทิร์นเดียวกับ meter_form.html) เพิ่มใหม่ = เปิดใช้งานเป็นค่าเริ่มต้น
+    {% endcomment %}
+    <input type="hidden" name="use_or_not" id="useOrNotField"
+           value="{% if phase.UseOrNot or not phase_id %}on{% endif %}">
+
+    <div class="flex items-center justify-between gap-3 border-t border-gray-100 pt-4">
+      <div>
+        {% if phase_id and phase.UseOrNot %}
+          <button type="button" id="openDisableBtn"
+                  class="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors">
+            ปิดใช้งาน
+          </button>
+        {% elif phase_id and not phase.UseOrNot %}
+          <button type="button" id="enableBtn"
+                  class="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 transition-colors">
+            เปิดใช้งาน
+          </button>
+        {% endif %}
+      </div>
+      <div class="flex gap-3">
+        <a href="{% url 'phase_list' %}"
+           class="px-5 py-2.5 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">
+          ยกเลิก
+        </a>
+        <button type="submit"
+                class="px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600">
+          บันทึก
+        </button>
+      </div>
+    </div>
+  </form>
+
+</div>
+
+{# --- modal ยืนยันการปิดใช้งาน (fade + scale animation) --- #}
+<div id="confirmModal" class="fixed inset-0 z-50 hidden items-center justify-center">
+  <div id="confirmBackdrop"
+       class="absolute inset-0 bg-black/50 opacity-0 transition-opacity duration-200"></div>
+
+  <div id="confirmBox"
+       class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6 scale-90 opacity-0 transition-all duration-200">
+    <div class="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
+      <svg class="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
+      </svg>
+    </div>
+    <h3 class="text-center text-base font-bold text-gray-900 mb-1">ยืนยันการปิดใช้งาน</h3>
+    <p class="text-center text-sm text-gray-500 mb-6">
+      ปิดใช้งานแล้วระบบไฟฟ้านี้จะไม่ขึ้นให้เลือกในหน้าจัดการมิเตอร์ ต้องการดำเนินการต่อหรือไม่?
+    </p>
+    <div class="flex gap-3">
+      <button type="button" id="confirmNo"
+              class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">
+        ไม่ต้องการ
+      </button>
+      <button type="button" id="confirmYes"
+              class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors">
+        ต้องการ
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="{% static 'meters/js/phase_form.js' %}" defer></script>
+{% endblock %}

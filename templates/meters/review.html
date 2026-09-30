@@ -12,7 +12,9 @@
 
     <div class="flex items-center justify-between mb-8">
       <h1 class="text-2xl font-bold text-gray-900">ค่าน้ำ-ค่าไฟ</h1>
+      {# ปุ่มนี้ล้างข้อมูลที่อัปโหลดไว้ทั้งหมดจริง (restart) -- ถามยืนยันก่อนกันกดพลาด #}
       <a href="{% url 'restart' %}"
+         onclick="return confirm('เริ่มรายการใหม่จะล้างข้อมูลที่อัปโหลดไว้ทั้งหมด ต้องการดำเนินการต่อหรือไม่?')"
          class="inline-flex items-center gap-1.5 bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -43,13 +45,30 @@
       </div>
       {% endif %}
 
+      {% if staged.summary.duplicate > 0 %}
+      <div class="flex items-start gap-2 bg-amber-50 border border-amber-100 text-amber-700 text-sm rounded-lg px-4 py-3 mb-5">
+        <svg class="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+        </svg>
+        <span>
+          พบ {{ staged.summary.duplicate }} รายการที่มีมิเตอร์อยู่ในระบบแล้ว —
+          ระบบจะ<strong>อัปเดตข้อมูลมิเตอร์ตัวเดิม</strong> ไม่สร้างรายการใหม่ซ้ำ
+          นำเข้าต่อได้ตามปกติ
+        </span>
+      </div>
+      {% endif %}
+
       <!-- ค้นหา/กรอง -->
       <form method="get" class="flex flex-wrap items-center gap-2 mb-4">
-        <a href="?type=all{% if search %}&q={{ search }}{% endif %}"
+        {% comment %}
+          ต้องใส่ |urlencode ทุกที่ที่เอาคำค้นต่อเข้า URL -- ถ้าผู้ใช้ค้นคำที่มี & หรือ #
+          คำค้นจะถูกตัดกลางทาง เพราะ & เป็นตัวคั่น query string และ # เป็นจุดเริ่ม fragment
+        {% endcomment %}
+        <a href="?type=all{% if search %}&q={{ search|urlencode }}{% endif %}"
            class="text-xs px-3 py-1.5 rounded-full border {% if active_filter == 'all' %}bg-gray-900 text-white border-gray-900{% else %}border-gray-200 text-gray-600{% endif %}">ทั้งหมด</a>
-        <a href="?type=9{% if search %}&q={{ search }}{% endif %}"
+        <a href="?type=9{% if search %}&q={{ search|urlencode }}{% endif %}"
            class="text-xs px-3 py-1.5 rounded-full border {% if active_filter == '9' %}bg-gray-900 text-white border-gray-900{% else %}border-gray-200 text-gray-600{% endif %}">น้ำ</a>
-        <a href="?type=8{% if search %}&q={{ search }}{% endif %}"
+        <a href="?type=8{% if search %}&q={{ search|urlencode }}{% endif %}"
            class="text-xs px-3 py-1.5 rounded-full border {% if active_filter == '8' %}bg-gray-900 text-white border-gray-900{% else %}border-gray-200 text-gray-600{% endif %}">ไฟฟ้า</a>
         <input type="hidden" name="type" value="{{ active_filter }}">
         <input type="text" name="q" value="{{ search }}" placeholder="ค้นหา รหัสสัญญา / SubArea / เลขมิเตอร์"
@@ -75,7 +94,7 @@
           </thead>
           <tbody class="divide-y divide-gray-50">
             {% for r in page_obj %}
-            <tr class="{% if r.status == 'error' %}bg-red-50{% endif %}">
+            <tr class="{% if r.status == 'error' %}bg-red-50{% elif r.status == 'duplicate' %}bg-amber-50{% endif %}">
               <td class="px-4 py-2.5 text-gray-400 font-mono text-xs">{{ r.idx }}</td>
               <td class="px-4 py-2.5 text-xs whitespace-nowrap">{{ r.customer_name|default:"—" }}</td>
               <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap">{{ r.tax_id|default:"—" }}</td>
@@ -91,8 +110,15 @@
               <td class="px-4 py-2.5">
                 {% if r.status == 'ok' %}
                   <span class="text-xs font-medium text-brand-600">พร้อมนำเข้า</span>
+                {% elif r.status == 'duplicate' %}
+                  <span class="text-xs font-medium text-amber-600 inline-flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 8.25V6a2.25 2.25 0 00-2.25-2.25H6A2.25 2.25 0 003.75 6v8.25A2.25 2.25 0 006 16.5h2.25m8.25-8.25H18A2.25 2.25 0 0120.25 10.5V18A2.25 2.25 0 0118 20.25h-7.5A2.25 2.25 0 018.25 18v-7.5A2.25 2.25 0 0110.5 8.25h6z" />
+                    </svg>
+                    {{ r.message }}
+                  </span>
                 {% elif r.status == 'skip' %}
-                  <span class="text-xs font-medium text-gray-400">ข้าม</span>
+                  <span class="text-xs font-medium text-gray-400">{{ r.message|default:"ข้าม" }}</span>
                 {% else %}
                   <span class="text-xs font-medium text-red-500 inline-flex items-center gap-1">
                     <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -114,24 +140,31 @@
       {% if page_obj.paginator.num_pages > 1 %}
       <div class="flex items-center justify-center gap-1 mt-4">
         {% if page_obj.has_previous %}
-          <a href="?type={{ active_filter }}&q={{ search }}&page={{ page_obj.previous_page_number }}"
+          <a href="?type={{ active_filter|urlencode }}&q={{ search|urlencode }}&page={{ page_obj.previous_page_number }}"
              class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">‹</a>
         {% endif %}
         <span class="text-xs text-gray-500 px-2">หน้า {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
         {% if page_obj.has_next %}
-          <a href="?type={{ active_filter }}&q={{ search }}&page={{ page_obj.next_page_number }}"
+          <a href="?type={{ active_filter|urlencode }}&q={{ search|urlencode }}&page={{ page_obj.next_page_number }}"
              class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">›</a>
         {% endif %}
       </div>
       {% endif %}
 
       <div class="text-xs text-gray-400 mt-3">
-        รวม {{ total_filtered }} รายการ (พร้อมนำเข้า {{ staged.summary.ok }} · ข้าม {{ staged.summary.skip }} · ผิดพลาด {{ staged.summary.error }})
+        รวม {{ total_filtered }} รายการ (พร้อมนำเข้า {{ staged.summary.ok }}
+        {% if staged.summary.duplicate %}· มีในระบบแล้ว {{ staged.summary.duplicate }}{% endif %}
+        · ข้าม {{ staged.summary.skip }} · ผิดพลาด {{ staged.summary.error }})
       </div>
 
       <!-- Bottom nav -->
       <div class="flex items-center justify-between mt-8 pt-6 border-t border-gray-100">
-        <a href="{% url 'restart' %}" class="text-sm text-gray-500 hover:text-gray-700 inline-flex items-center gap-1">
+        {% comment %}
+          ย้อนกลับไปหน้าอัปโหลด (Step 1) โดยไม่ล้างข้อมูล -- step1_upload ตอน GET แค่ render
+          ฟอร์ม ไม่ได้แตะ session ข้อมูลที่ parse ไว้จึงยังอยู่ กดกลับมา /review/ ก็เห็นเหมือนเดิม
+          เดิมชี้ไป 'restart' ซึ่งล้างข้อมูลทั้งหมดทิ้ง ไม่ตรงกับความหมายของคำว่า "ย้อนกลับ"
+        {% endcomment %}
+        <a href="{% url 'step1' %}" class="text-sm text-gray-500 hover:text-gray-700 inline-flex items-center gap-1">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
           </svg>

@@ -2,7 +2,6 @@
 import datetime
 
 from django.shortcuts import render, redirect
-from django.urls import reverse
 from django.core.paginator import Paginator
 
 from .. import services
@@ -21,15 +20,52 @@ def _current_year_be():
     return datetime.date.today().year + 543
 
 
+def _safe_month(raw, fallback):
+    """
+    แปลงเดือนที่ POST มาเป็น int 1-12 -- ถ้าไม่ใช่ตัวเลขหรืออยู่นอกช่วง คืน fallback
+    (ไม่ throw และไม่ปล่อยให้เป็น index ติดลบที่จะได้เดือนผิดแบบเงียบๆ)
+    """
+    try:
+        month = int(raw)
+    except (TypeError, ValueError):
+        return fallback
+    return month if 1 <= month <= 12 else fallback
+
+
+def _safe_year(raw, fallback):
+    """
+    แปลงปี พ.ศ. ที่ POST มาเป็น int -- ถ้าไม่ใช่ตัวเลขหรือดูไม่สมเหตุสมผล คืน fallback
+    ช่วงที่ยอมรับ 2500-2700 กันค่าอย่าง 0 หรือปี ค.ศ. ที่กรอกผิดช่อง
+    """
+    try:
+        year = int(raw)
+    except (TypeError, ValueError):
+        return fallback
+    return year if 2500 <= year <= 2700 else fallback
+
+
+def _previous_month():
+    """
+    คืน (month_idx 1-12, year_be) ของเดือนก่อนหน้าปัจจุบัน -- ใช้เป็นค่า default ของรอบบิล
+    ที่ดำเนินการในหน้า upload (ปกติจะบันทึกค่าน้ำ-ค่าไฟของเดือนที่ผ่านมา ไม่ใช่เดือนปัจจุบัน)
+    เผื่อกรณีเดือนมกราคม (เดือน 1) เดือนก่อนหน้าคือธันวาคมของปีก่อน -- ต้องถอยปีด้วย
+    """
+    today = datetime.date.today()
+    first_of_this_month = today.replace(day=1)
+    last_month = first_of_this_month - datetime.timedelta(days=1)
+    return last_month.month, last_month.year + 543
+
+
 def step1_upload(request):
+    prev_month_idx, prev_year_be = _previous_month()
     context = {
         'form': ExcelUploadForm(),
         'current_step': 1,
         'step_labels': STEP_LABELS,
         'thai_months': THAI_MONTHS,
-        'current_month_idx': datetime.date.today().month,
+        'current_month_idx': prev_month_idx,
         'year_options': [_current_year_be() - 1, _current_year_be(), _current_year_be() + 1],
-        'current_year_be': _current_year_be(),
+        'current_year_be': prev_year_be,
     }
 
     if request.method == 'POST':
@@ -37,8 +73,12 @@ def step1_upload(request):
         context['form'] = form
         if form.is_valid():
             excel_file = form.cleaned_data['excel_file']
-            month_idx = int(request.POST.get('billing_month', datetime.date.today().month))
-            year_be = int(request.POST.get('billing_year', _current_year_be()))
+            # ต้อง validate ก่อนใช้เป็น index: ค่าที่ POST มาเชื่อถือไม่ได้
+            # ถ้าใช้ int() ตรงๆ แล้วส่งค่าอย่าง 'abc' มาจะ ValueError -> 500
+            # และ 0 / ค่าว่าง จะกลายเป็น THAI_MONTHS[-1] = 'ธันวาคม' แบบเงียบๆ (รอบบิลผิดโดยไม่รู้ตัว)
+            prev_month_idx, prev_year_be = _previous_month()
+            month_idx = _safe_month(request.POST.get('billing_month'), prev_month_idx)
+            year_be = _safe_year(request.POST.get('billing_year'), prev_year_be)
             billing_period = f"{THAI_MONTHS[month_idx - 1]} {year_be}"
 
             parsed = services.parse_excel_staged(excel_file)
@@ -53,66 +93,6 @@ def step1_upload(request):
             return redirect('step2')
 
     return render(request, 'meters/upload.html', context)
-
-
-def edit_staged_row(request, idx):
-    """
-    แก้ไข 1 แถวใน session['staged']['rows'] ก่อนกดยืนยันใน step 3
-    (ใช้กับหน้า create_contract.html ที่จริงๆ คือหน้า "แก้ไข record ที่ parse มาแล้ว"
-    ไม่ใช่หน้าสร้างสัญญาใหม่ -- ไม่มี SP/table เพิ่ม แก้ข้อมูลใน session ตรงๆ)
-    """
-    staged = request.session.get('staged')
-    if not staged:
-        return redirect('step1')
-
-    rows = staged['rows']
-    row = next((r for r in rows if r['idx'] == idx), None)
-    if row is None:
-        return redirect('step2')
-
-    next_qs = request.GET.get('next', '') or request.POST.get('next', '')
-
-    if request.method == 'POST':
-        row['contract_code'] = request.POST.get('contract_code', '').strip() or None
-        row['location_id'] = request.POST.get('location_id', '').strip()
-        row['area_id'] = request.POST.get('area_id', '').strip()
-        row['subarea_id'] = request.POST.get('subarea_id', '').strip()
-        meter_no = request.POST.get('meter_no', '').strip()
-        row['meter_no'] = meter_no or None
-
-        if row['type_cd'] == 8:
-            row['phase_type'] = request.POST.get('phase_type') or None
-
-        # ตรวจสอบใหม่หลังแก้ไข (logic เดียวกับตอน parse ครั้งแรก)
-        if not row['contract_code']:
-            row['status'] = 'error'
-            row['message'] = 'ไม่พบรหัสสัญญาในแถวนี้'
-        elif not services.find_subarea(row['location_id'], row['area_id'], row['subarea_id']):
-            row['status'] = 'error'
-            row['message'] = f"ไม่พบพื้นที่ {row['location_id']}/{row['area_id']}/{row['subarea_id']} ในฐานข้อมูล"
-        else:
-            row['status'] = 'ok'
-            row['message'] = ''
-            row['meter_no_status'] = 'รอ Gen เลข' if not row['meter_no'] else 'ปกติ'
-
-        # คำนวณสรุปยอดใหม่ทั้งชุด (จำนวน error/skip อาจเปลี่ยนหลังแก้)
-        staged['summary'] = {
-            'total': len(rows),
-            'ok': sum(1 for r in rows if r['status'] == 'ok'),
-            'skip': sum(1 for r in rows if r['status'] == 'skip'),
-            'error': sum(1 for r in rows if r['status'] == 'error'),
-        }
-        request.session['staged'] = staged
-        request.session.modified = True
-
-        target = f"{reverse('step2')}?{next_qs}" if next_qs else reverse('step2')
-        return redirect(target)
-
-    context = {
-        'current_step': 2, 'step_labels': STEP_LABELS,
-        'row': row, 'next_qs': next_qs,
-    }
-    return render(request, 'meters/edit_row.html', context)
 
 
 def step2_review(request):

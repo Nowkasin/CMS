@@ -6,3 +6,11 @@ db.sqlite3
 /staticfiles/
 .vscode/
 .idea/
+
+# เอกสารประกอบ (requirement/สเปค) -- เก็บไว้ในเครื่อง ไม่เอาขึ้น git
+*.docx
+*.xlsx
+*.xls
+
+# สคริปต์แก้ schema ที่รันกับฐานข้อมูลจริงแล้ว -- จัดการผ่านกระบวนการของ DBA
+sql/

@@ -133,19 +133,27 @@
               <div class="grid grid-cols-2 gap-3">
                 <div>
                   <label class="block text-xs font-medium text-gray-600 mb-1">เลขอ่านก่อน (รอบนี้)</label>
-                  <input type="number" name="water_reading_before"
+                  <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
+                         name="water_reading_before"
                          value="{{ water_reading.Reading_before|default_if_none:'' }}"
                          {% if not subarea.water %}disabled{% endif %}
                          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-400">
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-600 mb-1">เลขอ่านหลัง (รอบนี้)</label>
-                  <input type="number" name="water_reading_after"
+                  <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
+                         name="water_reading_after"
                          value="{{ water_reading.Reading_after|default_if_none:'' }}"
                          {% if not subarea.water %}disabled{% endif %}
                          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-400">
                 </div>
               </div>
+              {% if water_reading.Contract_code %}
+              <p class="text-xs text-gray-400">
+                สัญญาที่ผูกกับเลขอ่านรอบนี้: {{ water_reading.Contract_code }}
+                (Contract_id #{{ water_reading.Contract_id }})
+              </p>
+              {% endif %}
             </div>
           </div>
 
@@ -181,26 +189,37 @@
                 <select name="electric_phase" {% if not subarea.electric %}disabled{% endif %}
                         class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400">
                   <option value="">ไม่ระบุ</option>
-                  <option value="1เฟส" {% if subarea.electric.Phase_type == "1เฟส" %}selected{% endif %}>1 เฟส</option>
-                  <option value="3เฟส" {% if subarea.electric.Phase_type == "3เฟส" %}selected{% endif %}>3 เฟส</option>
+                  {% for opt in phase_options %}
+                    <option value="{{ opt.Phase_type }}" {% if subarea.electric.Phase_type == opt.Phase_type %}selected{% endif %}>
+                      {{ opt.Phase_desc|default:opt.Phase_type }}{% if opt.is_obsolete %} (ปิดใช้งานแล้ว){% endif %}
+                    </option>
+                  {% endfor %}
                 </select>
               </div>
               <div class="grid grid-cols-2 gap-3">
                 <div>
                   <label class="block text-xs font-medium text-gray-600 mb-1">เลขอ่านก่อน (รอบนี้)</label>
-                  <input type="number" name="electric_reading_before"
+                  <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
+                         name="electric_reading_before"
                          value="{{ electric_reading.Reading_before|default_if_none:'' }}"
                          {% if not subarea.electric %}disabled{% endif %}
                          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400">
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-600 mb-1">เลขอ่านหลัง (รอบนี้)</label>
-                  <input type="number" name="electric_reading_after"
+                  <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
+                         name="electric_reading_after"
                          value="{{ electric_reading.Reading_after|default_if_none:'' }}"
                          {% if not subarea.electric %}disabled{% endif %}
                          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400">
                 </div>
               </div>
+              {% if electric_reading.Contract_code %}
+              <p class="text-xs text-gray-400">
+                สัญญาที่ผูกกับเลขอ่านรอบนี้: {{ electric_reading.Contract_code }}
+                (Contract_id #{{ electric_reading.Contract_id }})
+              </p>
+              {% endif %}
             </div>
           </div>
 
@@ -224,20 +243,5 @@
 
 </div>
 
-<script>
-  function wireToggle(checkboxId, fieldsId){
-    const checkbox = document.getElementById(checkboxId);
-    const fields = document.getElementById(fieldsId);
-    const inputs = fields.querySelectorAll('input, select');
-    function sync(){
-      const on = checkbox.checked;
-      fields.classList.toggle('opacity-40', !on);
-      fields.classList.toggle('pointer-events-none', !on);
-      inputs.forEach(el => el.disabled = !on);
-    }
-    checkbox.addEventListener('change', sync);
-  }
-  wireToggle('waterEnable', 'waterFields');
-  wireToggle('electricEnable', 'electricFields');
-</script>
+<script src="{% static 'meters/js/edit_meter.js' %}" defer></script>
 {% endblock %}

@@ -57,6 +57,11 @@
             {% if request.path == '/create_contract/' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
     สร้างสัญญา
   </a> -->
+  <a href="{% url 'phase_list' %}"
+     class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
+            {% if request.resolver_match.url_name == 'phase_list' or request.resolver_match.url_name == 'phase_new' or request.resolver_match.url_name == 'phase_edit' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
+    Master ระบบไฟฟ้า
+  </a>
   <a href="{% url 'dashboard' %}"
     target="_blank"
      class="px-4 py-2 rounded-lg text-sm font-medium transition-colors

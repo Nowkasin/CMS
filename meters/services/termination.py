@@ -1,5 +1,6 @@
 # meters/services/termination.py
 from .db import get_db_connection
+from .meters import _to_sql_like_pattern
 
 
 def find_contract_for_termination(search):
@@ -11,7 +12,9 @@ def find_contract_for_termination(search):
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        like = f"%{search}%"
+        # escape wildcard ที่ผู้ใช้พิมพ์มาจริง (% _ [) ไม่ให้ถูกตีความเป็น wildcard ของ SQL
+        # ไม่งั้นค้นหา '%' จะคืนสัญญาทั้งหมดในระบบ
+        like = _to_sql_like_pattern(search)
         cursor.execute(
             """
             SELECT DISTINCT c.Contract_id, c.Contract_code, c.Status_contract_id, cu.CompanyName

@@ -1,0 +1,97 @@
+{% extends "meters/base.html" %}
+{% load static %}
+
+{% block title %}Master ระบบไฟฟ้า{% endblock %}
+
+{% block content %}
+<div class="py-8">
+
+  <div class="text-sm text-gray-400 mb-1">
+    <a href="{% url 'dashboard' %}" class="hover:text-brand-600">แดชบอร์ด</a>
+    <span class="mx-1">›</span>
+    <span class="text-gray-500">Master ระบบไฟฟ้า</span>
+  </div>
+
+  <div class="flex items-center justify-between gap-4 flex-wrap mb-1">
+    <h1 class="text-2xl font-bold text-gray-900">Master ระบบไฟฟ้า</h1>
+    <a href="{% url 'phase_new' %}"
+       class="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600">
+      + เพิ่มระบบไฟฟ้า
+    </a>
+  </div>
+  <p class="text-sm text-gray-500 mb-4">
+    รายการนี้เป็นตัวเลือกในช่อง "ระบบไฟฟ้า" ของหน้าจัดการมิเตอร์และหน้าแก้ไขมิเตอร์
+    เฉพาะรายการที่เปิดใช้งานจึงจะขึ้นให้เลือก
+  </p>
+
+  <div class="flex gap-2 mb-4">
+    <a href="?status=active"
+       class="px-3 py-1.5 rounded-lg text-sm font-medium
+              {% if status_filter == 'active' %}bg-brand-500 text-white{% else %}text-gray-600 bg-white border border-gray-200 hover:bg-gray-50{% endif %}">
+      ใช้งานอยู่
+    </a>
+    <a href="?status=inactive"
+       class="px-3 py-1.5 rounded-lg text-sm font-medium
+              {% if status_filter == 'inactive' %}bg-brand-500 text-white{% else %}text-gray-600 bg-white border border-gray-200 hover:bg-gray-50{% endif %}">
+      ปิดใช้งาน
+    </a>
+    <a href="?status=all"
+       class="px-3 py-1.5 rounded-lg text-sm font-medium
+              {% if status_filter == 'all' %}bg-brand-500 text-white{% else %}text-gray-600 bg-white border border-gray-200 hover:bg-gray-50{% endif %}">
+      ทั้งหมด
+    </a>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-xl overflow-x-auto">
+    <table class="min-w-full text-sm text-left">
+      <thead>
+        <tr class="border-b border-gray-100 bg-gray-50">
+          <th class="px-4 py-2.5 font-semibold text-gray-500">รหัส</th>
+          <th class="px-4 py-2.5 font-semibold text-gray-500">ระบบไฟฟ้า</th>
+          <th class="px-4 py-2.5 font-semibold text-gray-500">คำบรรยาย</th>
+          <th class="px-4 py-2.5 font-semibold text-gray-500">สถานะใช้งาน</th>
+          <th class="px-4 py-2.5 font-semibold text-gray-500">มิเตอร์ที่ใช้อยู่</th>
+          <th class="px-4 py-2.5 font-semibold text-gray-500">ผู้บันทึก</th>
+          <th class="px-4 py-2.5 font-semibold text-gray-500">วันที่บันทึก</th>
+          <th class="px-4 py-2.5 font-semibold text-gray-500">ผู้แก้ไข</th>
+          <th class="px-4 py-2.5 font-semibold text-gray-500">วันที่แก้ไข</th>
+          <th class="px-4 py-2.5"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {% for p in phases %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-2.5 text-gray-400 font-mono text-xs">{{ p.Phase_id }}</td>
+          <td class="px-4 py-2.5 font-medium text-gray-800">{{ p.Phase_type }}</td>
+          <td class="px-4 py-2.5 text-gray-600">{{ p.Phase_desc|default:"—" }}</td>
+          <td class="px-4 py-2.5">
+            {% if p.UseOrNot %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-brand-50 text-brand-600">เปิดใช้งาน</span>
+            {% else %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-500">ปิดใช้งาน</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2.5 text-gray-600">
+            {% if p.meters_using %}
+              {{ p.meters_using }} มิเตอร์
+            {% else %}
+              <span class="text-gray-400">ยังไม่มี</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2.5 text-gray-500 text-xs">{{ p.UserEntry|default:"—" }}</td>
+          <td class="px-4 py-2.5 text-gray-500 text-xs">{{ p.DateEntry|date:"d/m/Y H:i"|default:"—" }}</td>
+          <td class="px-4 py-2.5 text-gray-500 text-xs">{{ p.UserUpdate|default:"—" }}</td>
+          <td class="px-4 py-2.5 text-gray-500 text-xs">{{ p.DateUpdate|date:"d/m/Y H:i"|default:"—" }}</td>
+          <td class="px-4 py-2.5 text-right">
+            <a href="{% url 'phase_edit' p.Phase_id %}" class="text-brand-600 hover:underline text-xs font-medium">แก้ไข</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="10" class="px-4 py-8 text-center text-gray-400">ไม่พบรายการระบบไฟฟ้า</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+{% endblock %}

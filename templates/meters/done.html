@@ -49,6 +49,14 @@
       </div>
     </div>
 
+    {% if committed.stats.meter_reused > 0 %}
+    {# meter_reused นับรวมอยู่ใน meter_ok แล้ว -- แยกบอกให้รู้ว่ากี่รายการเป็นการอัปเดตตัวเดิม #}
+    <div class="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-4 py-3 mb-6">
+        ในรายการที่สำเร็จ มี {{ committed.stats.meter_reused }} รายการที่เป็นการ<strong>อัปเดตมิเตอร์เดิม</strong>
+        ที่มีอยู่ในระบบแล้ว (ใช้ Meter_id เดิม ไม่ได้สร้างรายการใหม่)
+    </div>
+    {% endif %}
+
     <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-sm font-bold text-gray-900">รายละเอียดผลการนำเข้า</h3>
@@ -117,21 +125,5 @@
   </div>
 </div>
 
-<script>
-  document.getElementById('btnDownloadCsv')?.addEventListener('click', () => {
-    const rows = [['ลำดับ','รหัสสัญญา','SubArea','ประเภท','เลขมิเตอร์','สถานะ']];
-    document.querySelectorAll('#resultTable tbody tr').forEach(tr => {
-      const cells = Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim());
-      rows.push(cells);
-    });
-    const csv = rows.map(r => r.map(c => `"${c.replace(/"/g,'""')}"`).join(',')).join('\n');
-    const blob = new Blob(["\ufeff" + csv], {type: 'text/csv;charset=utf-8;'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'utility_import_report.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-  });
-</script>
+<script src="{% static 'meters/js/done.js' %}" defer></script>
 {% endblock %}

@@ -58,9 +58,60 @@ def sp_bind_to_contract(cursor, contract_id, location_id, area_id, subarea_id, m
                           f"@Meter_id_list='{meter_id}'"))
 
 
+def find_existing_meter(cursor, subarea_id, meter_type_cd, meter_no):
+    """
+    หามิเตอร์ที่ลงทะเบียนไว้แล้วในพื้นที่นี้ เพื่อใช้ Meter_id เดิมซ้ำแทนการสร้างแถวใหม่
+    คืนค่า (Meter_id, Meter_no, Meter_no_status) หรือ None ถ้าไม่เจอ
+
+    ทำไมต้องมี: sp_Contract_Meter_Save จะ INSERT ใหม่ทุกครั้งที่ @Meter_id เป็น NULL
+    โดยไม่เช็คเลยว่าเลขเครื่องวัดนี้มีอยู่แล้วหรือยัง และ UQ_Contract_meter_ms ที่มีอยู่
+    คุมแค่ (SubArea_id, Meter_type_cd, Meter_seq) ซึ่ง SP รันเลข seq ใหม่ให้ทุกครั้ง
+    -> ไม่มีอะไรกันการซ้ำเลย อัปโหลดไฟล์เดิมซ้ำจึงได้มิเตอร์งอกเพิ่มทั้งชุด
+    ผู้เรียกต้องหา Meter_id เดิมเองแล้วส่งเข้า SP เพื่อให้เข้า branch UPDATE
+
+    การจับคู่:
+      - มีเลขเครื่องวัด -> เทียบ (SubArea_id, Meter_type_cd, Meter_no) แบบ TRIM ทั้ง 2 ฝั่ง
+      - ไม่มีเลข (แถว "รอ Gen เลข") -> เทียบ (SubArea_id, Meter_type_cd) และใช้ซ้ำเฉพาะตอน
+        เจอตัวเดียวเท่านั้น เพราะถ้าเจอหลายตัวจะไม่รู้ว่าหมายถึงตัวไหน ปล่อยให้ INSERT ใหม่
+    เทียบเฉพาะแถว UseOrNot = 1 -- มิเตอร์ที่ถูกปิดใช้งานไว้ไม่ควรถูกปลุกกลับมาโดยการ import
+    """
+    if meter_no:
+        cursor.execute(
+            """
+            SELECT Meter_id, Meter_no, Meter_no_status
+            FROM dbo.Contract_meter_ms
+            WHERE LTRIM(RTRIM(SubArea_id)) = LTRIM(RTRIM(?))
+              AND Meter_type_cd = ?
+              AND LTRIM(RTRIM(Meter_no)) = LTRIM(RTRIM(?))
+              AND UseOrNot = 1
+            ORDER BY Meter_id
+            """,
+            subarea_id, meter_type_cd, meter_no,
+        )
+        row = cursor.fetchone()
+        return (row[0], row[1], row[2]) if row else None
+
+    cursor.execute(
+        """
+        SELECT Meter_id, Meter_no, Meter_no_status
+        FROM dbo.Contract_meter_ms
+        WHERE LTRIM(RTRIM(SubArea_id)) = LTRIM(RTRIM(?))
+          AND Meter_type_cd = ?
+          AND UseOrNot = 1
+        ORDER BY Meter_id
+        """,
+        subarea_id, meter_type_cd,
+    )
+    found = cursor.fetchall()
+    if len(found) == 1:
+        r = found[0]
+        return (r[0], r[1], r[2])
+    return None
+
+
 def commit_staged_rows(rows, user_id):
     logs = []
-    stats = {'meter_ok': 0, 'skipped': 0, 'errors': 0}
+    stats = {'meter_ok': 0, 'meter_reused': 0, 'skipped': 0, 'errors': 0}
     result_rows = []
 
     conn = get_db_connection()
@@ -84,12 +135,32 @@ def commit_staged_rows(rows, user_id):
                 continue
 
             try:
+                # หา Meter_id เดิมก่อน -- ถ้าเจอจะส่งเข้า SP ให้เข้า branch UPDATE
+                # (ใช้ cursor ตัวเดียวกับที่กำลัง commit อยู่ ให้เห็นแถวที่เพิ่ง insert ในรอบนี้ด้วย)
+                existing = find_existing_meter(
+                    cursor, r['subarea_id'], r['type_cd'], r['meter_no'],
+                )
+                reuse_id = existing[0] if existing else None
+
+                # สำคัญ: branch UPDATE ของ SP สั่ง SET Meter_no = @Meter_no ตรงๆ และ auto-gen
+                # เลขน้ำ (W001...) ทำงานแค่ใน branch INSERT เท่านั้น ถ้าแถวนี้ไม่มีเลขเครื่องวัด
+                # (รอ Gen เลข) แล้วเราส่ง NULL เข้า UPDATE เลขที่ระบบ gen ไว้เดิมจะถูกล้างหาย
+                # จึงต้องส่งเลข/สถานะเดิมของแถวนั้นกลับเข้าไปเพื่อรักษาค่าไว้
+                if existing and not r['meter_no']:
+                    meter_no_to_save, status_to_save = existing[1], existing[2]
+                else:
+                    meter_no_to_save, status_to_save = r['meter_no'], r['meter_no_status']
+
                 meter_id = sp_meter_save(
                     cursor, r['location_id'], r['area_id'], r['subarea_id'], r['type_cd'],
-                    r['meter_no'], r['meter_no_status'], user_id, logs, r.get('phase_type'),
+                    meter_no_to_save, status_to_save, user_id, logs, r.get('phase_type'),
+                    meter_id=reuse_id,
                 )
                 stats['meter_ok'] += 1
+                if reuse_id:
+                    stats['meter_reused'] += 1
                 row_result['meter_id'] = meter_id
+                row_result['reused'] = bool(reuse_id)
                 row_result['final_status'] = 'success'
 
                 if r.get('db_contract_id') and meter_id:
@@ -106,6 +177,11 @@ def commit_staged_rows(rows, user_id):
             result_rows.append(row_result)
 
         conn.commit()
+    except Exception:
+        # error ที่หลุดออกมานอก try ของแต่ละแถว (เช่นตอน commit เอง) -- rollback ให้ชัดเจน
+        # ไม่ปล่อยให้ไปพึ่งพฤติกรรม implicit rollback ตอน conn.close()
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
@@ -137,6 +213,7 @@ def fetch_subareas(search=None):
                 s.SubArea_name,
                 MAX(CASE WHEN m.Meter_type_cd = 9 THEN m.Meter_no END) AS water_meter_no,
                 MAX(CASE WHEN m.Meter_type_cd = 8 THEN m.Meter_no END) AS electric_meter_no,
+                MAX(c.Contract_id) AS contract_id,
                 MAX(c.Contract_code) AS contract_code,
                 MAX(cu.Customer_id) AS customer_id,
                 MAX(cu.CompanyName) AS customer_name
@@ -201,10 +278,16 @@ def fetch_subarea_meters(subarea_id):
         result = dict(zip(columns, subarea_row))
 
         cursor.execute(
+            # ต้องมี ORDER BY เสมอ: ข้อมูลจริงมีพื้นที่ที่ลงทะเบียนมิเตอร์ประเภทเดียวกันซ้ำหลายตัว
+            # (เช่น SubArea 'A10' มีมิเตอร์น้ำทั้ง 1014 และ 1038) ถ้าไม่สั่งเรียงลำดับ SQL Server
+            # ไม่การันตีว่าจะคืนแถวไหนก่อน -> next() ด้านล่างอาจหยิบมิเตอร์คนละตัวในแต่ละครั้งที่
+            # โหลดหน้า ทำให้เลขอ่านที่บันทึกไว้ใต้มิเตอร์ตัวหนึ่งดูเหมือนหายไปเอง
+            # เรียงตาม Meter_id -> ได้ตัวที่ลงทะเบียนไว้ก่อน (เก่าสุด) อย่างคงที่ทุกครั้ง
             """
             SELECT Meter_id, Meter_type_cd, Meter_no, Meter_no_status, Phase_type
             FROM dbo.Contract_meter_ms
             WHERE SubArea_id = ? AND UseOrNot = 1
+            ORDER BY Meter_type_cd, Meter_id
             """,
             subarea_id,
         )
@@ -284,15 +367,27 @@ def save_subarea_meters(location_id, area_id, subarea_id, user_id,
 def fetch_readings_for_meters(meter_ids, billing_year_be, billing_month):
     """
     ดึงเลขอ่านก่อน-หลังของมิเตอร์หลายตัว (ระบุเป็น list) ในรอบบิลหนึ่งๆ
-    คืนค่าเป็น dict {meter_id: {'Reading_before':.., 'Reading_after':..}}
-    ดึงจาก Contract_Installment_tr_dt โดยจับคู่ Contract_meter_id + เดือน-ปีของ
-    Contract_effective_date (แปลง billing_year_be พ.ศ. -> ค.ศ. ก่อนเทียบ)
+    จากตาราง dbo.Contract_meter_reading_tr พร้อม Contract_id/Contract_code ของสัญญาที่ผูกมิเตอร์นั้น
+
+    คืนค่าเป็น dict {meter_id (int): {'Reading_before', 'Reading_after', 'Contract_id', 'Contract_code'}}
+
+    ทำไมย้ายมาใช้ตารางนี้แทน Contract_Installment_tr_dt (เวอร์ชันเดิม):
+      - ตารางนี้ผูกมิเตอร์ด้วย Meter_id (int) ตรงกับ Contract_meter_ms.Meter_id ได้เลย
+        ต่างจาก Contract_Installment_tr_dt.Contract_meter_id ที่เป็น nvarchar เก็บข้อความอิสระ
+        (เจอค่าจริงอย่าง 'aa2222', 'T061-6012811-YG') ซึ่งแมตช์กับทะเบียนมิเตอร์ไม่ได้เลย
+      - เก็บรอบบิลเป็น Billing_year_be (พ.ศ. ตรงๆ) + Billing_month (1-12) ไม่ต้องแปลง ค.ศ.
+        และไม่ต้องอ้าง YEAR()/MONTH() ของ Contract_effective_date
+      - มี unique constraint (Meter_id, Billing_year_be, Billing_month) -> 1 มิเตอร์ต่อ 1 รอบบิล
+        ได้แถวเดียวเท่านั้น ไม่กำกวมเหมือนตารางงวดที่เดือนเดียวมีได้หลายงวด/หลายเรต
+
+    Contract_id/Contract_code เก็บอยู่ในตารางนี้โดยตรงแล้ว (ดู sql/Contract_meter_reading_tr_AddContract.sql)
+    เป็น snapshot ว่าตอนบันทึกเลขอ่านรอบนั้น มิเตอร์ผูกอยู่กับสัญญาไหน แต่ยังมี OUTER APPLY
+    เป็น fallback ผ่าน COALESCE เผื่อแถวเก่าที่บันทึกไว้ก่อนเพิ่มคอลัมน์ (ค่าเป็น NULL)
+    ยังแสดงสัญญาได้ตามปกติ -- ใช้ TOP 1 กันมิเตอร์ที่ผูกหลายสัญญาทำให้ได้เลขอ่านซ้ำแถว
     """
-    meter_ids = [str(m) for m in meter_ids if m]
+    meter_ids = [int(m) for m in meter_ids if m]
     if not meter_ids:
         return {}
-
-    ad_year = billing_year_be - 543
 
     conn = get_db_connection()
     try:
@@ -300,23 +395,33 @@ def fetch_readings_for_meters(meter_ids, billing_year_be, billing_month):
         placeholders = ','.join('?' for _ in meter_ids)
         cursor.execute(
             f"""
-            SELECT Contract_meter_id, Contract_read_number_before, Contract_read_number_after
-            FROM dbo.Contract_Installment_tr_dt
-            WHERE YEAR(Contract_effective_date) = ?
-              AND MONTH(Contract_effective_date) = ?
-              AND Contract_meter_id IN ({placeholders})
+            SELECT r.Meter_id, r.Reading_before, r.Reading_after,
+                   COALESCE(r.Contract_id, ct.Contract_id)     AS Contract_id,
+                   COALESCE(r.Contract_code, ct.Contract_code) AS Contract_code
+            FROM dbo.Contract_meter_reading_tr r
+            OUTER APPLY (
+                SELECT TOP 1 h.Contract_id, h.Contract_code
+                FROM dbo.Contract_meter_tr t
+                JOIN dbo.Contract_hrd_tr h ON h.Contract_id = t.Contract_id
+                WHERE t.Meter_id = r.Meter_id AND t.UseOrNot = 1
+                ORDER BY h.Contract_id DESC
+            ) ct
+            WHERE r.Billing_year_be = ?
+              AND r.Billing_month = ?
+              AND r.Meter_id IN ({placeholders})
             """,
-            ad_year, billing_month, *meter_ids,
+            billing_year_be, billing_month, *meter_ids,
         )
         columns = [c[0] for c in cursor.description]
         rows = [dict(zip(columns, r)) for r in cursor.fetchall()]
 
         result = {}
         for r in rows:
-            # key คืนเป็น int กลับ ให้ตรงกับ Meter_id (int) ที่ view ใช้ lookup ต่อ
-            result[int(r['Contract_meter_id'])] = {
-                'Reading_before': r['Contract_read_number_before'],
-                'Reading_after': r['Contract_read_number_after'],
+            result[int(r['Meter_id'])] = {
+                'Reading_before': r['Reading_before'],
+                'Reading_after': r['Reading_after'],
+                'Contract_id': r['Contract_id'],
+                'Contract_code': r['Contract_code'],
             }
         return result
     finally:
@@ -333,11 +438,26 @@ def fetch_meters(type_filter=None, search=None, status_filter='active'):
         sql = """
             SELECT
                 m.Meter_id, m.SubArea_id, m.Meter_type_cd,
-                m.Meter_no, m.Meter_no_status, m.UseOrNot,
-                STRING_AGG(c.Contract_code, ', ') AS bound_contracts
-            FROM Contract_meter_ms m
-            LEFT JOIN Contract_meter_tr t ON t.Meter_id = m.Meter_id
-            LEFT JOIN Contract_hrd_tr c ON c.Contract_id = t.Contract_id
+                m.Meter_no, m.Meter_no_status, m.Phase_type, m.UseOrNot,
+                m.Location_id, m.Area_id,
+                l.Location_name, a.Area_name, s.SubArea_name,
+                bc.bound_contracts
+            FROM dbo.Contract_meter_ms m
+            LEFT JOIN dbo.Contract_location_ms l
+                   ON l.Location_id = m.Location_id
+            LEFT JOIN dbo.Contract_location_area_ms a
+                   ON a.Location_id = m.Location_id
+                  AND a.Area_id = m.Area_id
+            LEFT JOIN dbo.Contract_location_subarea_ms s
+                   ON s.Location_id = m.Location_id
+                  AND s.Area_id = m.Area_id
+                  AND s.SubArea_id = m.SubArea_id
+            OUTER APPLY (
+                SELECT STRING_AGG(c.Contract_code, ', ') AS bound_contracts
+                FROM dbo.Contract_meter_tr t
+                JOIN dbo.Contract_hrd_tr c ON c.Contract_id = t.Contract_id
+                WHERE t.Meter_id = m.Meter_id
+            ) bc
             WHERE 1=1
         """
         params = []
@@ -349,18 +469,29 @@ def fetch_meters(type_filter=None, search=None, status_filter='active'):
             sql += " AND m.Meter_type_cd = ?"
             params.append(int(type_filter))
         if search:
+            # ค้นได้จากชื่อสถานที่/พื้นที่/พื้นที่ย่อยด้วย เพราะหน้าจัดการมิเตอร์แสดงคอลัมน์
+            # เหล่านี้แล้ว ถ้าค้นไม่ได้จะงงว่าเห็นอยู่บนจอแต่หาไม่เจอ
             sql += """ AND (
                 m.SubArea_id LIKE ? OR
                 m.Meter_no LIKE ? OR
+                m.Location_id LIKE ? OR
+                m.Area_id LIKE ? OR
+                l.Location_name LIKE ? OR
+                a.Area_name LIKE ? OR
+                s.SubArea_name LIKE ? OR
                 EXISTS (
-                    SELECT 1 FROM Contract_meter_tr t2
-                    JOIN Contract_hrd_tr c2 ON c2.Contract_id = t2.Contract_id
+                    SELECT 1 FROM dbo.Contract_meter_tr t2
+                    JOIN dbo.Contract_hrd_tr c2 ON c2.Contract_id = t2.Contract_id
                     WHERE t2.Meter_id = m.Meter_id AND c2.Contract_code LIKE ?
                 )
             )"""
-            like = f"%{search}%"
-            params += [like, like, like]
-        sql += " GROUP BY m.Meter_id, m.SubArea_id, m.Meter_type_cd, m.Meter_no, m.Meter_no_status, m.UseOrNot"
+            # ใช้ _to_sql_like_pattern เหมือน fetch_subareas -- escape % _ [ ที่ผู้ใช้พิมพ์มาจริง
+            # ไม่งั้นค้นหา '%' จะกลายเป็น wildcard คืนทุกแถว แทนที่จะหาอักขระ % ตามที่พิมพ์
+            like = _to_sql_like_pattern(search)
+            params += [like] * 8
+        # ไม่ใช้ GROUP BY แล้ว -- ย้าย STRING_AGG ไปอยู่ใน OUTER APPLY ข้างบนแทน
+        # เหตุผล: SubArea_name เป็น nvarchar(MAX) ซึ่ง SQL Server ไม่ยอมให้ GROUP BY
+        # และการใช้ OUTER APPLY ทำให้เพิ่มคอลัมน์ใหม่ได้โดยไม่ต้องไปต่อท้าย GROUP BY ทุกครั้ง
         sql += " ORDER BY m.Meter_id DESC"
 
         cursor.execute(sql, params)
@@ -368,6 +499,11 @@ def fetch_meters(type_filter=None, search=None, status_filter='active'):
         rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
         for r in rows:
             r['bound_contracts'] = (r['bound_contracts'] or '').split(', ') if r['bound_contracts'] else []
+            # ข้อมูลจริงมีชื่อที่ลงท้ายด้วยช่องว่าง/ขึ้นบรรทัดใหม่ติดมา (เช่น SubArea_name
+            # ของ A11 ลงท้ายด้วย '\n\n') ทำให้แสดงบนตารางเพี้ยน -- ตัดให้เรียบก่อนส่งออก
+            for key in ('Location_name', 'Area_name', 'SubArea_name'):
+                if r.get(key):
+                    r[key] = ' '.join(str(r[key]).split())
         return rows
     finally:
         conn.close()
@@ -377,13 +513,17 @@ def fetch_dashboard_stats():
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
+        # ต้องกรอง UseOrNot = 1 ให้ตรงกับตารางมิเตอร์ที่แสดงบนหน้า dashboard
+        # (fetch_meters ใช้ status_filter='active' เป็นค่าเริ่มต้น) ไม่งั้นตัวเลขบนการ์ด
+        # จะนับมิเตอร์ที่ปิดใช้งานรวมไปด้วย แล้วไม่ตรงกับจำนวนแถวที่ผู้ใช้เห็นในตาราง
         cursor.execute("""
             SELECT
                 (SELECT COUNT(*) FROM Contract_location_subarea_ms) AS subarea_count,
-                (SELECT COUNT(DISTINCT Contract_id) FROM Contract_meter_tr) AS contract_count,
-                (SELECT COUNT(*) FROM Contract_meter_ms WHERE Meter_type_cd = 9) AS water_count,
-                (SELECT COUNT(*) FROM Contract_meter_ms WHERE Meter_type_cd = 8) AS electric_count,
-                (SELECT COUNT(*) FROM Contract_meter_ms WHERE Meter_no_status = N'รอ Gen เลข') AS pending_gen
+                (SELECT COUNT(DISTINCT Contract_id) FROM Contract_meter_tr WHERE UseOrNot = 1) AS contract_count,
+                (SELECT COUNT(*) FROM Contract_meter_ms WHERE Meter_type_cd = 9 AND UseOrNot = 1) AS water_count,
+                (SELECT COUNT(*) FROM Contract_meter_ms WHERE Meter_type_cd = 8 AND UseOrNot = 1) AS electric_count,
+                (SELECT COUNT(*) FROM Contract_meter_ms
+                  WHERE Meter_no_status = N'รอ Gen เลข' AND UseOrNot = 1) AS pending_gen
         """)
         columns = [c[0] for c in cursor.description]
         row = cursor.fetchone()
@@ -392,40 +532,56 @@ def fetch_dashboard_stats():
         conn.close()
 
 
-def save_meter_reading(meter_id, billing_year_be, billing_month, reading_before, reading_after, user_id):
+def save_meter_reading(meter_id, billing_year_be, billing_month, reading_before, reading_after, user_id,
+                       contract_id=None, contract_code=None):
     """
-    บันทึกเลขอ่านก่อน-หลังของมิเตอร์ 1 ตัว ในรอบบิลหนึ่ง (UPDATE เท่านั้น)
-    คืนค่าจำนวนแถวที่อัปเดตสำเร็จ (0 = ไม่พบแถวงวดนี้)
+    บันทึกเลขอ่านก่อน-หลังของมิเตอร์ 1 ตัว ในรอบบิลหนึ่ง ผ่าน sp_Contract_Meter_Reading_Save
+    คืนค่า Reading_id ที่บันทึก (None ถ้า SP ไม่คืนค่ากลับมา)
 
-    สำคัญ: cast meter_id เป็น str() ก่อนส่งเข้า SQL เสมอ -- ดู docstring ของ
-    fetch_readings_for_meters เรื่อง data type precedence กับข้อมูลขยะในคอลัมน์นี้
+    SP ทำ upsert ให้เอง: หาแถวของ (Meter_id + Billing_year_be + Billing_month)
+    ถ้ายังไม่มีจะ INSERT ถ้ามีอยู่แล้วจะ UPDATE ทับ
+
+    ปีส่งเป็น พ.ศ. ตรงๆ ไม่ต้องแปลง ค.ศ. เพราะคอลัมน์ Billing_year_be เก็บ พ.ศ. อยู่แล้ว
+
+    contract_id/contract_code เก็บเป็น snapshot ว่าเลขอ่านรอบนี้อยู่ภายใต้สัญญาไหน
+    SP ใช้ COALESCE ตอน UPDATE จึงไม่ล้างค่าเดิมเป็น NULL ถ้าผู้เรียกไม่ส่งสัญญามา
+
+    ประวัติของฟังก์ชันนี้ (กันเข้าใจผิดซ้ำ):
+      - เดิมเรียก SP ตัวนี้อยู่แล้ว แต่การเรียกหลุดหายไปตอน commit ที่แยก meters/services.py
+        ออกเป็นแพ็กเกจ services/ แล้วถูกเขียนใหม่เป็น raw SQL ที่ยิงใส่ตารางผิดตัว
+        (Contract_Installment_tr_dt ซึ่งจับคู่ Contract_meter_id ไม่ได้) ทำให้บันทึกไม่สำเร็จเลย
+      - คอลัมน์ Contract_id/Contract_code เพิ่มเข้าตารางทีหลัง SP จึงต้องถูกแก้ให้รองรับด้วย
+        (ดู sql/sp_Contract_Meter_Reading_Save_AddContract.sql)
     """
     if reading_before is not None and not isinstance(reading_before, int):
         raise ValueError(f"reading_before ต้องเป็น int หรือ None เท่านั้น ได้รับ: {reading_before!r}")
     if reading_after is not None and not isinstance(reading_after, int):
         raise ValueError(f"reading_after ต้องเป็น int หรือ None เท่านั้น ได้รับ: {reading_after!r}")
 
-    ad_year = billing_year_be - 543
+    contract_id = int(contract_id) if contract_id else None
+    contract_code = (str(contract_code).strip() or None) if contract_code else None
 
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
         cursor.execute(
             """
-            UPDATE dbo.Contract_Installment_tr_dt
-            SET Contract_read_number_before = ?,
-                Contract_read_number_after  = ?,
-                UserUpdate = ?,
-                DateUpdate = GETDATE()
-            WHERE Contract_meter_id = ?
-              AND YEAR(Contract_effective_date) = ?
-              AND MONTH(Contract_effective_date) = ?
+            EXEC dbo.sp_Contract_Meter_Reading_Save
+                @Meter_id        = ?,
+                @Billing_year_be = ?,
+                @Billing_month   = ?,
+                @Reading_before  = ?,
+                @Reading_after   = ?,
+                @UserId          = ?,
+                @Contract_id     = ?,
+                @Contract_code   = ?
             """,
-            reading_before, reading_after, user_id, str(meter_id), ad_year, billing_month,
+            int(meter_id), billing_year_be, billing_month,
+            reading_before, reading_after, user_id, contract_id, contract_code,
         )
-        rows_updated = cursor.rowcount
+        row = cursor.fetchone()
         conn.commit()
-        return rows_updated
+        return int(row[0]) if row else None
     finally:
         conn.close()
 

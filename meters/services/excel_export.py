@@ -18,8 +18,12 @@ def build_subareas_workbook(rows):
     ws = wb.active
     ws.title = 'มิเตอร์น้ำ-ไฟ'
 
+    # 'เลขที่สัญญา' = Contract_id (ตรงกับที่ไฟล์จากหน้าดาวน์โหลด Excel ใช้ และตรงกับความหมาย
+    # ที่ผู้ใช้กรอกในคอลัมน์ "เลขที่สัญญา" ของไฟล์ import -- ดูคอมเมนต์ใน fetch_subarea_meters)
+    # เดิมหัวคอลัมน์แรกเขียนว่า 'เลขที่สัญญา (SubArea)' แต่ใส่ค่า SubArea_id ลงไป ทำให้เข้าใจผิดว่า
+    # SubArea_id คือเลขที่สัญญา จึงแยกเป็น 2 คอลัมน์ให้ตรงความหมายจริง
     headers = [
-        'เลขที่สัญญา (SubArea)', 'รหัสสัญญา', 'รหัสลูกหนี้', 'ชื่อลูกหนี้',
+        'SubArea_id', 'เลขที่สัญญา', 'รหัสสัญญา', 'รหัสลูกหนี้', 'ชื่อลูกหนี้',
         'พื้นที่', 'สถานที่ตั้ง', 'เลขมิเตอร์น้ำ', 'เลขมิเตอร์ไฟฟ้า', 'สถานะ',
     ]
 
@@ -42,6 +46,7 @@ def build_subareas_workbook(rows):
         status = 'มีสัญญา' if r.get('contract_code') else 'ยังไม่ผูกสัญญา'
         ws.append([
             r.get('SubArea_id') or '',
+            r.get('contract_id') or '',
             r.get('contract_code') or '',
             r.get('customer_id') or '',
             r.get('customer_name') or '',
@@ -58,7 +63,7 @@ def build_subareas_workbook(rows):
             cell.border = border
             cell.alignment = Alignment(vertical='center')
 
-    widths = [20, 16, 14, 28, 16, 22, 16, 16, 16]
+    widths = [14, 14, 16, 14, 28, 16, 22, 16, 16, 16]
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(i)].width = w
 

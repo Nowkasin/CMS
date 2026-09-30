@@ -22,17 +22,18 @@
 
   {# --- แท็บสถานะ --- #}
   <div class="flex gap-2 mb-4">
-    <a href="?status=active&type={{ active_filter }}&q={{ search }}"
+    {# |urlencode จำเป็น -- ถ้าคำค้นมี & หรือ # จะทำให้ query string ถูกตัดกลางทาง #}
+    <a href="?status=active&type={{ active_filter|urlencode }}&q={{ search|urlencode }}"
        class="px-3 py-1.5 rounded-lg text-sm font-medium
               {% if status_filter == 'active' %}bg-brand-500 text-white{% else %}text-gray-600 bg-white border border-gray-200 hover:bg-gray-50{% endif %}">
       ใช้งานอยู่
     </a>
-    <a href="?status=inactive&type={{ active_filter }}&q={{ search }}"
+    <a href="?status=inactive&type={{ active_filter|urlencode }}&q={{ search|urlencode }}"
        class="px-3 py-1.5 rounded-lg text-sm font-medium
               {% if status_filter == 'inactive' %}bg-brand-500 text-white{% else %}text-gray-600 bg-white border border-gray-200 hover:bg-gray-50{% endif %}">
       ปิดใช้งาน
     </a>
-    <a href="?status=all&type={{ active_filter }}&q={{ search }}"
+    <a href="?status=all&type={{ active_filter|urlencode }}&q={{ search|urlencode }}"
        class="px-3 py-1.5 rounded-lg text-sm font-medium
               {% if status_filter == 'all' %}bg-brand-500 text-white{% else %}text-gray-600 bg-white border border-gray-200 hover:bg-gray-50{% endif %}">
       ทั้งหมด
@@ -47,7 +48,7 @@
       <option value="9" {% if active_filter == '9' %}selected{% endif %}>น้ำ</option>
       <option value="8" {% if active_filter == '8' %}selected{% endif %}>ไฟ</option>
     </select>
-    <input type="text" name="q" value="{{ search }}" placeholder="ค้นหา SubArea / เลขมิเตอร์ / รหัสสัญญา"
+    <input type="text" name="q" value="{{ search }}" placeholder="ค้นหา สถานที่ / พื้นที่ / SubArea / เลขมิเตอร์ / รหัสสัญญา"
            class="flex-1 min-w-[200px] border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
     <button type="submit"
             class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">
@@ -60,7 +61,9 @@
       <thead>
         <tr class="border-b border-gray-100 bg-gray-50">
           <th class="px-4 py-2.5 font-semibold text-gray-500">Meter_id</th>
-          <th class="px-4 py-2.5 font-semibold text-gray-500">SubArea_id</th>
+          <th class="px-4 py-2.5 font-semibold text-gray-500">สถานที่</th>
+          <th class="px-4 py-2.5 font-semibold text-gray-500">พื้นที่</th>
+          <th class="px-4 py-2.5 font-semibold text-gray-500">พื้นที่ย่อย</th>
           <th class="px-4 py-2.5 font-semibold text-gray-500">ประเภท</th>
           <th class="px-4 py-2.5 font-semibold text-gray-500">เลขมิเตอร์</th>
           <th class="px-4 py-2.5 font-semibold text-gray-500">สถานะเลข</th>
@@ -73,7 +76,22 @@
         {% for m in meters %}
         <tr class="hover:bg-gray-50">
           <td class="px-4 py-2.5 text-gray-700">{{ m.Meter_id }}</td>
-          <td class="px-4 py-2.5 text-gray-700">{{ m.SubArea_id }}</td>
+          <td class="px-4 py-2.5">
+            <div class="text-gray-700">{{ m.Location_name|default:"—" }}</div>
+            {% if m.Location_id %}
+              <div class="text-xs text-gray-400 font-mono">{{ m.Location_id }}</div>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2.5">
+            <div class="text-gray-700">{{ m.Area_name|default:"—" }}</div>
+            {% if m.Area_id %}
+              <div class="text-xs text-gray-400 font-mono">{{ m.Area_id }}</div>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2.5">
+            <div class="text-gray-700">{{ m.SubArea_name|default:"—" }}</div>
+            <div class="text-xs text-gray-400 font-mono">{{ m.SubArea_id }}</div>
+          </td>
           <td class="px-4 py-2.5 text-gray-700">{% if m.Meter_type_cd == 9 %}น้ำ{% else %}ไฟ{% endif %}</td>
           <td class="px-4 py-2.5 text-gray-700">{{ m.Meter_no|default:"—" }}</td>
           <td class="px-4 py-2.5 text-gray-500">{{ m.Meter_no_status|default:"—" }}</td>
@@ -90,7 +108,7 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">ไม่พบมิเตอร์</td></tr>
+        <tr><td colspan="10" class="px-4 py-8 text-center text-gray-400">ไม่พบมิเตอร์</td></tr>
         {% endfor %}
       </tbody>
     </table>

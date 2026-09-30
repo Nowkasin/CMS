@@ -1,12 +1,4 @@
-"""
-โมเดลเหล่านี้เป็นแค่ตัว "แมป" ไปยังตารางที่มีอยู่แล้วจริงในฐานข้อมูล SWU_contract
-managed = False ทุกตัว -> Django จะไม่พยายามสร้าง/แก้ไข/ลบตารางเหล่านี้ให้เด็ดขาด
-(การสร้าง/แก้ไขตารางทำผ่านไฟล์ .sql ที่ DBA รันเองเท่านั้น)
 
-หมายเหตุ: Contract_location_subarea_ms มี Primary Key เป็น composite
-(Location_id, Area_id, SubArea_id) ซึ่ง Django ORM ไม่รองรับ composite PK ตรงๆ
-จึงไม่สร้างโมเดลสำหรับตารางนี้ - ใช้ raw SQL ใน services.py แทน
-"""
 from django.db import models
 
 
