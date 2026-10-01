@@ -238,6 +238,17 @@ def fetch_subareas(search=None):
 
 
 def fetch_contract_meter_detail(contract_id=None, contract_code=None):
+    """
+    มิเตอร์ทั้งหมดที่ผูกกับสัญญาหนึ่ง -- ใช้ในหน้ายกเลิกสัญญา
+
+    sp_Contract_Meter_SelectByContract คืนแต่ Location_id / Area_id ซึ่งเป็นรหัสล้วน
+    (เช่น 'L01', 'A3') อ่านบนหน้าจอไม่รู้ว่าที่ไหน จึงเติมชื่อสถานที่/พื้นที่ให้ด้วย
+    ยังเรียก SP เดิมเป็นตัวหา "มิเตอร์ของสัญญานี้" อยู่ (ไม่เขียน join ใหม่ซ้ำ)
+    แล้วค่อย lookup ชื่อแยกอีก query เดียวจากรหัสที่ได้มา
+
+    เหตุผลที่ lookup แยกไม่ join รวด: ผล SP เป็น result set ที่ join ต่อตรงๆ ใน SQL ไม่ได้
+    (ต้องผ่าน temp table) ซึ่งซับซ้อนกว่าโดยไม่ได้อะไรเพิ่ม -- จำนวนพื้นที่ต่อสัญญามีไม่มาก
+    """
     if contract_id is None and contract_code is None:
         raise ValueError('ต้องระบุ contract_id หรือ contract_code อย่างใดอย่างหนึ่ง')
 
@@ -249,7 +260,45 @@ def fetch_contract_meter_detail(contract_id=None, contract_code=None):
             contract_id, contract_code,
         )
         columns = [c[0] for c in cursor.description]
-        return [dict(zip(columns, row)) for row in cursor.fetchall()]
+        rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        if not rows:
+            return rows
+
+        # ชื่อสถานที่ (1 query ครอบคลุมทุกแถว) -- คีย์เป็น Location_id
+        location_ids = {r.get('Location_id') for r in rows if r.get('Location_id')}
+        location_names = {}
+        if location_ids:
+            ph = ','.join('?' for _ in location_ids)
+            cursor.execute(
+                f"SELECT Location_id, Location_name FROM dbo.Contract_location_ms "
+                f"WHERE Location_id IN ({ph})",
+                *location_ids,
+            )
+            location_names = {r[0]: r[1] for r in cursor.fetchall()}
+
+        # ชื่อพื้นที่ -- คีย์เป็น (Location_id, Area_id) เพราะ Area_id ซ้ำได้ข้ามสถานที่
+        area_pairs = {(r.get('Location_id'), r.get('Area_id'))
+                      for r in rows if r.get('Location_id') and r.get('Area_id')}
+        area_names = {}
+        if area_pairs:
+            conds = ' OR '.join('(Location_id = ? AND Area_id = ?)' for _ in area_pairs)
+            params = [v for pair in area_pairs for v in pair]
+            cursor.execute(
+                f"SELECT Location_id, Area_id, Area_name FROM dbo.Contract_location_area_ms "
+                f"WHERE {conds}",
+                *params,
+            )
+            area_names = {(r[0], r[1]): r[2] for r in cursor.fetchall()}
+
+        for r in rows:
+            r['Location_name'] = location_names.get(r.get('Location_id'))
+            r['Area_name'] = area_names.get((r.get('Location_id'), r.get('Area_id')))
+            # ข้อมูลจริงมีชื่อที่ลงท้ายด้วยช่องว่าง/ขึ้นบรรทัดใหม่ติดมา (เช่น SubArea_name ของ A11
+            # ลงท้ายด้วย '\n\n') ทำให้แสดงบนตารางเพี้ยน -- ตัดให้เรียบเหมือนที่ fetch_meters ทำ
+            for key in ('Location_name', 'Area_name', 'SubArea_name'):
+                if r.get(key):
+                    r[key] = ' '.join(str(r[key]).split())
+        return rows
     finally:
         conn.close()
 

@@ -20,6 +20,11 @@ urlpatterns = [
         views.termination_toggle_installment,
         name='termination_toggle',
     ),
+    path(
+        'termination/<int:contract_id>/toggle-all/',
+        views.termination_select_all_installments,
+        name='termination_toggle_all',
+    ),
         # --- ดาวน์โหลด Excel รายชื่อสัญญา + เลขอ่านมิเตอร์ ---
     path('download/', views.download_form, name='download_form'),
     path('download/excel/', views.download_excel, name='download_excel'),

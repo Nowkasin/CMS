@@ -1,4 +1,4 @@
-# meters/views/__init__.py
+﻿# meters/views/__init__.py
 """
 Re-export ทุก view จากโมดูลย่อย เพื่อให้ urls.py ที่เรียก views.xxx เหมือนเดิม
 ยังทำงานได้ทุกจุดโดยไม่ต้องแก้ import
@@ -8,7 +8,9 @@ Re-export ทุก view จากโมดูลย่อย เพื่อใ
                       step4_done, restart
   dashboard.py    -> dashboard, edit_meter
   export.py       -> export_meters_excel
-  termination.py  -> termination_search, termination_detail, termination_toggle_installment
+  termination.py  -> termination_search, termination_detail,
+                      termination_toggle_installment,
+                      termination_select_all_installments
   download.py     -> download_form, download_excel
   meter_master.py -> meter_list, meter_form
   phase_master.py -> phase_list, phase_form
@@ -32,6 +34,7 @@ from .termination import (
     termination_search,
     termination_detail,
     termination_toggle_installment,
+    termination_select_all_installments,
 )
 from .download import download_form, download_excel
 
@@ -45,6 +48,7 @@ __all__ = [
     'dashboard', 'edit_meter',
     'export_meters_excel',
     'termination_search', 'termination_detail', 'termination_toggle_installment',
+    'termination_select_all_installments',
     'download_form', 'download_excel',
     'meter_list', 'meter_form',
     'phase_list', 'phase_form',

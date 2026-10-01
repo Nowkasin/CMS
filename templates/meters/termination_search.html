@@ -50,15 +50,43 @@
     <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide px-5 pt-4 pb-2">
       พบ {{ matches|length }} รายการ -- เลือกสัญญาที่ต้องการ
     </p>
+
+    {% comment %}
+      ค้นหาคำกว้างๆ เดิมคืนมาทั้งหมดรวดเดียว -- จำกัดที่ SEARCH_RESULT_LIMIT แล้วเตือนให้พิมพ์แคบลง
+    {% endcomment %}
+    {% if truncated %}
+    <div class="mx-5 mb-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2">
+      ผลค้นหามีมากกว่า {{ search_limit }} รายการ -- แสดงเพียง {{ search_limit }} รายการแรก
+      กรุณาพิมพ์คำค้นให้เจาะจงขึ้น
+    </div>
+    {% endif %}
+
     <div class="divide-y divide-gray-100">
       {% for m in matches %}
+      {% comment %}
+        โชว์สถานะสัญญาในลิสต์เลย (เดิม service ดึง Status_contract_id มาแล้วแต่ไม่ได้ใช้)
+        สัญญาที่ปิด/ยกเลิกไปแล้ว ยังคลิกเข้าไปดูได้ แต่ติดป้ายไว้ให้รู้ว่าบันทึกต่อไม่ได้
+      {% endcomment %}
       <a href="{% url 'termination_detail' m.Contract_id %}"
          class="flex items-center justify-between gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
-        <div>
+        <div class="min-w-0">
           <div class="text-sm font-medium text-gray-800">{{ m.Contract_code|default:"—" }}</div>
-          <div class="text-xs text-gray-400 mt-0.5">{{ m.CompanyName|default:"ไม่มีชื่อลูกค้า" }}</div>
+          <div class="text-xs text-gray-400 mt-0.5 truncate">{{ m.CompanyName|default:"ไม่มีชื่อลูกค้า" }}</div>
+          <div class="flex items-center gap-1.5 mt-1.5 flex-wrap">
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+                         {% if m.is_blocked %}bg-amber-50 text-amber-700{% else %}bg-gray-100 text-gray-600{% endif %}">
+              {{ m.Status_contract_Desc|default:"ไม่ทราบสถานะ" }}
+            </span>
+            {% if m.Has_termination %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-600">
+                บันทึกยกเลิกแล้ว
+              </span>
+            {% endif %}
+          </div>
         </div>
-        <span class="text-brand-500 text-sm">เลือก ›</span>
+        <span class="text-sm shrink-0 {% if m.is_blocked %}text-gray-400{% else %}text-brand-500{% endif %}">
+          {% if m.is_blocked %}ดูข้อมูล ›{% else %}เลือก ›{% endif %}
+        </span>
       </a>
       {% endfor %}
     </div>

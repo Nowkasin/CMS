@@ -1,4 +1,4 @@
-# meters/services/__init__.py
+﻿# meters/services/__init__.py
 """
 Re-export ทุกฟังก์ชัน/ค่าคงที่จากโมดูลย่อย เพื่อให้โค้ดเดิมที่เรียก services.xxx()
 (เช่นใน views.py) ยังทำงานได้เหมือนเดิมทุกจุด โดยไม่ต้องแก้ import ที่อื่นเลย
@@ -12,8 +12,10 @@ Re-export ทุกฟังก์ชัน/ค่าคงที่จากโ
                        sp_bind_to_contract, find_existing_meter, DEFAULT_USER,
                        fetch_meter_by_id, save_standalone_meter
   excel_export.py  -> build_subareas_workbook
-  termination.py   -> find_contract_for_termination, save_termination,
-                       fetch_termination_detail, set_installment_selection
+  termination.py   -> find_contract_for_termination, fetch_contract_summary,
+                       save_termination, fetch_termination_detail,
+                       set_installment_selection, set_all_installment_selections,
+                       BLOCKED_CONTRACT_STATUSES, SEARCH_RESULT_LIMIT
   download.py      -> fetch_contracts_for_download
   phase.py         -> fetch_phase_types, fetch_phase_options, fetch_phase_type_by_id,
                        save_phase_type, MAX_PHASE_TYPE_LEN
@@ -52,10 +54,14 @@ from .meters import (
 from .excel_export import build_subareas_workbook
 
 from .termination import (
+    BLOCKED_CONTRACT_STATUSES,
+    SEARCH_RESULT_LIMIT,
     find_contract_for_termination,
+    fetch_contract_summary,
     save_termination,
     fetch_termination_detail,
     set_installment_selection,
+    set_all_installment_selections,
 )
 
 from .download import fetch_contracts_for_download
@@ -80,8 +86,11 @@ __all__ = [
     'fetch_dashboard_stats', 'save_meter_reading',
     'fetch_meter_by_id', 'save_standalone_meter',
     'build_subareas_workbook',
-    'find_contract_for_termination', 'save_termination',
+    'BLOCKED_CONTRACT_STATUSES', 'SEARCH_RESULT_LIMIT',
+    'find_contract_for_termination', 'fetch_contract_summary',
+    'save_termination',
     'fetch_termination_detail', 'set_installment_selection',
+    'set_all_installment_selections',
     'fetch_contracts_for_download',
     'MAX_PHASE_TYPE_LEN', 'fetch_phase_types', 'fetch_phase_options',
     'fetch_phase_type_by_id', 'save_phase_type',
