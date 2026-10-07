@@ -1,10 +1,16 @@
-{% extends "meters/base.html" %}
+﻿{% extends "meters/base.html" %}
 {% load static %}
 
 {% block title %}ยกเลิกสัญญา{% endblock %}
 
+{% comment %}
+  หน้ารายการสัญญาสำหรับงานยกเลิก -- เดิมเป็นหน้าค้นหาแบบ POST ที่เปิดมาว่างเปล่า
+  ทุกอย่างเป็น GET แล้ว (?tab=&status=&q=&page=) เพื่อให้กด back จากหน้า detail
+  กลับมาเห็นรายการเดิม refresh ได้ และแชร์ลิงก์ได้ -- ใช้ pattern เดียวกับ meter_list
+{% endcomment %}
+
 {% block content %}
-<div class="py-8 max-w-xl mx-auto">
+<div class="py-8">
 
   <div class="text-sm text-gray-400 mb-1">
     <a href="{% url 'dashboard' %}" class="hover:text-brand-600">แดชบอร์ด</a>
@@ -12,85 +18,217 @@
     <span class="text-gray-500">ยกเลิกสัญญา</span>
   </div>
 
-  <div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-900">ยกเลิกสัญญา</h1>
-    <p class="text-sm text-gray-500 mt-1">ค้นหาสัญญาด้วยรหัสสัญญา หรือชื่อลูกค้า เพื่อเข้าไปจัดการข้อมูลยกเลิก</p>
-  </div>
-
-  {% if error %}
-  <div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-4">
-    {{ error }}
-  </div>
-  {% endif %}
-
-  <form method="post" class="bg-white border border-gray-200 rounded-xl p-6 flex flex-col gap-4">
-    {% csrf_token %}
+  <div class="flex items-start justify-between gap-4 flex-wrap mb-6">
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1.5">รหัสสัญญา หรือ ชื่อลูกค้า</label>
-      <input type="text" name="contract_code" autofocus
-             value="{{ contract_code }}"
-             placeholder="เช่น AI5-AI6/2569 หรือ บริษัท เอบีซี จำกัด"
-             class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
-      <p class="text-xs text-gray-400 mt-1.5">จำรหัสสัญญาไม่ได้ก็พิมพ์บางส่วนของชื่อบริษัทลูกค้าแทนได้</p>
+      <h1 class="text-2xl font-bold text-gray-900">ยกเลิกสัญญา</h1>
+      <p class="text-sm text-gray-500 mt-1">
+        เลือกสัญญาที่ต้องการบันทึกการยกเลิก -- เรียงตามวันสิ้นสุดสัญญา เก่าสุดขึ้นก่อน
+      </p>
     </div>
-    <div class="flex justify-end gap-3">
-      <a href="{% url 'dashboard' %}"
-         class="px-5 py-2.5 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">
-        ยกเลิก
-      </a>
-      <button type="submit"
-              class="px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600">
-        ค้นหา
-      </button>
-    </div>
+    <a href="{% url 'termination_log' %}"
+       class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">
+      ประวัติการยกเลิก ›
+    </a>
+  </div>
+
+  {% comment %}
+    แท็บเป็นลิงก์ GET ไม่ใช่ปุ่ม submit -- แต่ละแท็บมี URL ของตัวเอง
+    ตัวเลขนับหลังกรองด้วย q/status แล้ว จึงตรงกับสิ่งที่เห็นในตาราง
+  {% endcomment %}
+  <div class="flex gap-2 mb-4 flex-wrap">
+    {% for t in tabs %}
+    <a href="?tab={{ t.key|urlencode }}&scope={{ active_scope|urlencode }}&status={{ status_filter|urlencode }}&q={{ search|urlencode }}"
+       class="px-3 py-1.5 rounded-lg text-sm font-medium
+              {% if t.is_active %}bg-brand-500 text-white{% else %}text-gray-600 bg-white border border-gray-200 hover:bg-gray-50{% endif %}">
+      {{ t.label }}
+      <span class="{% if t.is_active %}text-white/80{% else %}text-gray-400{% endif %}">({{ t.count }})</span>
+    </a>
+    {% endfor %}
+  </div>
+
+  <form method="get" class="flex flex-wrap gap-3 mb-2">
+    <input type="hidden" name="tab" value="{{ active_tab }}">
+    {% comment %}
+      ขอบเขตข้อมูล -- ค่าเริ่มต้นคือ "สัญญาจริง" เพราะข้อมูลจริงมี 20 ฉบับที่เป็นร่าง
+      และยังไม่ตั้งหนี้ (มีข้อมูลทดสอบปนอยู่) ซึ่งไม่มีสัญญาให้ยกเลิก
+      ไม่ซ่อนถาวร -- สลับมาดูได้ เพราะยังแยกไม่ออกว่าแถวไหนจริงแถวไหนทดสอบ
+    {% endcomment %}
+    <select name="scope" onchange="this.form.submit()"
+            class="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700">
+      {% for sc in scopes %}
+      <option value="{{ sc.key }}" {% if sc.is_active %}selected{% endif %}>
+        {{ sc.label }} ({{ sc.count }})
+      </option>
+      {% endfor %}
+    </select>
+    <select name="status" onchange="this.form.submit()"
+            class="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700">
+      <option value="all" {% if status_filter == 'all' %}selected{% endif %}>ทุกสถานะ</option>
+      {% for s in statuses %}
+      <option value="{{ s.Status_contract_id }}" {% if status_filter == s.Status_contract_id %}selected{% endif %}>
+        {{ s.Status_contract_Desc }} ({{ s.Contract_count }})
+      </option>
+      {% endfor %}
+    </select>
+    <input type="text" name="q" value="{{ search }}"
+           placeholder="ค้นหา รหัสสัญญา หรือ ชื่อลูกค้า"
+           class="flex-1 min-w-[220px] border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
+    <button type="submit"
+            class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">
+      ค้นหา
+    </button>
+    {% if search or status_filter != 'all' or not scope_is_default %}
+    <a href="?tab={{ active_tab|urlencode }}"
+       class="px-4 py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-50">
+      ล้างตัวกรอง
+    </a>
+    {% endif %}
   </form>
 
-  {% if matches %}
-  <div class="bg-white border border-gray-200 rounded-xl mt-4 overflow-hidden">
-    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide px-5 pt-4 pb-2">
-      พบ {{ matches|length }} รายการ -- เลือกสัญญาที่ต้องการ
-    </p>
-
-    {% comment %}
-      ค้นหาคำกว้างๆ เดิมคืนมาทั้งหมดรวดเดียว -- จำกัดที่ SEARCH_RESULT_LIMIT แล้วเตือนให้พิมพ์แคบลง
-    {% endcomment %}
-    {% if truncated %}
-    <div class="mx-5 mb-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2">
-      ผลค้นหามีมากกว่า {{ search_limit }} รายการ -- แสดงเพียง {{ search_limit }} รายการแรก
-      กรุณาพิมพ์คำค้นให้เจาะจงขึ้น
-    </div>
+  <p class="text-xs text-gray-400 mb-4">
+    {% if active_scope == 'real' %}
+      แสดงเฉพาะสัญญาที่ workflow เสร็จสมบูรณ์ หรือมีงวดตั้งหนี้แล้ว
+      -- ฉบับร่างที่ยังไม่ตั้งหนี้ถูกซ่อนไว้ สลับดูได้จากช่องซ้ายสุด
+    {% elif active_scope == 'draft' %}
+      แสดงเฉพาะฉบับร่าง/ไม่อนุมัติ ที่ยังไม่มีงวดตั้งหนี้ -- กลุ่มนี้ไม่มีสัญญาให้ยกเลิก
+      และอาจมีข้อมูลทดสอบปนอยู่
+    {% else %}
+      แสดงทุกแถวใน Contract_hrd_tr รวมฉบับร่างและข้อมูลทดสอบ
     {% endif %}
+  </p>
 
-    <div class="divide-y divide-gray-100">
-      {% for m in matches %}
-      {% comment %}
-        โชว์สถานะสัญญาในลิสต์เลย (เดิม service ดึง Status_contract_id มาแล้วแต่ไม่ได้ใช้)
-        สัญญาที่ปิด/ยกเลิกไปแล้ว ยังคลิกเข้าไปดูได้ แต่ติดป้ายไว้ให้รู้ว่าบันทึกต่อไม่ได้
-      {% endcomment %}
-      <a href="{% url 'termination_detail' m.Contract_id %}"
-         class="flex items-center justify-between gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
-        <div class="min-w-0">
-          <div class="text-sm font-medium text-gray-800">{{ m.Contract_code|default:"—" }}</div>
-          <div class="text-xs text-gray-400 mt-0.5 truncate">{{ m.CompanyName|default:"ไม่มีชื่อลูกค้า" }}</div>
-          <div class="flex items-center gap-1.5 mt-1.5 flex-wrap">
+  <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+    <table class="min-w-full text-sm text-left">
+      <thead>
+        <tr class="border-b border-gray-100 bg-gray-50">
+          <th class="px-4 py-2.5 font-semibold text-gray-500">รหัสสัญญา</th>
+          <th class="px-4 py-2.5 font-semibold text-gray-500">ลูกค้า</th>
+          <th class="px-4 py-2.5 font-semibold text-gray-500">สถานะในระบบ</th>
+          <th class="px-4 py-2.5 font-semibold text-gray-500">ขั้นของสัญญา</th>
+          <th class="px-4 py-2.5 font-semibold text-gray-500">สิ้นสุดอายุสัญญา</th>
+          <th class="px-4 py-2.5 font-semibold text-gray-500">ตามอายุสัญญา</th>
+          <th class="px-4 py-2.5"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {% for m in contracts %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-2.5">
+            <div class="font-medium text-gray-800">{{ m.Contract_code|default:"—" }}</div>
+            <div class="text-xs text-gray-400">
+              #{{ m.Contract_id }}{% if m.Contract_year %} · ปี {{ m.Contract_year }}{% endif %}
+            </div>
+          </td>
+          <td class="px-4 py-2.5 text-gray-700 max-w-[260px]">
+            <div class="truncate" title="{{ m.CompanyName|default:'' }}">
+              {{ m.CompanyName|default:"ไม่มีชื่อลูกค้า" }}
+            </div>
+          </td>
+          <td class="px-4 py-2.5">
             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
                          {% if m.is_blocked %}bg-amber-50 text-amber-700{% else %}bg-gray-100 text-gray-600{% endif %}">
               {{ m.Status_contract_Desc|default:"ไม่ทราบสถานะ" }}
             </span>
             {% if m.Has_termination %}
+            <div class="mt-1">
               <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-600">
                 บันทึกยกเลิกแล้ว
               </span>
+            </div>
             {% endif %}
-          </div>
-        </div>
-        <span class="text-sm shrink-0 {% if m.is_blocked %}text-gray-400{% else %}text-brand-500{% endif %}">
-          {% if m.is_blocked %}ดูข้อมูล ›{% else %}เลือก ›{% endif %}
-        </span>
+          </td>
+          {% comment %}
+            ขั้นของสัญญา (Status_workflow__id) -- ติดป้ายเตือนถ้ายังไม่เสร็จสมบูรณ์
+            ถ้ามีงวดตั้งหนี้แล้วก็บอกไว้ เพราะเป็นเหตุผลที่แถวนั้นยังนับเป็นสัญญาจริง
+          {% endcomment %}
+          <td class="px-4 py-2.5 max-w-[200px]">
+            <div class="text-xs {% if m.is_real_contract %}text-gray-600{% else %}text-amber-700{% endif %} truncate"
+                 title="{{ m.Status_workflow_Desc|default:'' }}">
+              {{ m.Status_workflow_Desc|default:"ไม่ทราบขั้น" }}
+            </div>
+            {% if m.Has_installment %}
+              <div class="text-xs text-gray-400 mt-0.5">ตั้งหนี้แล้ว</div>
+            {% elif not m.is_real_contract %}
+              <div class="text-xs text-amber-600 mt-0.5">ยังไม่ตั้งหนี้</div>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2.5 text-gray-700 whitespace-nowrap">
+            {{ m.end_contract_label|default:"ไม่มีข้อมูล" }}
+          </td>
+          {% comment %}
+            คอลัมน์นี้คำนวณจาก End_contract ไม่ใช่ Status_contract_id -- แยกหัวตาราง
+            ออกจาก "สถานะในระบบ" เพราะสองอันนี้ไม่ตรงกันใน 199 จาก 222 สัญญา
+          {% endcomment %}
+          <td class="px-4 py-2.5 whitespace-nowrap">
+            {% if m.is_expired %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-rose-50 text-rose-600">
+                หมดอายุแล้ว
+              </span>
+              {% if m.expired_ago_label %}
+                <div class="text-xs text-gray-400 mt-0.5">{{ m.expired_ago_label }}</div>
+              {% endif %}
+            {% elif m.End_contract %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-600">
+                ยังไม่หมดอายุ
+              </span>
+            {% else %}
+              <span class="text-xs text-gray-400">—</span>
+            {% endif %}
+          </td>
+          {% comment %}
+            พกตัวกรองไปกับลิงก์ด้วย เพื่อให้ breadcrumb ในหน้า detail พากลับมาที่เดิมได้
+          {% endcomment %}
+          <td class="px-4 py-2.5 text-right whitespace-nowrap">
+            <a href="{% url 'termination_detail' m.Contract_id %}?tab={{ active_tab|urlencode }}&scope={{ active_scope|urlencode }}&status={{ status_filter|urlencode }}&q={{ search|urlencode }}&page={{ page_obj.number }}"
+               class="text-sm font-medium {% if m.is_blocked %}text-gray-400 hover:text-gray-600{% else %}text-brand-600 hover:text-brand-700{% endif %}">
+              {% if m.is_blocked %}ดูข้อมูล ›{% else %}บันทึกยกเลิก ›{% endif %}
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="px-4 py-10 text-center text-gray-400 text-sm">
+            {% if search or status_filter != 'all' %}
+              ไม่พบสัญญาที่ตรงกับตัวกรอง -- ลองล้างตัวกรองหรือเปลี่ยนแท็บ
+            {% else %}
+              ไม่มีสัญญาในกลุ่มนี้
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% comment %}
+    แบ่งหน้าแบบเดียวกับ step2_review -- ลิงก์พก filter_qs ไปด้วย
+    ไม่งั้นกดหน้า 2 แล้วแท็บกับตัวกรองหลุดกลับเป็นค่าเริ่มต้น
+  {% endcomment %}
+  {% if page_obj.paginator.num_pages > 1 %}
+  <div class="flex items-center justify-between gap-3 mt-4 flex-wrap">
+    <p class="text-xs text-gray-400">
+      แสดง {{ page_obj.start_index }}-{{ page_obj.end_index }} จาก {{ total_visible }} สัญญา
+    </p>
+    <div class="flex items-center gap-1.5">
+      {% if page_obj.has_previous %}
+      <a href="?tab={{ active_tab|urlencode }}&scope={{ active_scope|urlencode }}&status={{ status_filter|urlencode }}&q={{ search|urlencode }}&page={{ page_obj.previous_page_number }}"
+         class="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50">
+        ก่อนหน้า
       </a>
-      {% endfor %}
+      {% endif %}
+      <span class="px-3 py-1.5 text-sm text-gray-500">
+        หน้า {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+      </span>
+      {% if page_obj.has_next %}
+      <a href="?tab={{ active_tab|urlencode }}&scope={{ active_scope|urlencode }}&status={{ status_filter|urlencode }}&q={{ search|urlencode }}&page={{ page_obj.next_page_number }}"
+         class="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50">
+        ถัดไป
+      </a>
+      {% endif %}
     </div>
   </div>
+  {% else %}
+  <p class="text-xs text-gray-400 mt-3">พบ {{ total_visible }} สัญญา</p>
   {% endif %}
 
 </div>

@@ -9,7 +9,16 @@
   <div class="text-sm text-gray-400 mb-1">
     <a href="{% url 'dashboard' %}" class="hover:text-brand-600">แดชบอร์ด</a>
     <span class="mx-1">›</span>
-    <a href="{% url 'termination_search' %}" class="hover:text-brand-600">ยกเลิกสัญญา</a>
+    {% comment %}
+      พา query string ของหน้ารายการกลับไปด้วย (view ส่งมาใน back_qs)
+      ไม่งั้นกดลิงก์นี้จะเด้งไปแท็บเริ่มต้น ไม่ใช่ตัวกรองที่ผู้ใช้ตั้งไว้
+      (ปุ่ม back ของเบราว์เซอร์ทำงานอยู่แล้วเพราะหน้ารายการเป็น GET แต่ลิงก์นี้ควรตรงกัน)
+    {% endcomment %}
+    <a href="{% url 'termination_search' %}{% if back_qs %}?{{ back_qs }}{% endif %}"
+       class="hover:text-brand-600">ยกเลิกสัญญา</a>
+    <span class="mx-1">·</span>
+    <a href="{% url 'termination_log' %}?q={{ contract.Contract_code|urlencode }}"
+       class="hover:text-brand-600">ดูประวัติ</a>
     <span class="mx-1">›</span>
     <span class="text-gray-500">สัญญา #{{ contract_id }}</span>
   </div>
@@ -23,16 +32,54 @@
       <h1 class="text-2xl font-bold text-gray-900">รายละเอียดการยกเลิกสัญญา</h1>
       <p class="text-lg font-semibold text-gray-800 mt-2">{{ contract.Contract_code|default:"ไม่มีรหัสสัญญา" }}</p>
       <p class="text-sm text-gray-600">{{ contract.CompanyName|default:"ไม่มีชื่อลูกค้าในระบบ" }}</p>
+      {% if contract.SAPVendor_Id %}
+        <p class="text-xs text-gray-400">
+          รหัสผู้ขาย SAP {{ contract.SAPVendor_Id }}
+          {% if contract.Customer_id and contract.Customer_id != contract.SAPVendor_Id %}
+            · รหัสลูกหนี้ {{ contract.Customer_id }}
+          {% endif %}
+        </p>
+      {% endif %}
+      {% comment %}
+        ช่วงอายุสัญญาจาก Contract_tr (Start_contract / End_contract)
+        เป็นที่มาของค่าที่เติมในช่อง "วันที่สิ้นสุดสัญญา" โชว้ไว้ให้ผู้ใช้ตรวจทานได้
+      {% endcomment %}
+      {% if contract.start_contract_label or contract.end_contract_label %}
+      <p class="text-sm text-gray-500 mt-1.5">
+        อายุสัญญา {{ contract.start_contract_label|default:"—" }} ถึง {{ contract.end_contract_label|default:"—" }}
+        {% if contract.Contract_Installment_age %}
+          <span class="text-gray-400">({{ contract.Contract_Installment_age }})</span>
+        {% endif %}
+      </p>
+      {% endif %}
       <p class="text-xs text-gray-400 mt-1">
         Contract_id #{{ contract_id }}
         {% if contract.Contract_year %} · ปีสัญญา {{ contract.Contract_year }}{% endif %}
         {% if contract.Vendor_tel %} · โทร {{ contract.Vendor_tel }}{% endif %}
+        {% if contract.Status_workflow_Desc %} · ขั้น {{ contract.Status_workflow_Desc }}{% endif %}
       </p>
     </div>
     <div class="flex flex-col items-end gap-2">
       <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
         สถานะสัญญา: {{ contract.Status_contract_Desc|default:"—" }}
       </span>
+      {% comment %}
+        ป้าย "หมดอายุแล้ว" คำนวณจาก End_contract < วันนี้ ไม่ใช่ Status_contract_id
+        ข้อมูลจริงมี 199 จาก 222 สัญญาที่หมดอายุแล้วแต่สถานะยังเป็น '1' (สัญญา)
+        จึงต้องเขียนกำกับว่าอันนี้มาจากอายุสัญญา ไม่ใช่สถานะในระบบ
+        ไม่บล็อกการยกเลิก -- สัญญาหมดอายุคือเคสที่ควรยกเลิก (case 2 สิ้นสุดตามอายุ)
+      {% endcomment %}
+      {% if end_date_is_past %}
+      <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-600"
+            title="คำนวณจากวันสิ้นสุดอายุสัญญา ไม่ใช่สถานะที่บันทึกในระบบ">
+        ตามอายุสัญญา: หมดอายุแล้ว{% if contract.expired_ago_label %} {{ contract.expired_ago_label }}{% endif %}
+      </span>
+      {% elif contract.End_contract %}
+      <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600"
+            title="คำนวณจากวันสิ้นสุดอายุสัญญา ไม่ใช่สถานะที่บันทึกในระบบ">
+        ตามอายุสัญญา: ยังไม่หมดอายุ
+      </span>
+      {% endif %}
       {% if header %}
         <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-600">
           มีข้อมูลยกเลิกแล้ว
@@ -53,6 +100,45 @@
   </div>
   {% endif %}
 
+  {% if flash_success %}
+  <div class="bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg px-4 py-3 mb-4">
+    {{ flash_success }}
+  </div>
+  {% endif %}
+
+  {% if flash_warning %}
+  <div class="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-4 py-3 mb-4">
+    {{ flash_warning }}
+  </div>
+  {% endif %}
+
+  {% comment %}
+    ชื่อลูกค้าในสัญญาไม่ตรงกับ master ฝั่ง SAP (Contract_Customer_SAP_ms)
+    ข้อมูลจริงมี 3 สัญญาที่เป็นคนละคนกันเลย (Contract_id 9, 19, 189)
+    ไม่เลือกข้างให้ -- แสดงทั้งสองค่าแล้วให้คนตรวจสอบ เพราะยังไม่รู้ว่าฝั่งไหนถูก
+  {% endcomment %}
+  {% if contract.sap_name_differs %}
+  <div class="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-4 py-3 mb-4">
+    <p class="font-medium mb-1">ชื่อลูกค้าไม่ตรงกับข้อมูล SAP</p>
+    <div class="text-xs space-y-0.5">
+      <div>ในสัญญา (Contract_customer_tr): <span class="font-medium">{{ contract.CompanyName|default:"—" }}</span></div>
+      <div>ใน SAP (รหัสผู้ขาย {{ contract.SAPVendor_Id|default:"—" }}): <span class="font-medium">{{ contract.SAP_CompanyName|default:"—" }}</span></div>
+    </div>
+    <p class="text-xs mt-1.5">กรุณาตรวจสอบว่ากำลังยกเลิกสัญญาของคู่สัญญารายที่ถูกต้องก่อนบันทึก</p>
+  </div>
+  {% endif %}
+
+  {% comment %}
+    เตือนถ้าสัญญายัง workflow ไม่เสร็จสมบูรณ์ -- ข้อมูลจริงมี 44 ฉบับแบบนี้
+    ไม่บล็อก เพราะ 24 ฉบับในนั้นตั้งหนี้ไปแล้วจริง อาจต้องยกเลิกจริง
+  {% endcomment %}
+  {% if contract.Status_workflow__id and contract.Status_workflow__id != '40' and contract.Status_workflow__id != '50' %}
+  <div class="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-4 py-3 mb-4">
+    สัญญาฉบับนี้อยู่ขั้น "{{ contract.Status_workflow_Desc|default:"ไม่ทราบขั้น" }}"
+    ยังไม่ถึงขั้นสัญญาเสร็จสมบูรณ์ -- ตรวจสอบให้แน่ใจว่าเป็นสัญญาที่ต้องยกเลิกจริงก่อนบันทึก
+  </div>
+  {% endif %}
+
   {% comment %}
     สถานะสัญญาปิด/ยกเลิกไปแล้วแต่ไม่มีแถวใน Contract_termination_tr -- เกิดจากระบบอื่น
     ตั้งสถานะไว้ (ข้อมูลจริงมีอยู่ เช่น Contract_id 113) ต้องบอกให้ชัดว่าทำต่อไม่ได้
@@ -62,6 +148,59 @@
     สัญญานี้มีสถานะ "{{ contract.Status_contract_Desc|default:"—" }}" อยู่แล้ว
     จึงบันทึกยกเลิกสัญญาซ้ำไม่ได้ (ไม่พบรายการยกเลิกในระบบนี้ -- สถานะน่าจะถูกตั้งจากช่องทางอื่น)
     หากข้อมูลไม่ถูกต้องกรุณาติดต่อผู้ดูแลระบบ
+  </div>
+  {% endif %}
+
+  {% comment %}
+    ประวัติรายการยกเลิกที่ถูกลบของสัญญานี้ -- จาก Contract_termination_tr_log
+    ข้อมูลถูกเก็บตอนลบอยู่แล้ว แต่เดิมไม่มีที่ไหนเอามาแสดง ถ้ามีคนลบแล้วบันทึกใหม่
+    จะมองไม่เห็นว่ารายการก่อนหน้าเป็นอะไรและใครลบ
+  {% endcomment %}
+  {% if deleted_history %}
+  <div class="bg-white border border-gray-200 rounded-xl p-6 mb-6">
+    <div class="flex items-baseline justify-between gap-3 mb-3">
+      <h2 class="text-base font-bold text-gray-900">ประวัติรายการยกเลิกที่ถูกลบ</h2>
+      <span class="text-xs text-gray-400">{{ deleted_history|length }} รายการ</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-xs text-left">
+        <thead>
+          <tr class="border-b border-gray-100 bg-gray-50">
+            <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">กรณี</th>
+            <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">สิ้นสุดสัญญา</th>
+            <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">งวดสุดท้าย</th>
+            <th class="px-3 py-2 font-semibold text-gray-500">หมายเหตุ</th>
+            <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">บันทึกโดย/เมื่อ</th>
+            <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">ลบโดย/เมื่อ</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50">
+          {% for g in deleted_history %}
+          <tr>
+            <td class="px-3 py-2 text-gray-700">{{ g.Termination_case_name|default:"—" }}</td>
+            <td class="px-3 py-2 text-gray-700 whitespace-nowrap">{{ g.Contract_end_date|date:"d/m/Y"|default:"—" }}</td>
+            <td class="px-3 py-2 text-gray-700 whitespace-nowrap">
+              {{ g.last_period_label|default:g.Last_installment_period|default:"—" }}
+            </td>
+            <td class="px-3 py-2 text-gray-600 max-w-[200px] truncate" title="{{ g.Remark|default:'' }}">
+              {{ g.Remark|default:"—" }}
+            </td>
+            <td class="px-3 py-2 text-gray-600 whitespace-nowrap">
+              {{ g.UserEntry|default:"—" }}<br>
+              <span class="text-gray-400">{{ g.DateEntry|date:"d/m/Y H:i" }}</span>
+            </td>
+            <td class="px-3 py-2 text-gray-600 whitespace-nowrap">
+              {{ g.UserDelete|default:"—" }}<br>
+              <span class="text-gray-400">{{ g.DateDelete|date:"d/m/Y H:i" }}</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="text-xs text-amber-700 mt-3">
+      ระบบยังไม่มีการล็อกอิน ชื่อผู้ทำรายการจึงเป็น {{ default_user }} ทุกแถว -- ยังระบุตัวบุคคลไม่ได้
+    </p>
   </div>
   {% endif %}
 
@@ -148,8 +287,8 @@
           ข้อความเดิมเขียนว่า "บันทึกทับข้อมูลเดิมได้" ซึ่งไม่ตรงกับพฤติกรรมจริง
         {% endcomment %}
         <p class="text-xs text-amber-600 mb-5">
-          สัญญานี้บันทึกข้อมูลยกเลิกไว้แล้ว -- ระบบไม่อนุญาตให้บันทึกซ้ำ
-          ถ้าต้องการแก้ไขต้องให้ผู้ดูแลระบบจัดการที่ฐานข้อมูล
+          สัญญานี้บันทึกข้อมูลยกเลิกไว้แล้ว -- แก้ไขค่าเดิมโดยตรงไม่ได้
+          ถ้ากรอกผิด ให้ลบรายการนี้ (ปุ่มด้านล่าง) แล้วบันทึกใหม่
         </p>
       {% elif blocked_status %}
         <p class="text-xs text-amber-600 mb-5">
@@ -195,6 +334,22 @@
                    {% if not can_save %}disabled{% endif %}
                    class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500
                           {% if not can_save %}bg-gray-50 text-gray-500 cursor-not-allowed{% endif %}">
+            {% comment %}
+              บอกที่มาของค่าที่เติมให้ชัด -- วันนี้เป็นตัวคำนวณจำนวนงวดและงวดสุดท้ายทั้งหมด
+              ถ้าผู้ใช้ไม่รู้ว่าค่ามาจากไหน จะไม่รู้ว่าควรตรวจทานหรือปล่อยผ่าน
+            {% endcomment %}
+            {% if can_save %}
+              {% if end_date_missing %}
+                <p class="text-xs text-amber-600 mt-1">
+                  สัญญานี้ไม่มีวันสิ้นสุดในระบบ กรุณากรอกเอง
+                </p>
+              {% elif end_date_autofilled %}
+                <p class="text-xs mt-1 {% if end_date_is_past %}text-amber-600{% else %}text-gray-400{% endif %}">
+                  เติมจากอายุสัญญาในระบบ ({{ contract.end_contract_label }})
+                  {% if end_date_is_past %}-- สัญญานี้สิ้นสุดไปแล้ว ตรวจทานอีกครั้งก่อนบันทึก{% endif %}
+                </p>
+              {% endif %}
+            {% endif %}
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1.5">วันที่แจ้งยกเลิก</label>
@@ -249,7 +404,73 @@
               <span class="text-gray-400">({{ header.Last_installment_period }})</span>
             {% endif %}
           </div>
+          <div>บันทึกโดย: <span class="text-gray-800">{{ header.UserEntry|default:"—" }}</span></div>
+          <div>วันที่บันทึก: <span class="text-gray-800">{{ header.DateEntry|date:"d/m/Y H:i"|default:"—" }}</span></div>
+          <div>สถานะก่อนยกเลิก:
+            <span class="text-gray-800">{{ header.Prev_status_contract_Desc|default:"ไม่ได้บันทึกไว้" }}</span>
+          </div>
         </div>
+      </div>
+
+      {% comment %}
+        ทางแก้เมื่อบันทึกผิด -- SP ไม่ให้แก้ค่าเดิม ต้องลบแล้วบันทึกใหม่
+        sp_Contract_Termination_Delete จะคืนสถานะสัญญากลับเป็น Prev_status_contract_id
+        และล็อกแถวเดิมไว้ใน Contract_termination_tr_log ก่อนลบ
+      {% endcomment %}
+      {% comment %}
+        ปิดการตั้งหนี้มิเตอร์ -- ตั้ง Contract_meter_tr.UseOrNot = 0 (ตัว transaction ที่ผูก
+        มิเตอร์กับสัญญา) ไม่แตะ Contract_meter_ms เพราะมิเตอร์เป็นของกายภาพติดกับพื้นที่
+        ผู้เช่ารายใหม่ยังต้องใช้ตัวเดิม
+
+        กดได้เฉพาะเมื่อพ้นงวดสุดท้ายแล้ว -- ปิดก่อนนั้นสัญญาจะหลุดจากไฟล์ดาวน์โหลดทันที
+        ทำให้งวดผ่อนผัน (1-2 เดือนตาม case) หายไปจากการตั้งหนี้
+      {% endcomment %}
+      <div class="mt-5 pt-5 border-t border-gray-100">
+        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">การตั้งหนี้มิเตอร์</p>
+        <p class="text-xs text-gray-500 mb-1">
+          มิเตอร์ที่ผูกกับสัญญานี้: ยังตั้งหนี้อยู่ {{ meter_bindings.active }} รายการ
+          {% if meter_bindings.closed %} · ปิดแล้ว {{ meter_bindings.closed }} รายการ{% endif %}
+        </p>
+
+        {% if meter_bindings.active == 0 and meter_bindings.closed %}
+          <p class="text-xs text-green-700 mb-3">
+            ปิดการตั้งหนี้มิเตอร์เรียบร้อยแล้ว -- ทะเบียนมิเตอร์ยังอยู่ นำไปผูกกับสัญญาใหม่ได้
+          </p>
+        {% elif meter_bindings.active == 0 %}
+          <p class="text-xs text-gray-400 mb-3">สัญญานี้ไม่มีมิเตอร์ผูกอยู่</p>
+        {% elif not buffer_passed %}
+          <p class="text-xs text-gray-400 mb-3">
+            ยังอยู่ในช่วงงวดผ่อนผัน (ถึงงวด {{ header.last_period_label|default:header.Last_installment_period }})
+            -- ยังต้องตั้งหนี้ต่อ จะปิดได้เมื่อพ้นงวดนี้แล้ว
+          </p>
+        {% else %}
+          <p class="text-xs text-gray-500 mb-3">
+            พ้นงวดสุดท้ายแล้ว ปิดการตั้งหนี้มิเตอร์ได้ -- ปิดเฉพาะการผูกกับสัญญานี้
+            ทะเบียนมิเตอร์ยังอยู่ ใช้กับสัญญาใหม่ได้
+          </p>
+          <form method="post" action="{% url 'termination_close_meters' contract_id %}">
+            {% csrf_token %}
+            <button type="submit"
+                    class="px-4 py-2 rounded-lg text-sm font-semibold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors">
+              ปิดการตั้งหนี้มิเตอร์ ({{ meter_bindings.active }} รายการ)
+            </button>
+          </form>
+        {% endif %}
+      </div>
+
+      <div class="mt-5 pt-5 border-t border-gray-100">
+        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">แก้ไขกรณีบันทึกผิด</p>
+        <p class="text-xs text-gray-400 mb-3">
+          ลบรายการนี้แล้วบันทึกใหม่ได้ ระบบจะคืนสถานะสัญญากลับเป็นค่าก่อนยกเลิก
+          และเก็บรายการที่ลบไว้ในประวัติ
+        </p>
+        <form id="deleteForm" method="post" action="{% url 'termination_delete' contract_id %}">
+          {% csrf_token %}
+          <button type="button" id="openDeleteBtn"
+                  class="px-4 py-2 rounded-lg text-sm font-semibold text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 transition-colors">
+            ลบรายการยกเลิกนี้
+          </button>
+        </form>
       </div>
       {% endif %}
     </div>
@@ -283,13 +504,26 @@
         </div>
         {% endif %}
       </div>
-      <p class="text-xs text-gray-400 mb-5">
+      <p class="text-xs text-gray-400 mb-2">
         ติ๊กเลือกเฉพาะงวดที่ต้องการดำเนินการต่อหลังยกเลิกสัญญา
         {% if not header %}(ต้องบันทึกข้อมูลยกเลิกทางซ้ายก่อน ถึงจะติ๊กงวดได้){% endif %}
         {% if header and periods %}
           <span class="text-gray-500">-- เลือกอยู่ {{ selected_count }} จาก {{ periods|length }} งวด</span>
         {% endif %}
       </p>
+
+      {% comment %}
+        บอกให้ชัดว่าการติ๊กงวดเป็นการ "บันทึกไว้" ไม่ใช่ระบบตั้งหนี้ให้
+        ค่า Is_selected ถูกอ่านโดย sp_Contract_Installment_CreateAfterTermination ตัวเดียว
+        ซึ่งไม่เคยถูกเรียก (0 ครั้ง) และการตั้งหนี้เป็นงานของระบบ CMS (K2) ไม่ใช่เว็บนี้
+        ถ้าไม่เขียนกำกับ ผู้ใช้จะเข้าใจว่าติ๊กแล้วระบบจัดการต่อให้เอง
+      {% endcomment %}
+      {% if header and periods %}
+      <div class="bg-gray-50 border border-gray-200 text-gray-600 text-xs rounded-lg px-3 py-2 mb-5">
+        การติ๊กงวดที่นี่เป็นการ <span class="font-medium">บันทึกไว้เป็นข้อมูลอ้างอิง</span> เท่านั้น
+        ระบบนี้ไม่ได้ตั้งหนี้ให้ -- การตั้งหนี้และออกใบแจ้งหนี้ทำที่ระบบ CMS
+      </div>
+      {% endif %}
 
       {% if periods %}
         <div class="divide-y divide-gray-100 border border-gray-100 rounded-lg overflow-hidden">
@@ -380,6 +614,56 @@
     </div>
   </div>
 </div>
+
+{% comment %}
+  กล่องยืนยันการลบรายการยกเลิก -- แยกจากกล่องยืนยันการบันทึก
+  เพราะเป็นการกระทำที่ต่างกันและต้องย้ำผลลัพธ์ที่ต่างกัน
+{% endcomment %}
+{% if header %}
+<div id="deleteModal" class="fixed inset-0 z-50 hidden items-center justify-center">
+  <div id="deleteBackdrop"
+       class="absolute inset-0 bg-black/50 opacity-0 transition-opacity duration-200"></div>
+
+  <div id="deleteBox"
+       class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6 scale-90 opacity-0 transition-all duration-200">
+    <div class="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
+      <svg class="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round"
+              d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/>
+      </svg>
+    </div>
+    <h3 class="text-center text-base font-bold text-gray-900 mb-1">ลบรายการยกเลิกสัญญา</h3>
+    <div class="text-center mb-4">
+      <p class="text-sm font-semibold text-gray-800">{{ contract.Contract_code|default:"ไม่มีรหัสสัญญา" }}</p>
+      <p class="text-xs text-gray-500 mt-0.5">{{ contract.CompanyName|default:"ไม่มีชื่อลูกค้าในระบบ" }}</p>
+    </div>
+    <div class="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 mb-4 text-xs text-gray-600 space-y-1">
+      <div>ระบบจะลบข้อมูลยกเลิกและรายการงวดทั้ง {{ periods|length }} งวด</div>
+      <div>คืนสถานะสัญญากลับเป็น
+        <span class="font-medium text-gray-800">
+          {% if header.Prev_status_contract_Desc %}
+            "{{ header.Prev_status_contract_Desc }}"
+          {% else %}
+            — ไม่ได้บันทึกสถานะเดิมไว้ ระบบจะไม่เปลี่ยนสถานะสัญญา
+          {% endif %}
+        </span>
+      </div>
+      <div>เก็บรายการที่ลบไว้ในประวัติ (Contract_termination_tr_log)</div>
+    </div>
+    <p class="text-center text-sm text-gray-500 mb-6">ยืนยันลบรายการนี้หรือไม่?</p>
+    <div class="flex gap-3">
+      <button type="button" id="deleteNo"
+              class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">
+        ไม่ต้องการ
+      </button>
+      <button type="button" id="deleteYes"
+              class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors">
+        ลบรายการ
+      </button>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 {% comment %}
   ส่งค่าคงที่ไปให้ JS ด้วย json_script (escape ให้เองและไม่ต้อง hardcode ซ้ำในไฟล์ JS)

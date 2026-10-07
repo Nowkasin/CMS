@@ -10,7 +10,8 @@ Re-export ทุก view จากโมดูลย่อย เพื่อใ
   export.py       -> export_meters_excel
   termination.py  -> termination_search, termination_detail,
                       termination_toggle_installment,
-                      termination_select_all_installments
+                      termination_select_all_installments,
+                      termination_delete
   download.py     -> download_form, download_excel
   meter_master.py -> meter_list, meter_form
   phase_master.py -> phase_list, phase_form
@@ -35,6 +36,9 @@ from .termination import (
     termination_detail,
     termination_toggle_installment,
     termination_select_all_installments,
+    termination_delete,
+    termination_close_meters,
+    termination_log,
 )
 from .download import download_form, download_excel
 
@@ -48,7 +52,7 @@ __all__ = [
     'dashboard', 'edit_meter',
     'export_meters_excel',
     'termination_search', 'termination_detail', 'termination_toggle_installment',
-    'termination_select_all_installments',
+    'termination_select_all_installments', 'termination_delete', 'termination_close_meters', 'termination_log',
     'download_form', 'download_excel',
     'meter_list', 'meter_form',
     'phase_list', 'phase_form',

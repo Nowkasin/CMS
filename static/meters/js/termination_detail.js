@@ -1,19 +1,67 @@
 // หน้า termination_detail.html -- modal ยืนยันก่อนบันทึกการยกเลิกสัญญา
 // กล่องยืนยันสรุปสิ่งที่จะเกิดขึ้นจากค่าที่กรอกไว้ด้วย เพราะบันทึกแล้วแก้เองไม่ได้
+// กล่อง modal ใช้ร่วมกัน 2 ที่ (ยืนยันบันทึก / ยืนยันลบ) -- แยกเป็นฟังก์ชันไว้
+// เพื่อไม่ให้ต้องเขียน logic เปิด-ปิดซ้ำสองชุด
+function bindModal(ids, onOpen) {
+  const modal = document.getElementById(ids.modal);
+  const backdrop = document.getElementById(ids.backdrop);
+  const box = document.getElementById(ids.box);
+  const openBtn = document.getElementById(ids.openBtn);
+  const btnNo = document.getElementById(ids.no);
+  const btnYes = document.getElementById(ids.yes);
+  const form = document.getElementById(ids.form);
+
+  if (!modal || !backdrop || !box || !openBtn || !btnNo || !btnYes || !form) return;
+
+  function open() {
+    if (onOpen) onOpen({ form: form, yes: btnYes });
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    requestAnimationFrame(() => {
+      backdrop.classList.remove('opacity-0');
+      backdrop.classList.add('opacity-100');
+      box.classList.remove('opacity-0', 'scale-90');
+      box.classList.add('opacity-100', 'scale-100');
+    });
+  }
+
+  function close() {
+    backdrop.classList.remove('opacity-100');
+    backdrop.classList.add('opacity-0');
+    box.classList.remove('opacity-100', 'scale-100');
+    box.classList.add('opacity-0', 'scale-90');
+    setTimeout(() => {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }, 200);
+  }
+
+  openBtn.addEventListener('click', open);
+  btnNo.addEventListener('click', close);
+  backdrop.addEventListener('click', close);
+  btnYes.addEventListener('click', () => {
+    if (btnYes.disabled) return;
+    close();
+    form.submit();
+  });
+}
+
 (function () {
-  const openBtn = document.getElementById('openConfirmBtn');
-  const modal = document.getElementById('confirmModal');
-  const backdrop = document.getElementById('confirmBackdrop');
-  const box = document.getElementById('confirmBox');
-  const btnNo = document.getElementById('confirmNo');
-  const btnYes = document.getElementById('confirmYes');
   const form = document.getElementById('terminationForm');
 
   const summaryBox = document.getElementById('confirmSummary');
   const missingBox = document.getElementById('confirmMissing');
   const questionEl = document.getElementById('confirmQuestion');
+  const btnYes = document.getElementById('confirmYes');
 
-  if (!openBtn || !modal || !form) return;
+  // กล่องยืนยันลบ -- มีเฉพาะตอนสัญญานี้มีข้อมูลยกเลิกอยู่แล้ว ไม่มีอะไรต้องคำนวณ
+  bindModal({
+    modal: 'deleteModal', backdrop: 'deleteBackdrop', box: 'deleteBox',
+    openBtn: 'openDeleteBtn', no: 'deleteNo', yes: 'deleteYes', form: 'deleteForm',
+  });
+
+  // ฟอร์มบันทึกจะไม่มีตอนสัญญาถูกบล็อกหรือบันทึกไปแล้ว -- ข้ามส่วนที่เหลือ
+  if (!form) return;
 
   // ค่าคงที่ส่งมาจากเทมเพลตผ่าน json_script -- ไม่ hardcode ซ้ำที่นี่
   function readJson(id, fallback) {
@@ -130,35 +178,9 @@
     if (summaryBox) summaryBox.innerHTML = parts.join('');
   }
 
-  function openModal() {
-    buildSummary();
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-    requestAnimationFrame(() => {
-      backdrop.classList.remove('opacity-0');
-      backdrop.classList.add('opacity-100');
-      box.classList.remove('opacity-0', 'scale-90');
-      box.classList.add('opacity-100', 'scale-100');
-    });
-  }
-
-  function closeModal() {
-    backdrop.classList.remove('opacity-100');
-    backdrop.classList.add('opacity-0');
-    box.classList.remove('opacity-100', 'scale-100');
-    box.classList.add('opacity-0', 'scale-90');
-    setTimeout(() => {
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
-    }, 200);
-  }
-
-  openBtn.addEventListener('click', openModal);
-  btnNo.addEventListener('click', closeModal);
-  backdrop.addEventListener('click', closeModal);
-  btnYes.addEventListener('click', () => {
-    if (btnYes.disabled) return;
-    closeModal();
-    form.submit();
-  });
+  // กล่องยืนยันบันทึก -- เติมสรุปใหม่ทุกครั้งที่เปิด (ค่าในฟอร์มอาจเปลี่ยนไปแล้ว)
+  bindModal({
+    modal: 'confirmModal', backdrop: 'confirmBackdrop', box: 'confirmBox',
+    openBtn: 'openConfirmBtn', no: 'confirmNo', yes: 'confirmYes', form: 'terminationForm',
+  }, buildSummary);
 })();

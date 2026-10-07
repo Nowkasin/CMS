@@ -63,7 +63,15 @@ def fetch_contracts_for_download(meter_type_cd, billing_year_be, billing_month):
             LEFT JOIN dbo.Contract_Installment_tr it
                 ON it.Contract_id = dt.Contract_id
                 AND it.Contract_Installment_seq = dt.Contract_Installment_seq
-            WHERE c.Status_contract_id NOT IN (5, 9)
+            -- Status_contract_id เป็น nvarchar(2) -- ต้องเทียบกับสตริง ไม่ใช่ตัวเลข
+            -- เดิมเขียน NOT IN (5, 9) ซึ่งบังคับให้ SQL Server แปลงคอลัมน์เป็น int ทั้งคอลัมน์
+            -- ค่าปัจจุบันเป็นตัวเลขทั้งหมดจึงยังไม่พัง แต่ถ้ามีค่าอย่าง 'A1' เข้ามาแถวเดียว
+            -- query จะล้มทั้ง query ("Conversion failed ... to data type int") ทำให้หน้าดาวน์โหลดใช้ไม่ได้
+            -- ยืนยันแล้วว่าสองรูปแบบคืนสัญญาชุดเดียวกันเป๊ะ (223 แถว ไม่มีแถวต่าง)
+            --
+            -- หมายเหตุ: ตั้งใจไม่ตัดสถานะ '4' (ไม่ต่อสัญญา) ออก เพราะ case 2 ของการยกเลิกสัญญา
+            -- ให้ผ่อนผัน 1 เดือน จึงยังต้องส่งงวดสุดท้ายออกไปตั้งหนี้
+            WHERE c.Status_contract_id NOT IN ('5', '9')
             ORDER BY c.Contract_id, la.Contract_Location_seq, m.Meter_id
             """,
             meter_type_cd, meter_type_cd, ad_year, billing_month,

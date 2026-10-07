@@ -68,11 +68,20 @@
             {% if request.resolver_match.url_name == 'dashboard' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
     แดชบอร์ด
   </a>
+  {% comment %}
+    ไฮไลต์ "ยกเลิกสัญญา" ครอบทุกหน้าในกลุ่มนี้ (รายการ/รายละเอียด) ไม่ใช่แค่หน้ารายการ
+    เดิมเข้าหน้ารายละเอียดแล้วไม่มีปุ่มไหนไฮไลต์เลย ทำให้ไม่รู้ว่าอยู่ส่วนไหนของระบบ
+  {% endcomment %}
   <a href="{% url 'termination_search' %}"
       target="_blank"
      class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
-            {% if request.resolver_match.url_name == 'termination_search' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
+            {% if request.resolver_match.url_name == 'termination_search' or request.resolver_match.url_name == 'termination_detail' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
     ยกเลิกสัญญา
+  </a>
+  <a href="{% url 'termination_log' %}"
+     class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
+            {% if request.resolver_match.url_name == 'termination_log' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
+    ประวัติการยกเลิก
   </a>
 </nav>
 
