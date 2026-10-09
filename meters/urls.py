@@ -35,9 +35,11 @@ urlpatterns = [
         views.termination_close_meters,
         name='termination_close_meters',
     ),
-    # ต้องอยู่ก่อน <int:contract_id> ไม่จำเป็น เพราะ 'log' ไม่ match int converter
-    # แต่วางไว้ให้อ่านง่ายว่าเป็น URL ระดับเดียวกัน
-    path('termination/log/', views.termination_log, name='termination_log'),
+    # --- log เหตุการณ์รวมของระบบ ---
+    # หน้าเดียวรวมทุกเหตุการณ์ กรองตามประเภทด้วย ?action= และตามสัญญาด้วย ?contract=
+    # (เดิมเป็น /termination/log/ ที่อ่านจากตารางยกเลิกสัญญาโดยตรง -- ย้ายมาอ่าน
+    #  Contract_activity_log ที่รองรับเหตุการณ์จากทุกเมนูได้)
+    path('log/', views.activity_log, name='activity_log'),
         # --- ดาวน์โหลด Excel รายชื่อสัญญา + เลขอ่านมิเตอร์ ---
     path('download/', views.download_form, name='download_form'),
     path('download/excel/', views.download_excel, name='download_excel'),

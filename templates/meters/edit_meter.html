@@ -50,7 +50,16 @@
     <p class="text-xs text-gray-400 pb-2">เลขอ่านก่อน-หลังในการ์ดขวาเป็นของรอบบิลนี้โดยเฉพาะ เปลี่ยนเดือน-ปีเพื่อดู/แก้ของรอบอื่น</p>
   </form>
 
-  <form method="post">
+  {% comment %}
+    data-confirm-submit -- กันเผลอกด Enter แล้วบันทึกทันที (ดู static/meters/js/confirm_submit.js)
+    ฟอร์มเลือกรอบบิลด้านบนเป็น method="get" และใช้ onchange submit ตัวเอง จึงไม่ถูกดัก
+    (ไม่ได้เขียนข้อมูล แค่โหลดหน้าใหม่เพื่อดูเลขอ่านของรอบบิลอื่น)
+  {% endcomment %}
+  <form method="post"
+        data-confirm-submit
+        data-confirm-title="ยืนยันการบันทึกมิเตอร์และเลขอ่าน"
+        data-confirm-message="ระบบจะเขียนทับทะเบียนมิเตอร์ของพื้นที่ {{ subarea.SubArea_id }} และเลขอ่านรอบบิล {{ billing_month }}/{{ billing_year }} ทันที"
+        data-confirm-yes="ยืนยันบันทึก">
     {% csrf_token %}
     <input type="hidden" name="billing_month" value="{{ billing_month }}">
     <input type="hidden" name="billing_year" value="{{ billing_year }}">
@@ -125,8 +134,12 @@
             <div id="waterFields" class="grid grid-cols-1 gap-3 {% if not subarea.water %}opacity-40 pointer-events-none{% endif %}">
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">เลขประจำตัวเครื่องวัดน้ำ</label>
+                {# placeholder เดิมเขียนว่า "เว้นว่างได้ ระบบจะ Gen เลขให้ (W001...)" ซึ่งใช้ไม่ได้กับหน้านี้ #}
+                {# auto-gen ของ sp_Contract_Meter_Save อยู่ในสาขา INSERT เท่านั้น แต่หน้านี้แก้มิเตอร์ #}
+                {# ที่มีอยู่แล้ว = สาขา UPDATE ซึ่ง SET Meter_no ตรงๆ เว้นว่างแล้วเลขเดิมหายถาวร #}
                 <input type="text" name="water_meter_no" value="{{ subarea.water.Meter_no|default:'' }}"
-                       placeholder="เว้นว่างได้ ระบบจะ Gen เลขให้ (W001...)"
+                       data-confirm-field="เลขมิเตอร์น้ำ"
+                       placeholder="เลขเครื่องวัดน้ำ (เว้นว่างแล้วเลขเดิมจะถูกลบ)"
                        {% if not subarea.water %}disabled{% endif %}
                        class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-400">
               </div>
@@ -134,7 +147,7 @@
                 <div>
                   <label class="block text-xs font-medium text-gray-600 mb-1">เลขอ่านก่อน (รอบนี้)</label>
                   <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
-                         name="water_reading_before"
+                         name="water_reading_before" data-confirm-field="เลขอ่านก่อน (น้ำ)"
                          value="{{ water_reading.Reading_before|default_if_none:'' }}"
                          {% if not subarea.water %}disabled{% endif %}
                          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-400">
@@ -142,7 +155,7 @@
                 <div>
                   <label class="block text-xs font-medium text-gray-600 mb-1">เลขอ่านหลัง (รอบนี้)</label>
                   <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
-                         name="water_reading_after"
+                         name="water_reading_after" data-confirm-field="เลขอ่านหลัง (น้ำ)"
                          value="{{ water_reading.Reading_after|default_if_none:'' }}"
                          {% if not subarea.water %}disabled{% endif %}
                          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-400">
@@ -180,6 +193,7 @@
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">เลขประจำตัวเครื่องวัดไฟฟ้า</label>
                 <input type="text" name="electric_meter_no" value="{{ subarea.electric.Meter_no|default:'' }}"
+                       data-confirm-field="เลขมิเตอร์ไฟฟ้า"
                        placeholder="เลขเครื่องวัดจริงจากการไฟฟ้า"
                        {% if not subarea.electric %}disabled{% endif %}
                        class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400">
@@ -200,7 +214,7 @@
                 <div>
                   <label class="block text-xs font-medium text-gray-600 mb-1">เลขอ่านก่อน (รอบนี้)</label>
                   <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
-                         name="electric_reading_before"
+                         name="electric_reading_before" data-confirm-field="เลขอ่านก่อน (ไฟ)"
                          value="{{ electric_reading.Reading_before|default_if_none:'' }}"
                          {% if not subarea.electric %}disabled{% endif %}
                          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400">
@@ -208,7 +222,7 @@
                 <div>
                   <label class="block text-xs font-medium text-gray-600 mb-1">เลขอ่านหลัง (รอบนี้)</label>
                   <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
-                         name="electric_reading_after"
+                         name="electric_reading_after" data-confirm-field="เลขอ่านหลัง (ไฟ)"
                          value="{{ electric_reading.Reading_after|default_if_none:'' }}"
                          {% if not subarea.electric %}disabled{% endif %}
                          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400">

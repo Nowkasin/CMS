@@ -71,6 +71,22 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 
+# -----------------------------------------------------------------------
+# ขีดจำกัดการอัปโหลดไฟล์ Excel (ใช้ที่ meters/forms.py และ views/steppage.py)
+#
+# สองค่าข้างบนของ Django ไม่ใช่ขีดจำกัดขนาดไฟล์:
+#   DATA_UPLOAD_MAX_MEMORY_SIZE คุมขนาด POST ที่ไม่ใช่ไฟล์
+#   FILE_UPLOAD_MAX_MEMORY_SIZE เป็นเกณฑ์ว่าจะเก็บใน RAM หรือเขียนเป็นไฟล์ชั่วคราว
+# ไฟล์ 500 MB จึงผ่านทั้งคู่ แล้วไปล้มที่ openpyxl -- ต้องจำกัดเองที่ฟอร์ม
+#
+# EXCEL_UPLOAD_MAX_ROWS จำกัดจำนวนแถวที่ parse ได้ เพราะข้อมูล staged ถูกเก็บใน
+# session (ตาราง django_session ใน SQLite) วัดแล้วประมาณ 650 ไบต์ต่อแถว
+# -> 5,000 แถว ประมาณ 3 MB ต่อ session ซึ่งยังรับได้
+# ข้อมูลจริงมีมิเตอร์ 52 ตัว พื้นที่ย่อย 469 รายการ ไฟล์ปกติจึงไม่ใกล้เพดานนี้
+# -----------------------------------------------------------------------
+EXCEL_UPLOAD_MAX_SIZE = 10 * 1024 * 1024
+EXCEL_UPLOAD_MAX_ROWS = 5000
+
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 SESSION_COOKIE_AGE = 60 * 60 * 2  # 2 ชั่วโมง พอสำหรับทำ wizard ให้จบ
 

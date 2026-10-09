@@ -33,20 +33,86 @@
   </div>
   {% endif %}
 
-  <form id="meterForm" method="post" class="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
+  {% comment %}
+    data-confirm-submit -- กันเผลอกด Enter แล้วบันทึกทันที (ดู static/meters/js/confirm_submit.js)
+    กด Enter ในช่องใดก็ตามจะไม่ส่งฟอร์มอีก และกดปุ่มบันทึกจะขึ้นกล่องยืนยันพร้อมสรุปค่าก่อน
+  {% endcomment %}
+  <form id="meterForm" method="post" class="bg-white border border-gray-200 rounded-xl p-6 space-y-4"
+        data-confirm-submit
+        data-confirm-title="{% if meter_id %}ยืนยันการแก้ไขมิเตอร์{% else %}ยืนยันการเพิ่มมิเตอร์ใหม่{% endif %}"
+        data-confirm-message="{% if meter_id %}ระบบจะเขียนทับข้อมูลมิเตอร์ #{{ meter_id }} ทันที{% else %}ระบบจะสร้างมิเตอร์ใหม่ลงทะเบียนทันที{% endif %} กรุณาตรวจสอบข้อมูลด้านล่างก่อนยืนยัน"
+        data-confirm-yes="{% if meter_id %}ยืนยันการแก้ไข{% else %}ยืนยันเพิ่มมิเตอร์{% endif %}">
     {% csrf_token %}
 
+    {% comment %}
+      ช่องเลือกพื้นที่ย่อย -- มีตัวเลือก 468 แห่ง (พื้นที่ทั้งหมดใน master ไม่ใช่เฉพาะที่มีมิเตอร์)
+
+      โครงสร้างนี้เป็น progressive enhancement 2 ชั้น:
+        1) <select> ข้างล่างคือ form control จริง (ชื่อ subarea_id) ทำงานได้ด้วยตัวเองถ้า JS ไม่ทำงาน
+        2) ถ้า JS ทำงาน meter_form.js จะซ่อน <select> แล้วสร้างช่องค้นหา + รายการผลลัพธ์ขึ้นมาแทน
+           โดยยังเขียนค่ากลับลง <select> ตัวเดิม -- ฝั่ง server จึงไม่ต้องรู้เรื่องนี้เลย
+           (select ที่ display:none ยังส่งค่าไปกับฟอร์มปกติ ต่างจาก disabled ที่ไม่ส่ง)
+
+      ประวัติที่เคยลองแล้วไม่เวิร์ก กันทำซ้ำ:
+        - listbox (size="8"): คลิกเลือกได้จริงแต่ไม่มีช่องโชว์ค่าที่เลือก แถบไฮไลต์ตอนไม่โฟกัส
+          เป็นสีเทาจาง ผู้ใช้เข้าใจว่า "เลือกไม่ได้" และ label ของ optgroup หน้าตาคล้าย
+          ตัวเลือกจนคลิกผิด
+        - ช่องกรองแยก + dropdown ปกติ: เป็น 2 ช่องที่ดูเหมือนเกี่ยวกัน ต้องพิมพ์ช่องหนึ่ง
+          แล้วย้ายไปกดอีกช่องหนึ่ง สับสนว่าช่องไหนคือช่องที่ต้องกรอก
+    {% endcomment %}
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1.5">พื้นที่ย่อย (SubArea)</label>
-      <select name="subarea_id"
+      <label for="subareaSearch" id="subareaLabel"
+             class="block text-sm font-medium text-gray-700 mb-1.5">พื้นที่ย่อย (SubArea)</label>
+
+      {# --- ช่องค้นหา + รายการผลลัพธ์ (JS เอา .hidden ออกเมื่อพร้อมใช้) --- #}
+      <div id="subareaCombo" class="relative hidden">
+        <div class="relative">
+          <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+               fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M21 21l-4.3-4.3"/>
+          </svg>
+          <input type="text" id="subareaSearch" autocomplete="off" role="combobox"
+                 aria-expanded="false" aria-controls="subareaList" aria-autocomplete="list"
+                 aria-labelledby="subareaLabel" aria-describedby="subareaHint"
+                 placeholder="พิมพ์รหัสพื้นที่ ชื่อพื้นที่ หรือชื่อสถานที่ แล้วเลือกจากรายการ"
+                 class="w-full pl-9 pr-9 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
+          <button type="button" id="subareaClear" aria-label="ล้างพื้นที่ที่เลือก"
+                  class="hidden absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 flex items-center justify-center">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+
+        <ul id="subareaList" role="listbox" aria-labelledby="subareaLabel"
+            class="hidden absolute z-30 left-0 right-0 mt-1 max-h-72 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg py-1">
+        </ul>
+      </div>
+
+      {# --- form control จริง -- ใช้งานตรงๆ ได้เมื่อ JS ไม่ทำงาน --- #}
+      <select name="subarea_id" id="subareaSelect" data-confirm-field="พื้นที่ย่อย"
               class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
-        <option value="">-- เลือก SubArea --</option>
-        {% for s in subareas %}
-          <option value="{{ s.SubArea_id }}" {% if meter.SubArea_id == s.SubArea_id %}selected{% endif %}>
-            {{ s.SubArea_id }} — {{ s.SubArea_name|default:"—" }}
-          </option>
+        <option value="" {% if not selected_subarea_id %}selected{% endif %}>-- เลือก SubArea --</option>
+        {% for g in subarea_groups %}
+        <optgroup label="{{ g.label }}">
+          {% for s in g.items %}
+            {# data-* ให้ JS เอาไปจัดหน้าตาแต่ละแถวได้ โดยไม่ต้องไปแกะสตริงใน textContent #}
+            <option value="{{ s.SubArea_id }}"
+                    data-name="{{ s.SubArea_name|default:'' }}"
+                    data-group="{{ g.label }}"
+                    data-meters="{{ s.meter_count|default:0 }}"
+                    data-inactive="{% if s.is_inactive %}1{% endif %}"
+                    {% if selected_subarea_id == s.SubArea_id %}selected{% endif %}>
+              {{ s.SubArea_id }} — {{ s.SubArea_name|default:"—" }}{% if s.meter_count %} · มีมิเตอร์ {{ s.meter_count }} ตัว{% endif %}{% if s.is_inactive %} · ปิดใช้งานใน master{% endif %}
+            </option>
+          {% endfor %}
+        </optgroup>
         {% endfor %}
       </select>
+
+      <p id="subareaHint" class="text-xs mt-1.5 {% if selected_subarea_id %}text-brand-600 font-medium{% else %}text-gray-400{% endif %}">
+        {% if selected_subarea_id %}เลือกไว้: {{ selected_subarea_id }}{% else %}ยังไม่ได้เลือกพื้นที่{% endif %}
+      </p>
     </div>
 
     <div>
@@ -71,7 +137,7 @@
           <a href="{% url 'meter_new' %}" class="text-brand-600 hover:underline">เพิ่มมิเตอร์ใหม่</a> แทน
         </p>
       {% else %}
-        <select name="meter_type_cd" id="meterTypeSelect"
+        <select name="meter_type_cd" id="meterTypeSelect" data-confirm-field="ประเภทมิเตอร์"
                 class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
           <option value="9" {% if meter.Meter_type_cd == 9 %}selected{% endif %}>น้ำ</option>
           <option value="8" {% if meter.Meter_type_cd == 8 %}selected{% endif %}>ไฟ</option>
@@ -80,10 +146,29 @@
     </div>
 
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1.5">เลขประจำเครื่องวัด</label>
-      <input type="text" name="meter_no" value="{{ meter.Meter_no|default:'' }}"
-             placeholder="เว้นว่างได้ ระบบจะ Gen เลขให้"
+      <label for="meterNoInput" class="block text-sm font-medium text-gray-700 mb-1.5">เลขประจำเครื่องวัด</label>
+      {% comment %}
+        พฤติกรรมการ "Gen เลขให้" ของ sp_Contract_Meter_Save ไม่เหมือนกันทุกกรณี
+        ข้อความตรงนี้จึงต้องเปลี่ยนตามกรณี ไม่ใช่ประโยคเดียวใช้ทุกที่:
+          - เพิ่มใหม่ + มิเตอร์น้ำ (9) + เว้นว่าง -> SP gen ให้จริง (W001, W002, ...)
+          - เพิ่มใหม่ + มิเตอร์ไฟ (8) + เว้นว่าง -> ปล่อย NULL ไว้ ไม่ gen ให้ (ตามคอมเมนต์ใน SP:
+            ไฟฟ้าต้องใช้เลขเครื่องวัดจริงจากการไฟฟ้า)
+          - แก้ไขมิเตอร์เดิม (ทุกประเภท) -> สาขา UPDATE ทำ SET Meter_no = @Meter_no ตรงๆ
+            ไม่มี gen ใดๆ เว้นว่างแล้วเลขเดิมหายถาวร
+        ตอนเพิ่มใหม่ JS สลับข้อความตามประเภทที่เลือก (ดู meter_form.js)
+      {% endcomment %}
+      <input type="text" name="meter_no" id="meterNoInput" value="{{ meter.Meter_no|default:'' }}"
+             data-confirm-field="เลขประจำเครื่องวัด"
+             data-ph-water="เว้นว่างได้ ระบบจะ Gen เลขชั่วคราวให้ (W001, W002, ...)"
+             data-ph-electric="เลขเครื่องวัดจริงจากการไฟฟ้า (เว้นว่างได้ แล้วมากรอกภายหลัง)"
+             placeholder="{% if meter_id %}เลขเครื่องวัด (เว้นว่างแล้วเลขเดิมจะถูกลบ){% elif meter.Meter_type_cd == 8 %}เลขเครื่องวัดจริงจากการไฟฟ้า (เว้นว่างได้ แล้วมากรอกภายหลัง){% else %}เว้นว่างได้ ระบบจะ Gen เลขชั่วคราวให้ (W001, W002, ...){% endif %}"
              class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
+      {% if meter_id %}
+        <p class="text-xs text-gray-400 mt-1">
+          การแก้ไขจะเขียนทับเลขเดิมทันที ถ้าเว้นว่างไว้ระบบจะถือว่าต้องการลบเลขทิ้ง
+          และจะเตือนก่อนบันทึก
+        </p>
+      {% endif %}
     </div>
 
     {% comment %}
@@ -95,7 +180,7 @@
     {% if not meter_id or meter.Meter_type_cd == 8 %}
     <div id="phaseField" {% if not meter_id and meter.Meter_type_cd != 8 %}class="hidden"{% endif %}>
       <label class="block text-sm font-medium text-gray-700 mb-1.5">ระบบไฟฟ้า (เฉพาะมิเตอร์ไฟ)</label>
-      <select name="phase_type"
+      <select name="phase_type" data-confirm-field="ระบบไฟฟ้า"
               class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
         <option value="">ไม่ระบุ</option>
         {% for opt in phase_options %}
@@ -112,7 +197,7 @@
 
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1.5">หมายเหตุ</label>
-      <textarea name="meter_remark" rows="2"
+      <textarea name="meter_remark" rows="2" data-confirm-field="หมายเหตุ"
                 placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"
                 class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">{{ meter.Meter_remark|default:'' }}</textarea>
     </div>

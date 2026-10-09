@@ -8,14 +8,17 @@ from .. import services
 
 def export_meters_excel(request):
     """
-    ใช้ query เดียวกับที่ตาราง dashboard ใช้แสดงผล (fetch_subareas + search)
+    ใช้ query เดียวกับที่ตาราง dashboard ใช้แสดงผล (fetch_subareas + search + type)
     เพื่อให้ข้อมูลที่ export ตรงกับสิ่งที่ผู้ใช้เห็นบนจอตอนกดปุ่ม
-    หมายเหตุ: type_filter (?type=8/9) ยังไม่ได้ผูกกับ fetch_subareas() ในหน้า dashboard เอง
-    (ตารางบนจอไม่ได้กรองตาม type อยู่แล้วในตอนนี้) จึง export ไม่กรองตาม type ด้วยเหมือนกัน
-    เพื่อให้ผลลัพธ์ตรงกับที่เห็นจริงบนตาราง
+
+    ตอนนี้ fetch_subareas() กรองตามประเภทมิเตอร์ได้แล้ว จึงส่ง ?type= ต่อเข้าไปด้วย
+    (ก่อนหน้านี้ตารางบนจอยังไม่กรองตาม type เลย จึงตั้งใจไม่ส่งต่อ -- หมายเหตุนั้นหมดอายุแล้ว)
     """
     search = request.GET.get('q', '')
-    subareas = services.fetch_subareas(search)
+    type_filter = request.GET.get('type', 'all')
+    if type_filter not in ('all', '8', '9'):
+        type_filter = 'all'
+    subareas = services.fetch_subareas(search, type_filter)
     wb = services.build_subareas_workbook(subareas)
 
     response = HttpResponse(

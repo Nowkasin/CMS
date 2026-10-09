@@ -38,7 +38,16 @@
   </div>
   {% endif %}
 
-  <form method="post" id="phaseForm" class="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
+  {% comment %}
+    data-confirm-submit -- กันเผลอกด Enter แล้วบันทึกทันที (ดู static/meters/js/confirm_submit.js)
+    หน้านี้เสี่ยงกว่าหน้าอื่น เพราะค่า Phase_type ถูกเก็บเป็นข้อความในทะเบียนมิเตอร์
+    แก้ชื่อที่นี่แล้วข้อมูลมิเตอร์เดิมจะไม่ตามมา (ดูคำเตือนด้านบนของหน้า)
+  {% endcomment %}
+  <form method="post" id="phaseForm" class="bg-white border border-gray-200 rounded-xl p-6 space-y-4"
+        data-confirm-submit
+        data-confirm-title="{% if phase_id %}ยืนยันการแก้ไขระบบไฟฟ้า{% else %}ยืนยันการเพิ่มระบบไฟฟ้า{% endif %}"
+        data-confirm-message="{% if phase_id and meters_using %}ระบบไฟฟ้านี้มีมิเตอร์ใช้อยู่ {{ meters_using }} รายการ ถ้าแก้ชื่อ ข้อมูลในทะเบียนมิเตอร์จะยังเป็นชื่อเดิม ระบบไม่ตามไปแก้ให้{% else %}ค่านี้จะถูกบันทึกลงฐานข้อมูลทันที และเป็นค่าที่เขียนลงทะเบียนมิเตอร์จริง{% endif %}"
+        data-confirm-yes="{% if phase_id %}ยืนยันการแก้ไข{% else %}ยืนยันเพิ่มรายการ{% endif %}">
     {% csrf_token %}
 
     <div>
@@ -47,6 +56,7 @@
       </label>
       <input type="text" name="phase_type" value="{{ phase.Phase_type|default:'' }}"
              maxlength="{{ max_len }}" required autocomplete="off"
+             data-confirm-field="ระบบไฟฟ้า"
              placeholder="เช่น 1เฟส"
              class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
       <p class="text-xs text-gray-400 mt-1">
@@ -58,6 +68,7 @@
       <label class="block text-sm font-medium text-gray-700 mb-1.5">คำบรรยาย</label>
       <input type="text" name="phase_desc" value="{{ phase.Phase_desc|default:'' }}"
              maxlength="100" autocomplete="off"
+             data-confirm-field="คำบรรยาย"
              placeholder="เช่น ระบบไฟฟ้า 1 เฟส"
              class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
       <p class="text-xs text-gray-400 mt-1">ใช้แสดงบนหน้าจอเท่านั้น ไม่ได้บันทึกลงทะเบียนมิเตอร์</p>

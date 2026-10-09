@@ -1,4 +1,4 @@
-# meters/views/termination.py
+﻿# meters/views/termination.py
 import datetime
 import re
 from urllib.parse import urlencode
@@ -533,58 +533,6 @@ def termination_delete(request, contract_id):
         request.session['termination_flash_success'] = 'ลบรายการยกเลิกแล้ว คืนสถานะสัญญากลับเป็นค่าเดิมเรียบร้อย'
 
     return redirect(detail_url)
-
-
-LOG_PER_PAGE = 30
-
-
-def termination_log(request):
-    """
-    หน้าประวัติการยกเลิกสัญญาทั้งระบบ -- ใครบันทึก ใครลบ เมื่อไหร่
-
-    ข้อมูลถูกเก็บไว้แล้วใน Contract_termination_tr (UserEntry/DateEntry) และ
-    Contract_termination_tr_log (UserDelete/DateDelete) แต่เดิมไม่มีหน้าไหนเอามาแสดง
-
-    ข้อจำกัดที่ต้องรู้: ตอนนี้ระบบยังไม่มีล็อกอิน ชื่อผู้ทำรายการจึงเป็นค่าคงที่
-    DEFAULT_USER ทุกแถว -- log บอกได้ว่า "เกิดอะไรขึ้นเมื่อไหร่" แต่ยังบอกไม่ได้ว่า
-    "ใครทำ" จนกว่าจะผูกตัวตนจากระบบ CMS (K2) เข้ามา เทมเพลตเขียนกำกับไว้ให้ผู้ใช้รู้
-    """
-    search = request.GET.get('q', '').strip()
-    event = request.GET.get('event', services.LOG_EVENT_ALL if hasattr(services, 'LOG_EVENT_ALL') else 'all')
-    valid_events = dict(services.TERMINATION_LOG_EVENTS)
-    if event not in valid_events:
-        event = 'all'
-
-    rows = services.fetch_termination_log(search)
-
-    counts = {'all': len(rows)}
-    for key, _label in services.TERMINATION_LOG_EVENTS:
-        if key != 'all':
-            counts[key] = sum(1 for r in rows if r['Event_type'] == key)
-
-    visible = rows if event == 'all' else [r for r in rows if r['Event_type'] == event]
-
-    for r in visible:
-        r['period_label'] = _period_label(r.get('Last_installment_period'))
-
-    paginator = Paginator(visible, LOG_PER_PAGE)
-    page_obj = paginator.get_page(request.GET.get('page'))
-
-    events = [
-        {'key': key, 'label': label, 'count': counts.get(key, 0), 'is_active': key == event}
-        for key, label in services.TERMINATION_LOG_EVENTS
-    ]
-
-    context = {
-        'page_obj': page_obj,
-        'rows': page_obj.object_list,
-        'total_visible': len(visible),
-        'events': events,
-        'active_event': event,
-        'search': search,
-        'default_user': DEFAULT_USER,
-    }
-    return render(request, 'meters/termination_log.html', context)
 
 
 def _buffer_period_passed(header, today=None):

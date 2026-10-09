@@ -1,4 +1,4 @@
-# meters/services/termination.py
+﻿# meters/services/termination.py
 from .db import get_db_connection
 from .meters import _to_sql_like_pattern
 
@@ -335,89 +335,6 @@ def fetch_termination_history(contract_id):
             """,
             contract_id,
         )
-        columns = [c[0] for c in cursor.description]
-        return [dict(zip(columns, row)) for row in cursor.fetchall()]
-    finally:
-        conn.close()
-
-
-# ประเภทเหตุการณ์ในหน้าประวัติ (?event=)
-LOG_EVENT_SAVED = 'saved'
-LOG_EVENT_DELETED = 'deleted'
-LOG_EVENT_ALL = 'all'
-
-TERMINATION_LOG_EVENTS = [
-    (LOG_EVENT_ALL, 'ทุกเหตุการณ์'),
-    (LOG_EVENT_SAVED, 'บันทึกยกเลิก'),
-    (LOG_EVENT_DELETED, 'ลบรายการยกเลิก'),
-]
-
-
-def fetch_termination_log(search=''):
-    """
-    ประวัติการยกเลิกสัญญาทั้งระบบ เรียงตามเวลาล่าสุดก่อน
-
-    รวมเหตุการณ์จาก 2 ตารางด้วย UNION ALL:
-      1) Contract_termination_tr      -> 'saved'   (รายการที่ยังอยู่)
-      2) Contract_termination_tr_log  -> 'saved'   (รายการที่ถูกลบ -- ตอนที่เคยถูกบันทึก)
-      3) Contract_termination_tr_log  -> 'deleted' (ตอนที่ถูกลบ)
-
-    รายการที่ถูกลบจึงปรากฏ 2 เหตุการณ์ (บันทึก แล้วลบ) ทำให้เห็นลำดับเวลาครบ
-
-    ไม่รวมเหตุการณ์ "ปิดการตั้งหนี้มิเตอร์" เพราะ Contract_meter_tr เก็บแค่
-    DateUpdate ล่าสุดของแต่ละแถว ซึ่งถูกเขียนทับเมื่อคืนค่า -- เอามาทำ timeline
-    แล้วจะให้ข้อมูลที่เข้าใจผิดได้ (ดูสถานะปัจจุบันที่หน้ารายละเอียดสัญญาแทน)
-    """
-    conn = get_db_connection()
-    try:
-        cursor = conn.cursor()
-        sql = """
-            WITH events AS (
-                SELECT t.Contract_id, t.Termination_id, t.Termination_case,
-                       t.Last_installment_period, t.Remark,
-                       'saved' AS Event_type, t.UserEntry AS Event_user, t.DateEntry AS Event_at,
-                       CAST(1 AS int) AS Is_current
-                FROM dbo.Contract_termination_tr t
-                UNION ALL
-                SELECT g.Contract_id, g.Termination_id, g.Termination_case,
-                       g.Last_installment_period, g.Remark,
-                       'saved', g.UserEntry, g.DateEntry, CAST(0 AS int)
-                FROM dbo.Contract_termination_tr_log g
-                UNION ALL
-                SELECT g.Contract_id, g.Termination_id, g.Termination_case,
-                       g.Last_installment_period, g.Remark,
-                       'deleted', g.UserDelete, g.DateDelete, CAST(0 AS int)
-                FROM dbo.Contract_termination_tr_log g
-            )
-            SELECT e.Contract_id, c.Contract_code, cu.CompanyName,
-                   e.Termination_id, e.Termination_case,
-                   CASE e.Termination_case
-                        WHEN 1 THEN N'ยกเลิกสัญญาก่อนครบอายุ'
-                        ELSE N'สิ้นสุดตามอายุสัญญา (ไม่ต่อสัญญา)'
-                   END AS Termination_case_name,
-                   e.Last_installment_period, e.Remark,
-                   e.Event_type, e.Event_user, e.Event_at, e.Is_current
-            FROM events e
-            LEFT JOIN dbo.Contract_hrd_tr c ON c.Contract_id = e.Contract_id
-            OUTER APPLY (
-                SELECT TOP 1 x.CompanyName
-                FROM dbo.Contract_customer_tr x
-                WHERE TRY_CONVERT(int, x.Contract_id) = e.Contract_id
-            ) cu
-            WHERE 1 = 1
-        """
-        params = []
-        search = (search or '').strip()
-        if search:
-            like = _to_sql_like_pattern(search)
-            sql += """ AND (LTRIM(RTRIM(c.Contract_code)) LIKE ?
-                            OR cu.CompanyName LIKE ?
-                            OR e.Event_user LIKE ?)"""
-            params += [like, like, like]
-
-        sql += ' ORDER BY e.Event_at DESC, e.Termination_id DESC'
-
-        cursor.execute(sql, params)
         columns = [c[0] for c in cursor.description]
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
     finally:

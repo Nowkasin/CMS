@@ -109,7 +109,14 @@ def find_existing_meter(cursor, subarea_id, meter_type_cd, meter_no):
     return None
 
 
-def commit_staged_rows(rows, user_id):
+def commit_staged_rows(rows, user_id, source_filename=None, billing_period=None):
+    """
+    นำเข้าข้อมูลมิเตอร์จากไฟล์ Excel ที่ staged ไว้ลงฐานข้อมูลจริง
+
+    source_filename / billing_period ใช้เขียน Contract_activity_log เท่านั้น
+    (ชื่อไฟล์และรอบบิลมีอยู่แค่ใน session ฝั่ง Python ไม่มีใน DB) -- เป็น optional
+    เพื่อให้ผู้เรียกเดิมที่ไม่ส่งมายังทำงานได้เหมือนเดิม
+    """
     logs = []
     stats = {'meter_ok': 0, 'meter_reused': 0, 'skipped': 0, 'errors': 0}
     result_rows = []
@@ -176,6 +183,31 @@ def commit_staged_rows(rows, user_id):
 
             result_rows.append(row_result)
 
+        # เขียน log เหตุการณ์นำเข้าไฟล์ -- ใช้ cursor เดิม จึงอยู่ในทรานแซกชันเดียวกับ
+        # การนำเข้า ถ้า commit ไม่ผ่าน log ก็ไม่เกิด ไม่เหลือ log ของงานที่ไม่ได้เกิดขึ้น
+        # import ที่นี่ไม่ใช่ด้านบนไฟล์ เพราะ activity_log.py import _to_sql_like_pattern
+        # จากไฟล์นี้ -- ถ้า import ไว้ด้านบนจะเป็น circular import
+        from .activity_log import add_activity_log, ACTION_UPLOAD_COMMIT
+
+        contract_ids = {r.get('db_contract_id') for r in rows if r.get('db_contract_id')}
+        detail = (
+            f"นำเข้าไฟล์ Excel -- บันทึกมิเตอร์ {stats['meter_ok']} รายการ "
+            f"(ใช้ทะเบียนเดิม {stats['meter_reused']}) · ข้าม {stats['skipped']} · "
+            f"ผิดพลาด {stats['errors']} · สัญญาที่เกี่ยวข้อง {len(contract_ids)} ฉบับ"
+        )
+        if billing_period:
+            detail += f" · รอบบิล {billing_period}"
+
+        add_activity_log(
+            ACTION_UPLOAD_COMMIT, user_id,
+            # ผูกกับสัญญาได้เฉพาะเมื่อไฟล์นั้นเกี่ยวกับสัญญาเดียว -- ถ้าหลายสัญญา
+            # ปล่อยว่างไว้ แล้วบอกจำนวนใน Detail (log 1 แถวต่อ 1 ครั้งที่นำเข้า)
+            contract_id=next(iter(contract_ids)) if len(contract_ids) == 1 else None,
+            ref_text=source_filename,
+            detail=detail,
+            cursor=cursor,
+        )
+
         conn.commit()
     except Exception:
         # error ที่หลุดออกมานอก try ของแต่ละแถว (เช่นตอน commit เอง) -- rollback ให้ชัดเจน
@@ -201,7 +233,21 @@ def _to_sql_like_pattern(search):
     return f"%{escaped}%"
 
 
-def fetch_subareas(search=None):
+def fetch_subareas(search=None, type_filter=None):
+    """
+    1 แถว = 1 พื้นที่ย่อยที่มีมิเตอร์ลงทะเบียนอยู่ -- เป็นชุดข้อมูลที่ตารางหน้า dashboard ใช้แสดง
+
+    type_filter: '9' = เฉพาะพื้นที่ที่มีมิเตอร์น้ำ, '8' = เฉพาะที่มีมิเตอร์ไฟฟ้า, อื่นๆ = ไม่กรอง
+      กรองด้วย "จำนวนมิเตอร์ของประเภทนั้น > 0" ไม่ใช่ "มีเลขมิเตอร์" เพราะมิเตอร์ที่ยัง
+      รอ Gen เลขจะมี Meter_no เป็น NULL แต่ก็ถือว่าพื้นที่นั้นมีมิเตอร์ประเภทนั้นแล้ว
+
+    search: ค้นได้จากเลขที่สัญญา / รหัสลูกหนี้ / ชื่อลูกหนี้ / เลขมิเตอร์ / รหัส+ชื่อพื้นที่ย่อย
+      ให้ตรงกับที่ช่องค้นหาบนหน้าจอโฆษณาไว้ (เดิมกรองแต่ Contract_code อย่างเดียว
+      ค้นชื่อลูกหนี้หรือเลขมิเตอร์แล้วได้ 0 แถวทุกครั้ง)
+      ใช้ MAX(CASE WHEN ... THEN 1 ELSE 0 END) = 1 เพราะต้องการความหมายว่า
+      "มีมิเตอร์ตัวใดตัวหนึ่งในกลุ่มนี้ที่ตรงคำค้น" -- MAX(m.Meter_no) LIKE ? จะเทียบแค่
+      เลขมิเตอร์ตัวที่มากที่สุดในกลุ่ม ตัวอื่นในพื้นที่เดียวกันจะค้นไม่เจอ
+    """
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -213,6 +259,8 @@ def fetch_subareas(search=None):
                 s.SubArea_name,
                 MAX(CASE WHEN m.Meter_type_cd = 9 THEN m.Meter_no END) AS water_meter_no,
                 MAX(CASE WHEN m.Meter_type_cd = 8 THEN m.Meter_no END) AS electric_meter_no,
+                COUNT(CASE WHEN m.Meter_type_cd = 9 THEN 1 END) AS water_meter_count,
+                COUNT(CASE WHEN m.Meter_type_cd = 8 THEN 1 END) AS electric_meter_count,
                 MAX(c.Contract_id) AS contract_id,
                 MAX(c.Contract_code) AS contract_code,
                 MAX(cu.Customer_id) AS customer_id,
@@ -221,18 +269,114 @@ def fetch_subareas(search=None):
             LEFT JOIN Contract_location_subarea_ms s ON s.SubArea_id = m.SubArea_id
             LEFT JOIN Contract_meter_tr t ON t.Meter_id = m.Meter_id AND t.UseOrNot = 1
             LEFT JOIN Contract_hrd_tr c ON c.Contract_id = t.Contract_id
-            LEFT JOIN Contract_customer_tr cu ON cu.Contract_id = c.Contract_id
+            -- Contract_customer_tr.Contract_id เป็น nvarchar(50) แต่ Contract_hrd_tr.Contract_id
+            -- เป็น int -- ถ้า join ตรงๆ SQL Server จะ implicit convert ฝั่ง nvarchar เป็น int
+            -- แล้วพังทั้ง query ทันทีที่มีแถวไหนเก็บค่าที่แปลงไม่ได้ (ว่าง/มีตัวอักษร/มี CR LF ติดมา)
+            -- TRY_CONVERT ทำให้แถวนั้นกลายเป็น NULL (คือหาลูกหนี้ไม่เจอ) แทนที่จะทำให้หน้าจอล่ม
+            LEFT JOIN Contract_customer_tr cu
+                   ON TRY_CONVERT(int, REPLACE(REPLACE(cu.Contract_id, CHAR(13), ''), CHAR(10), ''))
+                      = c.Contract_id
+            -- ต้องกรอง UseOrNot = 1 ให้ตรงกับที่อื่นบนหน้าเดียวกัน: การ์ดสถิติ
+            -- (fetch_dashboard_stats) และหน้าแก้ไขมิเตอร์ (fetch_subarea_meters) กรอง
+            -- UseOrNot = 1 ทั้งคู่ เดิมฟังก์ชันนี้ไม่กรองเลย จึงนับมิเตอร์ที่ปิดใช้งานรวมด้วย
+            -- (52 ตัว vs 50 ตัว) และ MAX(Meter_no) อาจหยิบเลขของมิเตอร์ที่เลิกใช้แล้วมาโชว์
+            -- ทำให้ตารางแสดงเลขมิเตอร์ที่หน้าแก้ไขบอกว่า "ยังไม่มีมิเตอร์"
+            WHERE m.UseOrNot = 1
             GROUP BY m.Location_id, m.Area_id, m.SubArea_id, s.SubArea_name
         """
         params = []
+        having = []
         if search:
-            sql += " HAVING MAX(c.Contract_code) LIKE ? ESCAPE '['"
-            params.append(_to_sql_like_pattern(search))
+            having.append("""MAX(CASE WHEN
+                    c.Contract_code LIKE ? ESCAPE '[' OR
+                    cu.Customer_id  LIKE ? ESCAPE '[' OR
+                    cu.CompanyName  LIKE ? ESCAPE '[' OR
+                    m.Meter_no      LIKE ? ESCAPE '[' OR
+                    m.SubArea_id    LIKE ? ESCAPE '[' OR
+                    s.SubArea_name  LIKE ? ESCAPE '['
+                THEN 1 ELSE 0 END) = 1""")
+            params += [_to_sql_like_pattern(search)] * 6
+        if type_filter == '9':
+            having.append("COUNT(CASE WHEN m.Meter_type_cd = 9 THEN 1 END) > 0")
+        elif type_filter == '8':
+            having.append("COUNT(CASE WHEN m.Meter_type_cd = 8 THEN 1 END) > 0")
+        if having:
+            sql += " HAVING " + " AND ".join(having)
         sql += " ORDER BY m.Location_id, m.Area_id, m.SubArea_id"
 
         cursor.execute(sql, params)
         columns = [c[0] for c in cursor.description]
-        return [dict(zip(columns, row)) for row in cursor.fetchall()]
+        rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        # ข้อมูลจริงมีชื่อที่ลงท้ายด้วยช่องว่าง/ขึ้นบรรทัดใหม่ติดมา (SubArea_name ของ A11
+        # ลงท้ายด้วย '\n\n') ทำให้แถวในตารางสูงไม่เท่ากัน -- ตัดให้เรียบเหมือนที่ fetch_meters ทำ
+        for r in rows:
+            if r.get('SubArea_name'):
+                r['SubArea_name'] = ' '.join(str(r['SubArea_name']).split())
+        return rows
+    finally:
+        conn.close()
+
+
+def fetch_subarea_options(include_subarea_id=None):
+    """
+    พื้นที่ย่อย "ทั้งหมด" ใน master สำหรับ dropdown เลือกพื้นที่ในฟอร์มเพิ่ม/แก้ไขมิเตอร์
+
+    ต้องเป็นฟังก์ชันแยกจาก fetch_subareas() -- fetch_subareas() ขึ้นต้นด้วย
+    FROM Contract_meter_ms จึงคืนเฉพาะพื้นที่ "ที่มีมิเตอร์อยู่แล้ว" (13 จาก 469 แห่ง)
+    ใช้เป็น dropdown ของหน้าเพิ่มมิเตอร์ไม่ได้ เพราะทำให้เพิ่มมิเตอร์ให้พื้นที่ใหม่ไม่ได้เลย
+    (ต้องมีมิเตอร์อยู่แล้วจึงจะเลือกพื้นที่นั้นได้ = ไก่กับไข่)
+
+    คืนค่าเป็นรายการกลุ่มพร้อมใช้ทำ <optgroup>:
+        [{'label': '<สถานที่> › <พื้นที่>', 'items': [{...}, ...]}, ...]
+    เพราะ 469 ตัวเลือกใน select เดียวแบนๆ หาไม่เจอ -- จัดกลุ่มตามสถานที่/พื้นที่ให้ไล่ดูได้
+
+    include_subarea_id: พื้นที่ที่ถูกเลือกอยู่ตอนนี้ -- ต้องอยู่ในรายการเสมอแม้จะถูกปิดใช้งาน
+    ใน master (UseOrNot = '0') ไม่งั้นเปิดหน้าแก้ไขมิเตอร์ของพื้นที่นั้นแล้ว dropdown จะ
+    ไม่มีค่าเดิมให้เลือก กดบันทึกจะกลายเป็น "กรุณาเลือกพื้นที่ย่อย" ทั้งที่ผู้ใช้ไม่ได้แก้อะไร
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        # UseOrNot ของตารางนี้เป็น nvarchar(1) ('1'/'0'/NULL) ไม่ใช่ bit -- เทียบเป็นสตริง
+        # แถวที่เป็น NULL (มี 3 แถว) ไม่ฟันธงว่าปิดใช้งาน จึงยังแสดงไว้ ดีกว่าซ่อนไปเงียบๆ
+        cursor.execute(
+            """
+            SELECT s.Location_id, s.Area_id, s.SubArea_id, s.SubArea_name, s.UseOrNot,
+                   l.Location_name, a.Area_name, mc.meter_count
+            FROM dbo.Contract_location_subarea_ms s
+            LEFT JOIN dbo.Contract_location_ms l
+                   ON l.Location_id = s.Location_id
+            LEFT JOIN dbo.Contract_location_area_ms a
+                   ON a.Location_id = s.Location_id AND a.Area_id = s.Area_id
+            OUTER APPLY (
+                SELECT COUNT(*) AS meter_count
+                FROM dbo.Contract_meter_ms m
+                WHERE m.SubArea_id = s.SubArea_id AND m.UseOrNot = 1
+            ) mc
+            WHERE s.UseOrNot IS NULL OR s.UseOrNot <> '0' OR s.SubArea_id = ?
+            ORDER BY l.Location_name, a.Area_name, s.SubArea_id
+            """,
+            include_subarea_id,
+        )
+        columns = [c[0] for c in cursor.description]
+        rows = [dict(zip(columns, r)) for r in cursor.fetchall()]
+
+        groups = []
+        for r in rows:
+            # ข้อมูลจริงมีช่องว่าง/ขึ้นบรรทัดใหม่ติดท้ายชื่อ (เช่น Area_name ของ A ลงท้ายด้วย
+            # ช่องว่าง, SubArea_name ของ A11 ลงท้ายด้วย '\n\n') -- ตัดให้เรียบก่อนเอาไปทำ label
+            for key in ('Location_name', 'Area_name', 'SubArea_name'):
+                if r.get(key):
+                    r[key] = ' '.join(str(r[key]).split())
+            r['is_inactive'] = (r.get('UseOrNot') == '0')
+            # 12 พื้นที่ย่อยหาแถวใน Contract_location_area_ms ไม่เจอ -> ไม่มีชื่อพื้นที่
+            # ใช้รหัสพื้นที่แทนไปก่อน ดีกว่าขึ้น label ว่าง แล้วไม่รู้ว่ากลุ่มนี้คือที่ไหน
+            area_label = r.get('Area_name') or r.get('Area_id') or '-'
+            label = f"{r.get('Location_name') or r.get('Location_id') or '-'} › {area_label}"
+            if not groups or groups[-1]['label'] != label:
+                groups.append({'label': label, 'items': []})
+            groups[-1]['items'].append(r)
+        return groups
     finally:
         conn.close()
 
@@ -565,9 +709,11 @@ def fetch_dashboard_stats():
         # ต้องกรอง UseOrNot = 1 ให้ตรงกับตารางมิเตอร์ที่แสดงบนหน้า dashboard
         # (fetch_meters ใช้ status_filter='active' เป็นค่าเริ่มต้น) ไม่งั้นตัวเลขบนการ์ด
         # จะนับมิเตอร์ที่ปิดใช้งานรวมไปด้วย แล้วไม่ตรงกับจำนวนแถวที่ผู้ใช้เห็นในตาราง
+        # เลิกนับ subarea_count (COUNT(*) ทั้งตาราง Contract_location_subarea_ms = 469 แถว)
+        # ออกไปแล้ว -- ไม่มีที่ไหนบนหน้าจอใช้ค่านั้น และมันสื่อผิดด้วย เพราะพื้นที่ย่อยที่มี
+        # มิเตอร์จริงมีแค่ 13 แห่ง ตัวเลข 469 คือพื้นที่ทั้งหมดใน master ซึ่งไม่เกี่ยวกับหน้านี้
         cursor.execute("""
             SELECT
-                (SELECT COUNT(*) FROM Contract_location_subarea_ms) AS subarea_count,
                 (SELECT COUNT(DISTINCT Contract_id) FROM Contract_meter_tr WHERE UseOrNot = 1) AS contract_count,
                 (SELECT COUNT(*) FROM Contract_meter_ms WHERE Meter_type_cd = 9 AND UseOrNot = 1) AS water_count,
                 (SELECT COUNT(*) FROM Contract_meter_ms WHERE Meter_type_cd = 8 AND UseOrNot = 1) AS electric_count,

@@ -17,7 +17,7 @@
     <a href="{% url 'termination_search' %}{% if back_qs %}?{{ back_qs }}{% endif %}"
        class="hover:text-brand-600">ยกเลิกสัญญา</a>
     <span class="mx-1">·</span>
-    <a href="{% url 'termination_log' %}?q={{ contract.Contract_code|urlencode }}"
+    <a href="{% url 'activity_log' %}?contract={{ contract_id }}"
        class="hover:text-brand-600">ดูประวัติ</a>
     <span class="mx-1">›</span>
     <span class="text-gray-500">สัญญา #{{ contract_id }}</span>
@@ -448,7 +448,12 @@
             พ้นงวดสุดท้ายแล้ว ปิดการตั้งหนี้มิเตอร์ได้ -- ปิดเฉพาะการผูกกับสัญญานี้
             ทะเบียนมิเตอร์ยังอยู่ ใช้กับสัญญาใหม่ได้
           </p>
-          <form method="post" action="{% url 'termination_close_meters' contract_id %}">
+          {# ปุ่มนี้เขียน Contract_meter_tr.UseOrNot = 0 ทันทีที่กด -- ต้องมียืนยันอีกชั้น #}
+          <form method="post" action="{% url 'termination_close_meters' contract_id %}"
+                data-confirm-submit
+                data-confirm-title="ยืนยันปิดการตั้งหนี้มิเตอร์"
+                data-confirm-message="มิเตอร์ที่ผูกกับสัญญานี้จะไม่ถูกนำไปตั้งหนี้อีก (ทะเบียนมิเตอร์ยังอยู่ ใช้กับสัญญาใหม่ได้) ต้องการดำเนินการต่อหรือไม่?"
+                data-confirm-yes="ยืนยันปิดการตั้งหนี้">
             {% csrf_token %}
             <button type="submit"
                     class="px-4 py-2 rounded-lg text-sm font-semibold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors">

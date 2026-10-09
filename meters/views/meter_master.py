@@ -31,6 +31,10 @@ def meter_form(request, meter_id=None):
     ฟอร์มเพิ่ม/แก้ไขมิเตอร์ตัวเดียว -- meter_id=None คือหน้าเพิ่มใหม่, มีค่าคือหน้าแก้ไข
     ต้องเลือก SubArea ที่มีอยู่แล้วในระบบเสมอ (ดึง Location_id/Area_id จาก SubArea อัตโนมัติ)
     มี checkbox เปิด/ปิดการใช้งาน (UseOrNot) -- ค่าเริ่มต้นตอนเพิ่มใหม่คือเปิดใช้งาน (ticked)
+
+    dropdown พื้นที่ใช้ fetch_subarea_options() = พื้นที่ทั้งหมดใน master (469 แห่ง)
+    เดิมใช้ fetch_subareas() ซึ่งคืนเฉพาะพื้นที่ที่ "มีมิเตอร์อยู่แล้ว" (13 แห่ง) ทำให้หน้านี้
+    เพิ่มมิเตอร์ให้พื้นที่ใหม่ไม่ได้เลย -- ต้องมีมิเตอร์ก่อนจึงจะเลือกพื้นที่นั้นได้
     """
     errors = []
     meter = None
@@ -64,6 +68,21 @@ def meter_form(request, meter_id=None):
         if meter_type_cd not in ('8', '9'):
             errors.append('กรุณาเลือกประเภทมิเตอร์ (น้ำ/ไฟ)')
 
+        # กันเลขมิเตอร์เดิมหายโดยไม่ตั้งใจ (บั๊กเดียวกับหน้าแก้ไขมิเตอร์ใน dashboard)
+        #
+        # sp_Contract_Meter_Save มี auto-gen เลขให้จริง แต่อยู่ใน "สาขา INSERT" และทำเฉพาะ
+        # มิเตอร์น้ำที่ไม่ส่งเลขมา (ได้ W001, W002, ...) ส่วน "สาขา UPDATE" ซึ่งใช้เมื่อมี
+        # meter_id ทำ SET Meter_no = @Meter_no ตรงๆ ไม่มี gen ใดๆ -- ส่งค่าว่างมาคือลบเลขทิ้ง
+        # และกู้ไม่ได้ (Contract_meter_ms ไม่ได้เปิด temporal/CDC)
+        #
+        # ตอนเพิ่มใหม่ไม่ต้องเตือน เพราะเว้นว่างเป็นพฤติกรรมที่ตั้งใจให้ใช้ได้
+        if meter_id and not meter_no and (meter or {}).get('Meter_no'):
+            errors.append(
+                f"เลขประจำเครื่องวัดถูกเว้นว่างไว้ ทั้งที่มิเตอร์ตัวนี้มีเลข '{meter['Meter_no']}' อยู่แล้ว "
+                f"-- ถ้าต้องการเปลี่ยนเลข ให้กรอกเลขใหม่ลงไป ถ้าต้องการเลิกใช้มิเตอร์ตัวนี้ "
+                f"ให้กดปุ่ม \"ปิดใช้งาน\" แทน (ระบบไม่ Gen เลขใหม่ให้ตอนแก้ไข เว้นว่างแล้วเลขเดิมจะหายถาวร)"
+            )
+
         if not errors:
             try:
                 services.save_standalone_meter(
@@ -79,8 +98,17 @@ def meter_form(request, meter_id=None):
                 # มักมีชื่อตาราง/ชื่อ driver/โครงสร้างฐานข้อมูลติดมาด้วย ไม่ควรให้ผู้ใช้เห็น
                 errors.append('บันทึกไม่สำเร็จ -- เกิดข้อผิดพลาดจากระบบฐานข้อมูล กรุณาลองใหม่อีกครั้ง')
 
+    # ค่าที่ควร "ถูกเลือกไว้" ใน dropdown: ถ้าเพิ่ง POST มาแล้วไม่ผ่าน ให้คงค่าที่ผู้ใช้เลือก
+    # (เดิมเทมเพลตอ่านจาก meter.SubArea_id เท่านั้น -- หน้าเพิ่มใหม่ที่บันทึกไม่ผ่านจะรีเซ็ต
+    #  เป็น "-- เลือก SubArea --" ทุกครั้ง ผู้ใช้ต้องไล่หาใน 469 ตัวเลือกใหม่หมด)
+    selected_subarea_id = (
+        request.POST.get('subarea_id', '').strip() if request.method == 'POST'
+        else (meter or {}).get('SubArea_id')
+    )
+
     context = {
-        'subareas': services.fetch_subareas(),
+        'subarea_groups': services.fetch_subarea_options(selected_subarea_id or None),
+        'selected_subarea_id': selected_subarea_id,
         'meter': meter,
         'meter_id': meter_id,
         # ตัวเลือกระบบไฟฟ้าดึงจาก Master (Contract_meter_phase_ms) ไม่ hardcode ในเทมเพลตแล้ว

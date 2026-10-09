@@ -130,7 +130,25 @@ def find_contract_sheet(sheetnames, keyword):
 
 
 def parse_excel_staged(uploaded_file):
-    wb = load_workbook(uploaded_file, data_only=True)
+    """
+    อ่านไฟล์ Excel ที่อัปโหลดมาแล้วแปลงเป็นรายการแถว staged (ยังไม่เขียน DB)
+
+    read_only=True ลดหน่วยความจำตอนอ่าน -- openpyxl โหมดปกติโหลดทุกเซลล์เป็น object
+    ไว้ในหน่วยความจำทั้งไฟล์ ไฟล์ใหญ่จะกินแรมมาก ส่วนโหมดนี้อ่านแบบ stream
+    เราใช้แค่ iter_rows(values_only=True) จึงไม่ต้องการความสามารถของโหมดปกติ
+    ต้อง wb.close() เองในโหมดนี้ (ปล่อย handle ของไฟล์ชั่วคราว)
+
+    โยน ValueError พร้อมข้อความไทยสำหรับผู้ใช้ 2 กรณี -- ชีทชื่อซ้ำเกิน 1
+    และหาคอลัมน์ header ไม่เจอ ผู้เรียก (step1_upload) รับไปแสดงบนฟอร์ม
+    """
+    wb = load_workbook(uploaded_file, data_only=True, read_only=True)
+    try:
+        return _parse_workbook(wb)
+    finally:
+        wb.close()
+
+
+def _parse_workbook(wb):
     water_sheet = find_contract_sheet(wb.sheetnames, 'น้ำ')
     elec_sheet = find_contract_sheet(wb.sheetnames, 'ไฟ')
 

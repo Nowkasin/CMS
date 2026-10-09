@@ -84,7 +84,17 @@
       </div>
       {% endif %}
 
-      <form method="post" id="confirmForm">
+      {% comment %}
+        ขั้นนี้คือจุดที่เขียนข้อมูลทั้งไฟล์ลงฐานข้อมูลจริง เป็นการเขียนก้อนใหญ่ที่สุดในระบบ
+        เดิมมีชั้นกันอยู่ 1 ชั้นคือ checkbox (ปุ่มถูก disabled ไว้จนติ๊ก) ซึ่งกัน Enter
+        ได้เฉพาะ "ก่อนติ๊ก" -- พอติ๊กแล้วปุ่มเปิดใช้งาน การเผลอกด Enter จะส่งฟอร์มทันที
+        data-confirm-submit จึงเพิ่มให้อีกชั้น (ดู static/meters/js/confirm_submit.js)
+      {% endcomment %}
+      <form method="post" id="confirmForm"
+            data-confirm-submit
+            data-confirm-title="ยืนยันนำเข้าข้อมูลเข้าระบบ"
+            data-confirm-message="ระบบจะบันทึกข้อมูลมิเตอร์จากไฟล์ลงฐานข้อมูลจริงทั้งหมด ย้อนกลับไม่ได้จากหน้านี้"
+            data-confirm-yes="ยืนยันนำเข้า">
         {% csrf_token %}
         <label class="flex items-start gap-2.5 text-sm text-gray-700 cursor-pointer mb-8">
           <input type="checkbox" name="confirm" id="confirmCheckbox"

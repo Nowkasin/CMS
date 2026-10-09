@@ -1,0 +1,168 @@
+{% extends "meters/base.html" %}
+{% load static %}
+
+{% block title %}ประวัติการใช้งานระบบ{% endblock %}
+
+{% comment %}
+  หน้า log เหตุการณ์รวมของระบบ -- อ่านจาก Contract_activity_log
+  ทำเป็นหน้าเดียวรวมทุกเหตุการณ์ แล้วใช้ ?action= / ?contract= กรองเป็นมุมมองย่อย
+  ไม่แยกหน้า log ต่อเมนู (เหตุผลอยู่ใน meters/views/activity_log.py)
+{% endcomment %}
+
+{% block content %}
+<div class="py-8">
+
+  <div class="text-sm text-gray-400 mb-1">
+    <a href="{% url 'dashboard' %}" class="hover:text-brand-600">แดชบอร์ด</a>
+    <span class="mx-1">›</span>
+    <span class="text-gray-500">ประวัติการใช้งาน</span>
+  </div>
+
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">ประวัติการใช้งานระบบ</h1>
+    <p class="text-sm text-gray-500 mt-1">เหตุการณ์ทั้งหมดในระบบ เรียงเวลาล่าสุดก่อน</p>
+  </div>
+
+  {% comment %}
+    เตือน 2 เรื่องที่ผู้ใช้ต้องรู้ก่อนเชื่อหน้านี้:
+    1) ชื่อผู้ทำรายการยังเป็นค่าคงที่ (ไม่มีล็อกอิน)
+    2) ยังไม่ครอบคลุมทุกเมนู -- บอกตรงๆ ว่าอะไรยังไม่เข้า log
+  {% endcomment %}
+  <div class="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-4 py-3 mb-4 space-y-1.5">
+    <div>
+      ระบบยังไม่มีการล็อกอิน ชื่อผู้ทำรายการจึงถูกบันทึกเป็น
+      <span class="font-medium">{{ default_user }}</span> ทุกรายการ
+      -- ประวัตินี้บอกได้ว่าเกิดอะไรขึ้นเมื่อไหร่ แต่ยังระบุตัวบุคคลไม่ได้
+      จนกว่าจะผูกตัวตนผู้ใช้จากระบบ CMS (K2)
+    </div>
+    <div>
+      ยังไม่ครอบคลุมทุกเมนู -- ที่ยังไม่เข้าประวัติ:
+      {% for s in pending_sources %}{{ s }}{% if not forloop.last %} · {% endif %}{% endfor %}
+    </div>
+  </div>
+
+  <div class="flex gap-2 mb-4 flex-wrap">
+    {% for a in actions %}
+    <a href="?action={{ a.key|urlencode }}&q={{ search|urlencode }}{% if contract_filter %}&contract={{ contract_filter }}{% endif %}"
+       class="px-3 py-1.5 rounded-lg text-sm font-medium
+              {% if a.is_active %}bg-brand-500 text-white{% else %}text-gray-600 bg-white border border-gray-200 hover:bg-gray-50{% endif %}">
+      {{ a.label }}
+      <span class="{% if a.is_active %}text-white/80{% else %}text-gray-400{% endif %}">({{ a.count }})</span>
+    </a>
+    {% endfor %}
+  </div>
+
+  <form method="get" class="flex flex-wrap gap-3 mb-2">
+    <input type="hidden" name="action" value="{{ active_action }}">
+    {% if contract_filter %}<input type="hidden" name="contract" value="{{ contract_filter }}">{% endif %}
+    <input type="text" name="q" value="{{ search }}"
+           placeholder="ค้นหา รหัสสัญญา / ชื่อลูกค้า / ผู้ทำรายการ / ชื่อไฟล์"
+           class="flex-1 min-w-[260px] border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
+    <button type="submit"
+            class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">
+      ค้นหา
+    </button>
+    {% if search or contract_filter %}
+    <a href="?action={{ active_action|urlencode }}"
+       class="px-4 py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-50">ล้างตัวกรอง</a>
+    {% endif %}
+  </form>
+
+  {% if contract_filter %}
+  <p class="text-xs text-gray-500 mb-4">
+    กรองเฉพาะสัญญา Contract_id #{{ contract_filter }}
+    <a href="?action={{ active_action|urlencode }}" class="text-brand-600 hover:text-brand-700">(ดูทุกสัญญา)</a>
+  </p>
+  {% else %}
+  <div class="mb-4"></div>
+  {% endif %}
+
+  <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+    <table class="min-w-full text-sm text-left">
+      <thead>
+        <tr class="border-b border-gray-100 bg-gray-50">
+          <th class="px-4 py-2.5 font-semibold text-gray-500 whitespace-nowrap">เมื่อ</th>
+          <th class="px-4 py-2.5 font-semibold text-gray-500 whitespace-nowrap">เหตุการณ์</th>
+          <th class="px-4 py-2.5 font-semibold text-gray-500">สัญญา</th>
+          <th class="px-4 py-2.5 font-semibold text-gray-500">รายละเอียด</th>
+          <th class="px-4 py-2.5 font-semibold text-gray-500 whitespace-nowrap">ผู้ทำรายการ</th>
+          <th class="px-4 py-2.5"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {% for r in rows %}
+        <tr class="hover:bg-gray-50 align-top">
+          <td class="px-4 py-2.5 text-gray-700 whitespace-nowrap">
+            {{ r.at_label|default:"—" }}
+          </td>
+          <td class="px-4 py-2.5 whitespace-nowrap">
+            {% comment %} สีแยกตามความรุนแรง: ลบ = แดง, ปิดการตั้งหนี้ = เหลือง, อื่นๆ = น้ำเงิน {% endcomment %}
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+                         {% if r.Action_type == 'termination_delete' %}bg-red-50 text-red-600
+                         {% elif r.Action_type == 'termination_close_meters' %}bg-amber-50 text-amber-700
+                         {% else %}bg-brand-50 text-brand-600{% endif %}">
+              {{ r.action_label }}
+            </span>
+            {% if r.Ref_text %}
+              <div class="text-xs text-gray-400 mt-0.5 max-w-[180px] truncate" title="{{ r.Ref_text }}">
+                {{ r.Ref_text }}
+              </div>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2.5 max-w-[200px]">
+            {% if r.Contract_id %}
+              <div class="font-medium text-gray-800">{{ r.Contract_code|default:"—" }}</div>
+              <div class="text-xs text-gray-400 truncate" title="{{ r.CompanyName|default:'' }}">
+                #{{ r.Contract_id }}{% if r.CompanyName %} · {{ r.CompanyName }}{% endif %}
+              </div>
+            {% else %}
+              <span class="text-xs text-gray-400">หลายสัญญา / ไม่ผูกสัญญา</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2.5 text-gray-600 text-xs">{{ r.Detail|default:"—" }}</td>
+          <td class="px-4 py-2.5 text-gray-700 text-xs whitespace-nowrap">{{ r.UserEntry|default:"—" }}</td>
+          <td class="px-4 py-2.5 text-right whitespace-nowrap">
+            {% if r.Contract_id %}
+            <a href="{% url 'termination_detail' r.Contract_id %}"
+               class="text-sm font-medium text-brand-600 hover:text-brand-700">ดูสัญญา ›</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="px-4 py-10 text-center text-gray-400 text-sm">
+            {% if search or contract_filter or active_action != 'all' %}
+              ไม่พบประวัติที่ตรงกับตัวกรอง
+            {% else %}
+              ยังไม่มีประวัติการใช้งานในระบบ -- จะเริ่มบันทึกเมื่อมีการนำเข้าไฟล์หรือยกเลิกสัญญา
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page_obj.paginator.num_pages > 1 %}
+  <div class="flex items-center justify-between gap-3 mt-4 flex-wrap">
+    <p class="text-xs text-gray-400">
+      แสดง {{ page_obj.start_index }}-{{ page_obj.end_index }} จาก {{ total_visible }} เหตุการณ์
+    </p>
+    <div class="flex items-center gap-1.5">
+      {% if page_obj.has_previous %}
+      <a href="?action={{ active_action|urlencode }}&q={{ search|urlencode }}{% if contract_filter %}&contract={{ contract_filter }}{% endif %}&page={{ page_obj.previous_page_number }}"
+         class="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50">ก่อนหน้า</a>
+      {% endif %}
+      <span class="px-3 py-1.5 text-sm text-gray-500">หน้า {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}
+      <a href="?action={{ active_action|urlencode }}&q={{ search|urlencode }}{% if contract_filter %}&contract={{ contract_filter }}{% endif %}&page={{ page_obj.next_page_number }}"
+         class="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50">ถัดไป</a>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+  <p class="text-xs text-gray-400 mt-3">พบ {{ total_visible }} เหตุการณ์</p>
+  {% endif %}
+
+</div>
+{% endblock %}

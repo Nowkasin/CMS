@@ -1,6 +1,7 @@
 # meters/views/wizard.py
 import datetime
 
+from django.conf import settings
 from django.shortcuts import render, redirect
 from django.core.paginator import Paginator
 
@@ -81,16 +82,45 @@ def step1_upload(request):
             year_be = _safe_year(request.POST.get('billing_year'), prev_year_be)
             billing_period = f"{THAI_MONTHS[month_idx - 1]} {year_be}"
 
-            parsed = services.parse_excel_staged(excel_file)
+            # parse_excel_staged โยน ValueError พร้อมข้อความไทยที่เขียนไว้ให้ผู้ใช้อ่าน
+            # 2 จุด (ชีทชื่อซ้ำเกิน 1 / หาคอลัมน์ header ไม่เจอ) เดิมไม่มีใครรับ
+            # ผู้ใช้จึงเห็นหน้า 500 แทนคำแนะนำที่เขียนไว้แล้ว
+            #
+            # ใส่เป็น error ของ field ด้วย form.add_error -- เทมเพลตแสดง
+            # form.excel_file.errors.0 อยู่แล้ว ไม่ต้องแก้หน้าจอ
+            parsed = None
+            try:
+                parsed = services.parse_excel_staged(excel_file)
+            except ValueError as exc:
+                form.add_error('excel_file', str(exc))
+            except Exception:
+                # error อื่น (ไฟล์เสียกลางทาง, openpyxl อ่านไม่ออก) -- ไม่โชว์ข้อความดิบ
+                form.add_error(
+                    'excel_file',
+                    'อ่านไฟล์ไม่สำเร็จ -- ไฟล์อาจเสียหายหรือไม่ใช่รูปแบบที่ระบบรองรับ '
+                    'กรุณาตรวจสอบไฟล์แล้วลองใหม่',
+                )
 
-            request.session['staged'] = {
-                'filename': excel_file.name,
-                'billing_period': billing_period,
-                'rows': parsed['rows'],
-                'summary': parsed['summary'],
-            }
-            request.session.modified = True
-            return redirect('step2')
+            if parsed is not None:
+                max_rows = getattr(settings, 'EXCEL_UPLOAD_MAX_ROWS', 5000)
+                row_count = len(parsed['rows'])
+                if row_count > max_rows:
+                    # ข้อมูล staged ถูกเก็บใน session -- ไฟล์ใหญ่มากจะทำให้ session
+                    # ใหญ่ตามและหน้า review ช้า จึงกันไว้พร้อมบอกตัวเลขจริง
+                    form.add_error(
+                        'excel_file',
+                        f'ไฟล์นี้มี {row_count:,} แถว เกินที่ระบบรับได้ ({max_rows:,} แถว) '
+                        f'กรุณาแบ่งไฟล์ออกเป็นหลายไฟล์แล้วอัปโหลดทีละไฟล์',
+                    )
+                else:
+                    request.session['staged'] = {
+                        'filename': excel_file.name,
+                        'billing_period': billing_period,
+                        'rows': parsed['rows'],
+                        'summary': parsed['summary'],
+                    }
+                    request.session.modified = True
+                    return redirect('step2')
 
     return render(request, 'meters/upload.html', context)
 
@@ -106,7 +136,9 @@ def step2_review(request):
 
     filtered = rows
     if type_filter in ('8', '9'):
-        filtered = [r for r in filtered if str(r['type_cd']) == type_filter]
+        # ใช้ .get() ให้ตรงกับบรรทัดถัดไป -- เดิมเป็น r['type_cd'] ซึ่งถ้าคีย์หาย
+        # (เช่น session ค้างจากโครงข้อมูลเวอร์ชันก่อน) จะเป็น KeyError -> หน้า 500
+        filtered = [r for r in filtered if str(r.get('type_cd')) == type_filter]
     if q:
         ql = q.lower()
         filtered = [
@@ -139,17 +171,36 @@ def step3_confirm(request):
         if request.POST.get('confirm') != 'on':
             error = 'กรุณายืนยันว่าตรวจสอบข้อมูลถูกต้องและครบถ้วนแล้วก่อนบันทึก'
         else:
-            result = services.commit_staged_rows(staged['rows'], DEFAULT_USER)
-            request.session['committed'] = {
-                'filename': staged['filename'],
-                'billing_period': staged['billing_period'],
-                'logs': result['logs'],
-                'stats': result['stats'],
-                'rows': result['rows'],
-            }
-            del request.session['staged']
-            request.session.modified = True
-            return redirect('step4')
+            # commit_staged_rows ทำ rollback ให้แล้วถ้าพัง แต่เดิมไม่มีใครรับ exception
+            # ผู้ใช้จึงเห็นหน้า 500 -- ข้อมูล staged ยังอยู่ใน session (ดี) แต่ไม่มี
+            # อะไรบอกว่าเกิดอะไรขึ้นและควรทำอย่างไรต่อ
+            try:
+                # ส่งชื่อไฟล์/รอบบิลไปด้วยเพื่อเขียน Contract_activity_log
+                # (สองค่านี้มีอยู่แค่ใน session ไม่มีใน DB)
+                result = services.commit_staged_rows(
+                    staged['rows'], DEFAULT_USER,
+                    source_filename=staged.get('filename'),
+                    billing_period=staged.get('billing_period'),
+                )
+            except Exception:
+                # ไม่โชว์ข้อความดิบจาก pyodbc/SQL Server (มีชื่อตาราง/driver ติดมา)
+                # คง staged ไว้ให้กดยืนยันซ้ำได้ ไม่ต้องอัปโหลดไฟล์ใหม่
+                error = (
+                    'บันทึกข้อมูลไม่สำเร็จ -- เกิดข้อผิดพลาดจากระบบฐานข้อมูล '
+                    'ข้อมูลที่ตรวจสอบไว้ยังอยู่ กรุณากดยืนยันอีกครั้ง '
+                    'หากยังไม่สำเร็จกรุณาติดต่อผู้ดูแลระบบ'
+                )
+            else:
+                request.session['committed'] = {
+                    'filename': staged['filename'],
+                    'billing_period': staged['billing_period'],
+                    'logs': result['logs'],
+                    'stats': result['stats'],
+                    'rows': result['rows'],
+                }
+                del request.session['staged']
+                request.session.modified = True
+                return redirect('step4')
 
     context = {
         'current_step': 3, 'step_labels': STEP_LABELS,

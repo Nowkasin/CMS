@@ -38,8 +38,9 @@ from .termination import (
     termination_select_all_installments,
     termination_delete,
     termination_close_meters,
-    termination_log,
 )
+from .activity_log import activity_log
+
 from .download import download_form, download_excel
 
 from .meter_master import meter_list, meter_form
@@ -52,7 +53,8 @@ __all__ = [
     'dashboard', 'edit_meter',
     'export_meters_excel',
     'termination_search', 'termination_detail', 'termination_toggle_installment',
-    'termination_select_all_installments', 'termination_delete', 'termination_close_meters', 'termination_log',
+    'termination_select_all_installments', 'termination_delete', 'termination_close_meters',
+    'activity_log',
     'download_form', 'download_excel',
     'meter_list', 'meter_form',
     'phase_list', 'phase_form',
