@@ -114,6 +114,10 @@ def meter_form(request, meter_id=None):
         # ตัวเลือกระบบไฟฟ้าดึงจาก Master (Contract_meter_phase_ms) ไม่ hardcode ในเทมเพลตแล้ว
         # ส่งค่าปัจจุบันไปด้วย เผื่อค่านั้นถูกปิดใช้งานใน master ภายหลัง -> ยังต้องแสดงให้เห็น
         'phase_options': services.fetch_phase_options((meter or {}).get('Phase_type')),
+        # ส่งความยาวสูงสุดไปทำ maxlength ในฟอร์ม -- ตัวเลขเดียวกับที่ service ใช้ตรวจ
+        # ไม่ hardcode ซ้ำในเทมเพลต จะได้ไม่หลุดจากกันเวลาแก้ขนาดคอลัมน์
+        'max_meter_no_len': services.MAX_METER_NO_LEN,
+        'max_meter_remark_len': services.MAX_METER_REMARK_LEN,
         'errors': errors,
     }
     return render(request, 'meters/meter_form.html', context)

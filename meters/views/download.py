@@ -4,7 +4,7 @@ import io
 from urllib.parse import quote
 
 from django.http import HttpResponse
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from openpyxl import Workbook
 from openpyxl.styles import Font
 
@@ -176,21 +176,36 @@ def download_form(request):
     }
 
     if 'month' in request.GET or 'year' in request.GET:
-        errors = []
-        year_be = _safe_int(request.GET.get('year'), 'ปี', errors) or _current_year_be()
-        month = _safe_int(request.GET.get('month'), 'เดือน', errors) or datetime.date.today().month
-
-        water_rows = _dedupe_meter_rows(services.fetch_contracts_for_download(9, year_be, month))
-        electric_rows = _dedupe_meter_rows(services.fetch_contracts_for_download(8, year_be, month))
-
-        combined_rows = _merge_water_electric(water_rows, electric_rows)
+        # เดิมสร้าง errors = [] ส่งเข้า _safe_int แล้วไม่เคยใส่ใน context
+        # ส่ง ?year=abc เข้ามาจะ fallback เป็นปีปัจจุบันแบบเงียบ ผู้ใช้ได้ข้อมูลของรอบบิล
+        # ที่ไม่ได้ขอโดยไม่รู้ตัว -- ตอนนี้ตรวจช่วงด้วยและส่งข้อความไปแสดงบนหน้าจอ
+        # (เทียบ `is None` ไม่ใช้ `or` เพราะ 0 เป็น falsy จะถูกกลืนเป็น fallback เงียบๆ)
+        period_errors = []
+        year_be = _safe_int(request.GET.get('year'), 'ปี', period_errors,
+                            min_value=2400, max_value=2700)
+        if year_be is None:
+            year_be = _current_year_be()
+        month = _safe_int(request.GET.get('month'), 'เดือน', period_errors,
+                          min_value=1, max_value=12)
+        if month is None:
+            month = datetime.date.today().month
 
         context.update({
-            'searched': True,
             'billing_month': month,
             'billing_year': year_be,
-            'combined_rows': combined_rows,
+            'period_errors': period_errors,
         })
+
+        # ถ้ารอบบิลที่ส่งมาไม่ถูกต้อง ไม่ query ข้อมูลเลย -- ไม่ควรโชว์ตารางของรอบบิลอื่น
+        # ให้ผู้ใช้ติ๊กเลือกแล้วดาวน์โหลดไป ทั้งที่เขาคิดว่าเป็นรอบบิลที่ตัวเองกรอก
+        if not period_errors:
+            water_rows = _dedupe_meter_rows(services.fetch_contracts_for_download(9, year_be, month))
+            electric_rows = _dedupe_meter_rows(services.fetch_contracts_for_download(8, year_be, month))
+
+            context.update({
+                'searched': True,
+                'combined_rows': _merge_water_electric(water_rows, electric_rows),
+            })
 
     return render(request, 'meters/download_form.html', context)
 
@@ -204,11 +219,33 @@ def download_excel(request):
     หน้าจอเลือกข้อมูลรวมน้ำ+ไฟเป็นแถวเดียว แต่ไฟล์ Excel ที่ export ออกมายังคงแยก 2 ชีท
     (น้ำ/ไฟ) เหมือนเดิม เพราะโครงสร้างคอลัมน์ตั้งต้นของแต่ละประเภทไม่เหมือนกัน
     """
-    errors = []
-    year_be = _safe_int(request.POST.get('year'), 'ปี', errors) or _current_year_be()
-    month = _safe_int(request.POST.get('month'), 'เดือน', errors) or datetime.date.today().month
+    # ต้องเป็น POST เท่านั้น -- เดิมเข้าด้วย GET ได้ แล้ว request.POST ว่าง ทำให้
+    # selected_rows ว่าง ได้ไฟล์ Excel ที่มีแต่หัวตาราง ผู้ใช้เข้าใจว่า "ไม่มีข้อมูล"
+    # ทั้งที่จริงคือเข้ามาผิดทาง จึงเด้งกลับไปหน้าเลือกรอบบิลแทน
+    if request.method != 'POST':
+        return redirect('download_form')
+
+    period_errors = []
+    year_be = _safe_int(request.POST.get('year'), 'ปี', period_errors,
+                        min_value=2400, max_value=2700)
+    month = _safe_int(request.POST.get('month'), 'เดือน', period_errors,
+                      min_value=1, max_value=12)
 
     selected_keys = set(request.POST.getlist('selected_rows'))
+
+    # รอบบิลเพี้ยนหรือไม่ได้ติ๊กอะไรมา -- กลับไปหน้าเลือกพร้อมข้อความ ดีกว่าส่งไฟล์เปล่า
+    # หรือไฟล์ของรอบบิลที่ผู้ใช้ไม่ได้ขอ ให้ผู้ใช้เอาไปตั้งหนี้ต่อ
+    if period_errors or not selected_keys:
+        if not selected_keys:
+            period_errors.append('ยังไม่ได้เลือกรายการที่ต้องการดาวน์โหลด -- กรุณาติ๊กอย่างน้อย 1 รายการ')
+        return render(request, 'meters/download_form.html', {
+            'thai_months': THAI_MONTHS,
+            'billing_month': month if month is not None else datetime.date.today().month,
+            'billing_year': year_be if year_be is not None else _current_year_be(),
+            'year_options': [_current_year_be() - 1, _current_year_be(), _current_year_be() + 1],
+            'searched': False,
+            'period_errors': period_errors,
+        })
 
     water_rows = _dedupe_meter_rows([
         r for r in services.fetch_contracts_for_download(9, year_be, month)

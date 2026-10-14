@@ -2,6 +2,11 @@
 
 from .db import get_db_connection
 
+METER_TYPE_TO_PRICE_TYPE = {
+    9: '8',   # มิเตอร์น้ำ   -> ค่าน้ำประปา
+    8: '9',   # มิเตอร์ไฟฟ้า -> ค่าไฟฟ้า
+}
+
 
 def fetch_contracts_for_download(meter_type_cd, billing_year_be, billing_month):
     """
@@ -9,10 +14,21 @@ def fetch_contracts_for_download(meter_type_cd, billing_year_be, billing_month):
     (9=น้ำ, 8=ไฟ) ผูกอยู่ พร้อมเลขอ่านก่อน-หลัง/จำนวนเงินของรอบบิลที่เลือก (LEFT JOIN -- ถ้าไม่มี
     งวดของเดือนนี้ แถวยังอยู่แต่เลขอ่าน/จำนวนเงิน/Base Line Date จะเป็น NULL ไม่ถูกตัดทิ้ง)
 
+    meter_type_cd รับได้แค่ 9 (น้ำ) หรือ 8 (ไฟฟ้า) -- ค่าอื่นจะ raise ValueError ทันที
+    ไม่ปล่อยให้ query ผ่านไปแล้วคืนลิสต์ว่างเงียบๆ ซึ่งแยกไม่ออกจาก "ไม่มีข้อมูลในรอบบิลนี้"
+
     ลำดับมิเตอร์ WW_seq/EE_seq ไม่มีคอลัมน์จริงรองรับ (ยืนยันกับผู้ใช้แล้วว่าไม่รู้ logic) คำนวณเอง
     ที่ views/download.py จากลำดับที่ query เจอต่อสัญญาเดียวกัน -- ต้องปรับถ้าไม่ตรงกับที่ต้องการ
     ส่วนลำดับพื้นที่ย่อยใช้ Contract_Location_area_tr.Contract_Location_seq ตรงๆ (มีคอลัมน์จริง)
     """
+    try:
+        meter_type_cd = int(meter_type_cd)
+    except (TypeError, ValueError):
+        raise ValueError(f"meter_type_cd ต้องเป็น 9 (น้ำ) หรือ 8 (ไฟฟ้า) ได้รับ: {meter_type_cd!r}")
+    if meter_type_cd not in METER_TYPE_TO_PRICE_TYPE:
+        raise ValueError(f"meter_type_cd ต้องเป็น 9 (น้ำ) หรือ 8 (ไฟฟ้า) ได้รับ: {meter_type_cd!r}")
+
+    price_type_id = METER_TYPE_TO_PRICE_TYPE[meter_type_cd]
     ad_year = billing_year_be - 543
 
     conn = get_db_connection()
@@ -55,6 +71,9 @@ def fetch_contracts_for_download(meter_type_cd, billing_year_be, billing_month):
             LEFT JOIN dbo.Contract_location_area_ms am
                 ON am.Location_id = la.Location_id AND am.Area_id = la.Area_id
             LEFT JOIN dbo.Contract_status_ms st ON st.Status_contract_id = c.Status_contract_id
+            -- dt.Contract_type_price_id ใช้รหัส "ประเภทค่าใช้จ่าย" ซึ่งสลับกับ Meter_type_cd
+            -- จึงต้องส่ง price_type_id ที่แปลงผ่าน METER_TYPE_TO_PRICE_TYPE มาแล้ว
+            -- ห้ามส่ง meter_type_cd ตรงๆ (ดูคอมเมนต์หัวไฟล์)
             LEFT JOIN dbo.Contract_Installment_tr_dt dt
                 ON dt.Contract_id = c.Contract_id
                 AND dt.Contract_type_price_id = ?
@@ -74,7 +93,9 @@ def fetch_contracts_for_download(meter_type_cd, billing_year_be, billing_month):
             WHERE c.Status_contract_id NOT IN ('5', '9')
             ORDER BY c.Contract_id, la.Contract_Location_seq, m.Meter_id
             """,
-            meter_type_cd, meter_type_cd, ad_year, billing_month,
+            # พารามิเตอร์ตัวที่ 1 = ประเภทมิเตอร์ (int) / ตัวที่ 2 = ประเภทค่าใช้จ่าย (str)
+            # เป็นค่าต่างกัน ไม่ใช่ตัวเดียวกันอย่างที่เคยเขียนไว้
+            meter_type_cd, price_type_id, ad_year, billing_month,
         )
         columns = [col[0] for col in cursor.description]
         return [dict(zip(columns, row)) for row in cursor.fetchall()]

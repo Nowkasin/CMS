@@ -17,6 +17,18 @@
     <p class="text-sm text-gray-500 mt-1">เลือกเดือน-ปี ค้นหา แล้วติ๊กรายการที่ต้องการก่อนดาวน์โหลด</p>
   </div>
 
+  {% comment %}
+    ข้อความเตือนเรื่องรอบบิล/การเลือกรายการ -- เดิม view เก็บ error ไว้ในตัวแปรแต่ไม่เคย
+    ส่งมาแสดง ผู้ใช้ส่ง ?year=abc เข้ามาแล้วได้ข้อมูลของปีปัจจุบันไปโดยไม่รู้ตัว
+  {% endcomment %}
+  {% if period_errors %}
+  <div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-4 space-y-1">
+    {% for err in period_errors %}
+      <div>{{ err }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   {# --- ฟอร์มค้นหา (GET) --- #}
   <form method="get" class="bg-white border border-gray-200 rounded-xl p-6 flex flex-col gap-4 max-w-xl mb-6">
     <div class="grid grid-cols-2 gap-3">

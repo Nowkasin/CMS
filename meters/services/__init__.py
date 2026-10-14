@@ -53,6 +53,8 @@ from .meters import (
     save_meter_reading,
     fetch_meter_by_id,
     save_standalone_meter,
+    MAX_METER_NO_LEN,
+    MAX_METER_REMARK_LEN,
 )
 
 from .excel_export import build_subareas_workbook
@@ -103,6 +105,7 @@ __all__ = [
     'save_subarea_meters', 'fetch_readings_for_meters', 'fetch_meters',
     'fetch_dashboard_stats', 'save_meter_reading',
     'fetch_meter_by_id', 'save_standalone_meter',
+    'MAX_METER_NO_LEN', 'MAX_METER_REMARK_LEN',
     'build_subareas_workbook',
     'BLOCKED_CONTRACT_STATUSES',
     'fetch_contracts_for_termination', 'fetch_contract_statuses',

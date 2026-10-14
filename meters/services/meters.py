@@ -805,7 +805,27 @@ def fetch_meter_by_id(meter_id):
         conn.close()
 
 
+# ความยาวสูงสุดของคอลัมน์ใน Contract_meter_ms -- ตรวจฝั่งแอปก่อนส่งเข้า DB
+# ถ้าไม่ตรวจ SQL Server จะโยน "String or binary data would be truncated" ซึ่ง view
+# แปลงเป็นข้อความ generic ("บันทึกไม่สำเร็จ -- เกิดข้อผิดพลาดจากระบบฐานข้อมูล")
+# ผู้ใช้จึงไม่รู้ว่าพิมพ์ยาวเกินช่องไหน (แพตเทิร์นเดียวกับ MAX_PHASE_TYPE_LEN ใน phase.py)
+MAX_METER_NO_LEN = 50       # Meter_no     varchar(50)
+MAX_METER_REMARK_LEN = 200  # Meter_remark nvarchar(200)
+MAX_PHASE_TYPE_LEN_METER = 10   # Phase_type   varchar(10)
+
+
 def save_standalone_meter(subarea_id, meter_type_cd, meter_no, phase_type, user_id, meter_id=None,meter_remark=None, use_or_not=1):
+    for value, limit, label in (
+        (meter_no, MAX_METER_NO_LEN, 'เลขประจำเครื่องวัด'),
+        (meter_remark, MAX_METER_REMARK_LEN, 'หมายเหตุ'),
+        (phase_type, MAX_PHASE_TYPE_LEN_METER, 'ระบบไฟฟ้า'),
+    ):
+        if value and len(str(value)) > limit:
+            raise ValueError(
+                f'{label}ยาวเกินกำหนด -- ใส่ได้ไม่เกิน {limit} อักขระ '
+                f'(ที่กรอกมา {len(str(value))} อักขระ)'
+            )
+
     conn = get_db_connection()
     try:
         cursor = conn.cursor()

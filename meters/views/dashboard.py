@@ -189,6 +189,21 @@ def edit_meter(request, subarea_id):
             errors_before_this = len(reading_errors)
             before_val = _safe_int(before_raw, f'เลขอ่านก่อน ({label})', reading_errors, min_value=0)
             after_val = _safe_int(after_raw, f'เลขอ่านหลัง ({label})', reading_errors, min_value=0)
+
+            # เลขอ่านหลังต้องไม่น้อยกว่าเลขอ่านก่อน -- มิเตอร์เดินไปข้างหน้าเท่านั้น
+            # ถ้าหลังน้อยกว่าก่อน หน่วยที่ใช้จะติดลบ ซึ่งจะกลายเป็นยอดเงินติดลบที่ปลายทาง
+            # เทียบเฉพาะตอนกรอกมาครบทั้งคู่และแปลงเป็นตัวเลขผ่านแล้ว
+            # (กรอกมาช่องเดียวเป็นเรื่องปกติ เช่น ยังไม่ได้ไปจดเลขหลัง จึงไม่ฟ้อง)
+            if (len(reading_errors) == errors_before_this
+                    and before_val is not None and after_val is not None
+                    and after_val < before_val):
+                reading_errors.append(
+                    f'เลขอ่านหลัง ({label}) คือ {after_val:,} ซึ่งน้อยกว่าเลขอ่านก่อน '
+                    f'({label}) คือ {before_val:,} -- มิเตอร์เดินไปข้างหน้าเท่านั้น '
+                    f'กรุณาตรวจสอบว่าสลับช่องกันหรือพิมพ์ตัวเลขผิด '
+                    f'(ถ้ามิเตอร์ถูกเปลี่ยนเครื่องใหม่หรือหมุนครบรอบ ให้แจ้งผู้ดูแลระบบ)'
+                )
+
             if len(reading_errors) == errors_before_this:
                 pending_readings.append((prefix, label, before_val, after_val))
 
