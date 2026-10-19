@@ -28,12 +28,10 @@
     1) ชื่อผู้ทำรายการยังเป็นค่าคงที่ (ไม่มีล็อกอิน)
     2) ยังไม่ครอบคลุมทุกเมนู -- บอกตรงๆ ว่าอะไรยังไม่เข้า log
   {% endcomment %}
-  <div class="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-4 py-3 mb-4 space-y-1.5">
+  <div class="bg-brand-50 border border-brand-100 text-brand-700 text-xs rounded-lg px-4 py-3 mb-4 space-y-1.5">
     <div>
-      ระบบยังไม่มีการล็อกอิน ชื่อผู้ทำรายการจึงถูกบันทึกเป็น
-      <span class="font-medium">{{ default_user }}</span> ทุกรายการ
-      -- ประวัตินี้บอกได้ว่าเกิดอะไรขึ้นเมื่อไหร่ แต่ยังระบุตัวบุคคลไม่ได้
-      จนกว่าจะผูกตัวตนผู้ใช้จากระบบ CMS (K2)
+      ผู้ใช้ปัจจุบัน: <span class="font-medium">{{ default_user }}</span>
+      — รายการใหม่จะบันทึก Buasri ID ของผู้ดำเนินการ
     </div>
     <div>
       ยังไม่ครอบคลุมทุกเมนู -- ที่ยังไม่เข้าประวัติ:

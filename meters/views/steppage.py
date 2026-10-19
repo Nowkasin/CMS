@@ -7,8 +7,6 @@ from django.core.paginator import Paginator
 
 from .. import services
 from ..forms import ExcelUploadForm
-
-DEFAULT_USER = 'web_upload'
 STEP_LABELS = ['อัปโหลดไฟล์', 'ตรวจสอบข้อมูล', 'ยืนยันนำเข้า', 'เสร็จสิ้น']
 
 THAI_MONTHS = [
@@ -178,7 +176,7 @@ def step3_confirm(request):
                 # ส่งชื่อไฟล์/รอบบิลไปด้วยเพื่อเขียน Contract_activity_log
                 # (สองค่านี้มีอยู่แค่ใน session ไม่มีใน DB)
                 result = services.commit_staged_rows(
-                    staged['rows'], DEFAULT_USER,
+                    staged['rows'], request.user.get_username(),
                     source_filename=staged.get('filename'),
                     billing_period=staged.get('billing_period'),
                 )

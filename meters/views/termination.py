@@ -10,8 +10,6 @@ from django.shortcuts import render, redirect
 from .. import services
 from .dashboard import THAI_MONTHS
 
-DEFAULT_USER = 'web_upload'
-
 # ค่า Termination_case -- ยืนยันให้ตรงกับ sp_Contract_Termination_Save แล้ว
 # (ดู sql/sp_Contract_Termination_FixCaseMapping.sql -- เดิม SP คาดหวังค่าสลับกับที่นี่
 #  ทำให้ได้จำนวนเดือนผ่อนผันและสถานะสัญญาผิด จึงแก้ SP ให้ตรงกับเอกสาร requirement)
@@ -392,7 +390,7 @@ def termination_detail(request, contract_id):
                 services.save_termination(
                     contract_id, None, form['termination_case'],
                     form['contract_end_date'], form['notify_date'] or None,
-                    form['remark'] or None, DEFAULT_USER,
+                    form['remark'] or None, request.user.get_username(),
                 )
                 return redirect('termination_detail', contract_id=contract_id)
             except Exception as exc:
@@ -477,7 +475,7 @@ def termination_detail(request, contract_id):
         'meter_bindings': meter_bindings,
         'buffer_passed': buffer_passed,
         'deleted_history': deleted_history,
-        'default_user': DEFAULT_USER,
+        'default_user': request.user.get_username(),
         'can_close_meters': bool(header) and buffer_passed and meter_bindings['active'] > 0,
         'form': form,
         # รวม 2 กองตอนส่งให้เทมเพลตแสดง -- แต่การตัดสินใจบันทึกใช้ form_errors เท่านั้น
@@ -518,7 +516,7 @@ def termination_delete(request, contract_id):
     detail_url = reverse('termination_detail', args=[contract_id])
 
     try:
-        result = services.delete_termination(contract_id, DEFAULT_USER)
+        result = services.delete_termination(contract_id, request.user.get_username())
     except Exception as exc:
         request.session['termination_flash_error'] = _sp_error_message(
             exc, 'ลบรายการยกเลิกไม่สำเร็จ -- เกิดข้อผิดพลาดจากระบบฐานข้อมูล')
@@ -581,7 +579,7 @@ def termination_close_meters(request, contract_id):
         return redirect(detail_url)
 
     try:
-        closed = services.close_meter_billing(contract_id, DEFAULT_USER)
+        closed = services.close_meter_billing(contract_id, request.user.get_username())
     except Exception as exc:
         request.session['termination_flash_error'] = _sp_error_message(
             exc, 'ปิดการตั้งหนี้มิเตอร์ไม่สำเร็จ -- เกิดข้อผิดพลาดจากระบบฐานข้อมูล')
@@ -608,7 +606,9 @@ def termination_select_all_installments(request, contract_id):
 
     is_selected = request.POST.get('is_selected') == '1'
     try:
-        services.set_all_installment_selections(termination_id, is_selected, DEFAULT_USER)
+        services.set_all_installment_selections(
+            termination_id, is_selected, request.user.get_username()
+        )
     except Exception:
         from django.urls import reverse
         return redirect(f"{reverse('termination_detail', args=[contract_id])}?toggle_error=1")
@@ -633,7 +633,9 @@ def termination_toggle_installment(request, contract_id, period):
 
     is_selected = request.POST.get('is_selected') == '1'
     try:
-        services.set_installment_selection(termination_id, period, is_selected, DEFAULT_USER)
+        services.set_installment_selection(
+            termination_id, period, is_selected, request.user.get_username()
+        )
     except Exception:
         from django.urls import reverse
         return redirect(f"{reverse('termination_detail', args=[contract_id])}?toggle_error=1")

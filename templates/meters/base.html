@@ -33,7 +33,7 @@
 {% block extra_css %}{% endblock %}
 </head>
 <body>
-<nav class="w-full bg-white border-b border-gray-200 px-6 py-3 flex gap-2">
+<nav class="w-full bg-white border-b border-gray-200 px-6 py-3 flex items-center flex-wrap gap-2">
   <a href="{% url 'meter_list' %}"
      class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
             {% if request.path|slice:':8' == '/meters/' or request.path == '/meters' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
@@ -83,6 +83,19 @@
             {% if request.resolver_match.url_name == 'activity_log' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
     ประวัติการใช้งาน
   </a>
+  <div class="ml-auto flex items-center gap-3 pl-4">
+    <div class="text-right leading-tight">
+      <div class="text-xs text-gray-400">ผู้ใช้งาน</div>
+      <div class="text-sm font-semibold text-gray-700">{{ request.user.username }}</div>
+    </div>
+    <form method="post" action="{% url 'logout' %}">
+      {% csrf_token %}
+      <button type="submit"
+              class="px-3 py-2 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">
+        ออกจากระบบ
+      </button>
+    </form>
+  </div>
 </nav>
 
 <div class="wrap px-6 py-8">

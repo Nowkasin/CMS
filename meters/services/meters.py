@@ -1,7 +1,5 @@
 from .db import get_db_connection
 
-DEFAULT_USER = 'web_upload'
-
 
 def sp_meter_save(cursor, location_id, area_id, subarea_id, type_cd, meter_no,
                    meter_no_status, user_id, logs, phase_type=None, meter_id=None,

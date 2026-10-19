@@ -9,7 +9,7 @@ Re-export ทุกฟังก์ชัน/ค่าคงที่จากโ
                        find_contract_sheet, find_subarea, find_contract_by_code,
                        find_registered_meter
   meters.py        -> fetch_*, save_*, commit_staged_rows, sp_meter_save,
-                       sp_bind_to_contract, find_existing_meter, DEFAULT_USER,
+                       sp_bind_to_contract, find_existing_meter,
                        fetch_meter_by_id, save_standalone_meter
   excel_export.py  -> build_subareas_workbook
   termination.py   -> fetch_contracts_for_termination, fetch_contract_statuses,
@@ -37,7 +37,6 @@ from .excel_import import (
 )
 
 from .meters import (
-    DEFAULT_USER,
     sp_meter_save,
     sp_bind_to_contract,
     find_existing_meter,
@@ -98,7 +97,7 @@ __all__ = [
     'STATUS_MAP', 'COL_KEYS', 'build_column_map', 'find_subarea',
     'find_contract_by_code', 'find_contract_sheet', 'find_registered_meter',
     'parse_excel_staged',
-    'DEFAULT_USER', 'sp_meter_save', 'sp_bind_to_contract',
+    'sp_meter_save', 'sp_bind_to_contract',
     'find_existing_meter', 'commit_staged_rows',
     'fetch_subareas', 'fetch_subarea_options',
     'fetch_contract_meter_detail', 'fetch_subarea_meters',

@@ -14,8 +14,6 @@ from django.shortcuts import render
 
 from .. import services
 from .dashboard import THAI_MONTHS
-
-DEFAULT_USER = 'web_upload'
 LOG_PER_PAGE = 30
 
 
@@ -83,7 +81,7 @@ def activity_log(request):
         'active_action': action,
         'search': search,
         'contract_filter': contract_id,
-        'default_user': DEFAULT_USER,
+        'default_user': request.user.get_username(),
         # ประเภทที่ยังไม่ได้เขียน log -- บอกผู้ใช้ตรงๆ ว่าหน้านี้ยังไม่ครอบคลุมอะไร
         'pending_sources': [
             'แก้ไขมิเตอร์และบันทึกเลขอ่านจากหน้าแดชบอร์ด',

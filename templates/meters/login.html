@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>เข้าสู่ระบบ CMS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-50 flex items-center justify-center p-5 font-sans">
+  <main class="w-full max-w-md">
+    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-8">
+      <div class="w-12 h-12 rounded-xl bg-emerald-700 text-white flex items-center justify-center font-bold text-xl mb-6">
+        CMS
+      </div>
+      <h1 class="text-2xl font-bold text-slate-900">เข้าสู่ระบบ</h1>
+      <p class="text-sm text-slate-500 mt-2 mb-7">ใช้ Buasri ID สำหรับเข้าใช้งานระบบบริหารสัญญา</p>
+
+      {% if form.errors %}
+        <div class="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          Buasri ID หรือรหัสผ่านไม่ถูกต้อง หรือบัญชีนี้ยังไม่มีสิทธิ์เข้าใช้งาน
+        </div>
+      {% endif %}
+
+      <form method="post" action="{% url 'login' %}" class="space-y-5">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ next }}">
+        <div>
+          <label for="id_username" class="block text-sm font-semibold text-slate-700 mb-2">Buasri ID</label>
+          <input id="id_username" name="username" type="text" value="{{ form.username.value|default:'' }}"
+                 autocomplete="username" autofocus required
+                 class="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-slate-900 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
+        </div>
+        <div>
+          <label for="id_password" class="block text-sm font-semibold text-slate-700 mb-2">รหัสผ่าน</label>
+          <input id="id_password" name="password" type="password" autocomplete="current-password" required
+                 class="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-slate-900 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
+        </div>
+        <button type="submit"
+                class="w-full rounded-lg bg-emerald-700 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-200">
+          เข้าสู่ระบบ
+        </button>
+      </form>
+    </div>
+    <p class="text-center text-xs text-slate-400 mt-4">ระบบจะไม่จัดเก็บรหัสผ่าน Buasri</p>
+  </main>
+</body>
+</html>

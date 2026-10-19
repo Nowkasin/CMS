@@ -7,8 +7,6 @@ from django.shortcuts import render, redirect
 
 from .. import services
 
-DEFAULT_USER = 'web_upload'
-
 
 def phase_list(request):
     """
@@ -56,7 +54,7 @@ def phase_form(request, phase_id=None):
 
         try:
             services.save_phase_type(
-                phase_type, phase_desc, DEFAULT_USER,
+                phase_type, phase_desc, request.user.get_username(),
                 phase_id=phase_id, use_or_not=use_or_not,
             )
             return redirect('phase_list')

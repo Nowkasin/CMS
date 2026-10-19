@@ -73,4 +73,8 @@ RUNSERVER_PORT=8080
    ไม่งั้น `mssql-django` จะต่อฐานข้อมูลไม่ได้
 3. คอลัมน์ Excel ที่ view ใช้อ้างอิง (`meters/views.py` ตัวแปร `COL`) อิงตามไฟล์
    "ข้อมูลสัญญาที่สร้างปี68 ในระบบ CMS" — ถ้าโครงสร้างคอลัมน์ไฟล์เปลี่ยน ต้องแก้ตำแหน่ง index ในนี้ด้วย
-4. `DEFAULT_USER = 'web_upload'` ใน `views.py` คือค่าที่บันทึกลง `UserEntry` — เปลี่ยนเป็น username จริงของผู้ใช้ที่ login ได้ถ้าต้องการ (ตอนนี้ยังไม่มีระบบ login)
+4. ระบบล็อกอินตรวจรหัสผ่านกับ Buasri LDAP จากนั้นแปลง `BUASRI_ID` เป็น
+   `PERSON_ID` ผ่าน `[EMPLOYEE].[SAP_FI].[dbo].[v_sarabun_ess_Person]` แล้วอ่านสิทธิ์
+   จาก `SysUserGroupAssiciate` และ `SysGroup` ในฐานเดิม รหัสผ่านจะไม่ถูกบันทึกลงระบบนี้
+5. ตั้งค่า `LDAP_SERVER_URI` และ `LDAP_USER_DN_TEMPLATE` ใน `.env` ก่อนใช้งาน
+   ตัวเลือกเพิ่มเติมคือ `LDAP_CONNECT_TIMEOUT`, `LDAP_START_TLS` และ `LDAP_TLS_VALIDATE`

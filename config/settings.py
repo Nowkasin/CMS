@@ -17,6 +17,7 @@ DEBUG = config('DJANGO_DEBUG', default=False, cast=bool)
 ALLOWED_HOSTS = config('DJANGO_ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
 
 INSTALLED_APPS = [
+    'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',   # จำเป็น: ใช้เก็บข้อมูล staged ระหว่าง step ของ wizard
     'django.contrib.staticfiles',
@@ -26,6 +27,9 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',  # จำเป็นสำหรับ request.session
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    # ทุกหน้าต้องล็อกอิน ยกเว้น view ที่ติด @login_not_required
+    'django.contrib.auth.middleware.LoginRequiredMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
 ]
@@ -40,6 +44,7 @@ TEMPLATES = [
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
             ],
         },
     },
@@ -89,5 +94,26 @@ EXCEL_UPLOAD_MAX_ROWS = 5000
 
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 SESSION_COOKIE_AGE = 60 * 60 * 2  # 2 ชั่วโมง พอสำหรับทำ wizard ให้จบ
+
+# -----------------------------------------------------------------------
+# Authentication
+#
+# LDAP ตรวจรหัสผ่าน ส่วนตาราง SysUserGroupAssiciate/SysGroup ใน SQL Server เดิม
+# ใช้ยืนยันว่าบุคคลนั้นมีสิทธิ์เข้า CMS รหัสผ่านจะไม่ถูกเก็บในระบบนี้
+# -----------------------------------------------------------------------
+AUTHENTICATION_BACKENDS = ['meters.auth_backend.BuasriLDAPBackend']
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'meter_list'
+LOGOUT_REDIRECT_URL = 'login'
+
+LDAP_SERVER_URI = config('LDAP_SERVER_URI', default='')
+LDAP_USER_DN_TEMPLATE = config('LDAP_USER_DN_TEMPLATE', default='')
+LDAP_CONNECT_TIMEOUT = config('LDAP_CONNECT_TIMEOUT', default=5, cast=int)
+LDAP_START_TLS = config('LDAP_START_TLS', default=False, cast=bool)
+LDAP_TLS_VALIDATE = config('LDAP_TLS_VALIDATE', default=True, cast=bool)
+LDAP_USERNAME_PATTERN = config(
+    'LDAP_USERNAME_PATTERN',
+    default=r'^[A-Za-z0-9._-]{1,64}$',
+)
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

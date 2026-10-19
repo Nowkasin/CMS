@@ -3,8 +3,6 @@ from django.shortcuts import render, redirect
 
 from .. import services
 
-DEFAULT_USER = 'web_upload'
-
 
 def meter_list(request):
     """
@@ -86,7 +84,8 @@ def meter_form(request, meter_id=None):
         if not errors:
             try:
                 services.save_standalone_meter(
-                    subarea_id, int(meter_type_cd), meter_no, phase_type, DEFAULT_USER,
+                    subarea_id, int(meter_type_cd), meter_no, phase_type,
+                    request.user.get_username(),
                     meter_id=meter_id, meter_remark=meter_remark, use_or_not=use_or_not,
                 )
                 return redirect('meter_list')

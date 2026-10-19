@@ -6,8 +6,6 @@ from django.urls import reverse
 
 from .. import services
 
-DEFAULT_USER = 'web_upload'
-
 THAI_MONTHS = [
     'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
     'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
@@ -47,7 +45,7 @@ def _safe_int(raw, field_label, errors, min_value=None, max_value=None):
 
 
 def _safe_save_reading(meter_id, year_be, month, before_val, after_val, label, errors,
-                       contract_id=None, contract_code=None):
+                       user_id, contract_id=None, contract_code=None):
     """
     ครอบการเรียก save_meter_reading() ด้วย try/except กันไม่ให้ error จากฐานข้อมูลหลุดเป็น 500
 
@@ -61,7 +59,7 @@ def _safe_save_reading(meter_id, year_be, month, before_val, after_val, label, e
     """
     try:
         reading_id = services.save_meter_reading(
-            meter_id, year_be, month, before_val, after_val, DEFAULT_USER,
+            meter_id, year_be, month, before_val, after_val, user_id,
             contract_id=contract_id, contract_code=contract_code,
         )
     except Exception:
@@ -216,7 +214,7 @@ def edit_meter(request, subarea_id):
         # ---------- 2) ผ่านการตรวจหมดแล้ว จึงเขียน ----------
         _logs, result_meter_ids = services.save_subarea_meters(
             location_id=data['Location_id'], area_id=data['Area_id'], subarea_id=data['SubArea_id'],
-            user_id=DEFAULT_USER,
+            user_id=request.user.get_username(),
             water_enabled=water_enabled,
             water_meter_id=data['water']['Meter_id'] if data['water'] else None,
             water_meter_no=water_meter_no,
@@ -232,6 +230,7 @@ def edit_meter(request, subarea_id):
                 continue
             _safe_save_reading(
                 meter_id, year_be, month, before_val, after_val, label, reading_errors,
+                request.user.get_username(),
                 contract_id=reading_contract_id, contract_code=reading_contract_code,
             )
 
