@@ -10,7 +10,7 @@
 {% endcomment %}
 
 {% block content %}
-<div class="py-8">
+<div class="mx-auto w-full max-w-[1600px]">
 
   <div class="text-sm text-gray-400 mb-1">
     <a href="{% url 'dashboard' %}" class="hover:text-brand-600">แดชบอร์ด</a>
@@ -19,7 +19,7 @@
   </div>
 
   <div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-900">ประวัติการใช้งานระบบ</h1>
+    <h1 class="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">ประวัติการใช้งานระบบ</h1>
     <p class="text-sm text-gray-500 mt-1">เหตุการณ์ทั้งหมดในระบบ เรียงเวลาล่าสุดก่อน</p>
   </div>
 
@@ -75,8 +75,8 @@
   <div class="mb-4"></div>
   {% endif %}
 
-  <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-    <table class="min-w-full text-sm text-left">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
+    <table class="min-w-[920px] w-full text-sm text-left">
       <thead>
         <tr class="border-b border-gray-100 bg-gray-50">
           <th class="px-4 py-2.5 font-semibold text-gray-500 whitespace-nowrap">เมื่อ</th>
@@ -84,7 +84,7 @@
           <th class="px-4 py-2.5 font-semibold text-gray-500">สัญญา</th>
           <th class="px-4 py-2.5 font-semibold text-gray-500">รายละเอียด</th>
           <th class="px-4 py-2.5 font-semibold text-gray-500 whitespace-nowrap">ผู้ทำรายการ</th>
-          <th class="px-4 py-2.5"></th>
+          <th class="px-4 py-2.5 text-right font-semibold text-gray-500">ดำเนินการ</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-50">

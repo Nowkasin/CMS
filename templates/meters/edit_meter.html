@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block content %}
-<div class="py-8">
+<div class="mx-auto w-full max-w-[1600px]">
   {% if reading_errors %}
   <div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-4 space-y-1">
     {% for err in reading_errors %}
@@ -19,7 +19,7 @@
   {# --- Heading + status badge --- #}
   <div class="flex items-center justify-between gap-4 flex-wrap mb-6">
     <div>
-      <h1 class="text-2xl font-bold text-gray-900">แก้ไขมิเตอร์ — {{ subarea.SubArea_id }}</h1>
+      <h1 class="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">แก้ไขมิเตอร์ — {{ subarea.SubArea_id }}</h1>
       <p class="text-sm text-gray-500 mt-1">{{ subarea.Area_name|default:"—" }} · {{ subarea.SubArea_name|default:"—" }}</p>
     </div>
     <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-brand-50 text-brand-600">
@@ -28,7 +28,7 @@
   </div>
 
   {# --- เลือกรอบบิล (GET -- เปลี่ยนแล้วโหลดหน้าใหม่ทันที เพื่อดึงเลขอ่านของรอบนั้นมาแสดง) --- #}
-  <form method="get" class="bg-white border border-gray-200 rounded-xl p-4 mb-6 flex flex-wrap items-end gap-3">
+  <form method="get" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-6 flex flex-wrap items-end gap-3">
     <div>
       <label class="block text-xs font-medium text-gray-500 mb-1">รอบบิล — เดือน</label>
       <select name="month" onchange="this.form.submit()"
@@ -67,7 +67,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
       {# --- ฝั่งซ้าย: ข้อมูลสัญญา (read-only) --- #}
-      <div class="bg-white border border-gray-200 rounded-xl p-6">
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
         <h2 class="text-base font-bold text-gray-900 mb-1">ข้อมูลสัญญา</h2>
         <p class="text-xs text-gray-400 mb-5">ข้อมูลจากระบบสัญญา แก้ไขจากหน้านี้ไม่ได้</p>
 
@@ -107,7 +107,7 @@
       </div>
 
       {# --- ฝั่งขวา: มิเตอร์น้ำ-ไฟ (แก้ไขได้) --- #}
-      <div class="bg-white border border-gray-200 rounded-xl p-6">
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
         <h2 class="text-base font-bold text-gray-900 mb-5">มิเตอร์น้ำ-ไฟ</h2>
 
         <div class="space-y-4">

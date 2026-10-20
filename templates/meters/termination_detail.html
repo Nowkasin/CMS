@@ -1,10 +1,10 @@
-﻿{% extends "meters/base.html" %}
+{% extends "meters/base.html" %}
 {% load static %}
 
 {% block title %}รายละเอียดการยกเลิกสัญญา{% endblock %}
 
 {% block content %}
-<div class="py-8">
+<div class="mx-auto w-full max-w-[1600px]">
 
   <div class="text-sm text-gray-400 mb-1">
     <a href="{% url 'dashboard' %}" class="hover:text-brand-600">แดชบอร์ด</a>
@@ -29,7 +29,7 @@
   {% endcomment %}
   <div class="flex items-start justify-between gap-4 flex-wrap mb-6">
     <div>
-      <h1 class="text-2xl font-bold text-gray-900">รายละเอียดการยกเลิกสัญญา</h1>
+      <h1 class="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">รายละเอียดการยกเลิกสัญญา</h1>
       <p class="text-lg font-semibold text-gray-800 mt-2">{{ contract.Contract_code|default:"ไม่มีรหัสสัญญา" }}</p>
       <p class="text-sm text-gray-600">{{ contract.CompanyName|default:"ไม่มีชื่อลูกค้าในระบบ" }}</p>
       {% if contract.SAPVendor_Id %}
@@ -157,13 +157,13 @@
     จะมองไม่เห็นว่ารายการก่อนหน้าเป็นอะไรและใครลบ
   {% endcomment %}
   {% if deleted_history %}
-  <div class="bg-white border border-gray-200 rounded-xl p-6 mb-6">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mb-6">
     <div class="flex items-baseline justify-between gap-3 mb-3">
       <h2 class="text-base font-bold text-gray-900">ประวัติรายการยกเลิกที่ถูกลบ</h2>
       <span class="text-xs text-gray-400">{{ deleted_history|length }} รายการ</span>
     </div>
     <div class="overflow-x-auto">
-      <table class="min-w-full text-xs text-left">
+      <table class="min-w-[900px] w-full text-xs text-left">
         <thead>
           <tr class="border-b border-gray-100 bg-gray-50">
             <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">กรณี</th>
@@ -210,7 +210,7 @@
     ตอนนี้เลือกเฉพาะคอลัมน์ที่ใช้จริง หัวตารางเป็นไทย และ service เติมชื่อสถานที่/พื้นที่มาให้
   {% endcomment %}
   {% if contract_meters %}
-  <div class="bg-white border border-gray-200 rounded-xl p-6 mb-6">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mb-6">
     <div class="flex items-baseline justify-between gap-3 mb-4">
       <h2 class="text-base font-bold text-gray-900">มิเตอร์ที่ผูกกับสัญญานี้</h2>
       <span class="text-xs text-gray-400">{{ contract_meters|length }} รายการ</span>
@@ -228,7 +228,7 @@
     </div>
     {% endif %}
     <div class="overflow-x-auto">
-      <table class="min-w-full text-xs text-left">
+      <table class="min-w-[1000px] w-full text-xs text-left">
         <thead>
           <tr class="border-b border-gray-100 bg-gray-50">
             <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">รหัสมิเตอร์</th>
@@ -279,7 +279,7 @@
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
     {# --- ฝั่งซ้าย: ฟอร์มข้อมูลยกเลิก --- #}
-    <div class="bg-white border border-gray-200 rounded-xl p-6">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
       <h2 class="text-base font-bold text-gray-900 mb-1">ข้อมูลการยกเลิก</h2>
       {% if header %}
         {% comment %}
@@ -481,7 +481,7 @@
     </div>
 
     {# --- ฝั่งขวา: รายการงวด --- #}
-    <div class="bg-white border border-gray-200 rounded-xl p-6">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
       <div class="flex items-start justify-between gap-3 flex-wrap mb-1">
         <h2 class="text-base font-bold text-gray-900">รายการงวดของสัญญา</h2>
         {% comment %}

@@ -1,0 +1,30 @@
+<nav class="flex gap-2 overflow-x-auto p-3 lg:flex-col lg:overflow-visible lg:p-4" aria-label="เมนูหลัก">
+  <a href="{% url 'meter_list' %}"
+     class="shrink-0 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors {% if request.resolver_match.url_name == 'meter_list' or request.resolver_match.url_name == 'meter_new' or request.resolver_match.url_name == 'meter_edit' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
+    จัดการมิเตอร์
+  </a>
+  <a href="{% url 'step1' %}"
+     class="shrink-0 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors {% if request.resolver_match.url_name == 'step1' or request.resolver_match.url_name == 'step2' or request.resolver_match.url_name == 'step3' or request.resolver_match.url_name == 'step4' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
+    อัปโหลดไฟล์
+  </a>
+  <a href="{% url 'download_form' %}"
+     class="shrink-0 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors {% if request.resolver_match.url_name == 'download_form' or request.resolver_match.url_name == 'download_excel' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
+    ดาวน์โหลด Excel
+  </a>
+  <a href="{% url 'phase_list' %}"
+     class="shrink-0 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors {% if request.resolver_match.url_name == 'phase_list' or request.resolver_match.url_name == 'phase_new' or request.resolver_match.url_name == 'phase_edit' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
+    Master ระบบไฟฟ้า
+  </a>
+  <a href="{% url 'dashboard' %}"
+     class="shrink-0 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors {% if request.resolver_match.url_name == 'dashboard' or request.resolver_match.url_name == 'edit_meter' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
+    แดชบอร์ด
+  </a>
+  <a href="{% url 'termination_search' %}"
+     class="shrink-0 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors {% if request.resolver_match.url_name == 'termination_search' or request.resolver_match.url_name == 'termination_detail' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
+    ยกเลิกสัญญา
+  </a>
+  <a href="{% url 'activity_log' %}"
+     class="shrink-0 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors {% if request.resolver_match.url_name == 'activity_log' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
+    ประวัติการใช้งาน
+  </a>
+</nav>

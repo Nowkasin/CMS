@@ -4,7 +4,7 @@
 {% block title %}Master ระบบไฟฟ้า{% endblock %}
 
 {% block content %}
-<div class="py-8">
+<div class="mx-auto w-full max-w-[1600px]">
 
   <div class="text-sm text-gray-400 mb-1">
     <a href="{% url 'dashboard' %}" class="hover:text-brand-600">แดชบอร์ด</a>
@@ -13,7 +13,7 @@
   </div>
 
   <div class="flex items-center justify-between gap-4 flex-wrap mb-1">
-    <h1 class="text-2xl font-bold text-gray-900">Master ระบบไฟฟ้า</h1>
+    <h1 class="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">Master ระบบไฟฟ้า</h1>
     <a href="{% url 'phase_new' %}"
        class="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600">
       + เพิ่มระบบไฟฟ้า
@@ -42,8 +42,8 @@
     </a>
   </div>
 
-  <div class="bg-white border border-gray-200 rounded-xl overflow-x-auto">
-    <table class="min-w-full text-sm text-left">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
+    <table class="min-w-[1180px] w-full text-sm text-left">
       <thead>
         <tr class="border-b border-gray-100 bg-gray-50">
           <th class="px-4 py-2.5 font-semibold text-gray-500">รหัส</th>
@@ -55,7 +55,7 @@
           <th class="px-4 py-2.5 font-semibold text-gray-500">วันที่บันทึก</th>
           <th class="px-4 py-2.5 font-semibold text-gray-500">ผู้แก้ไข</th>
           <th class="px-4 py-2.5 font-semibold text-gray-500">วันที่แก้ไข</th>
-          <th class="px-4 py-2.5"></th>
+          <th class="px-4 py-2.5 text-right font-semibold text-gray-500">ดำเนินการ</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-50">

@@ -1,16 +1,20 @@
 {% extends "meters/base.html" %}
 {% load static %}
 
+{% block title %}นำเข้าข้อมูลเรียบร้อย{% endblock %}
+
 {% block content %}
-<div class="min-h-screen bg-gray-50 font-sans">
-  <div class="max-w-4xl mx-auto px-6 py-10">
+<div class="mx-auto w-full max-w-6xl space-y-6">
 
-    <div class="text-xs text-gray-400 mb-2 flex items-center gap-1.5">
-      <span>หน้าแรก</span><span>›</span><span>ประวัติค่าน้ำ-ค่าไฟ</span>
-    </div>
+    <nav class="flex items-center gap-2 text-sm text-gray-400" aria-label="Breadcrumb">
+      <a href="{% url 'step1' %}" class="hover:text-brand-600">อัปโหลดไฟล์</a><span>›</span><span class="text-gray-600">ผลการนำเข้า</span>
+    </nav>
 
-    <div class="flex items-center justify-between mb-8">
-      <h1 class="text-2xl font-bold text-gray-900">ค่าน้ำ-ค่าไฟ</h1>
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">ผลการนำเข้าข้อมูล</h1>
+        <p class="mt-1 text-sm text-gray-500">สรุปรายการค่าน้ำและค่าไฟที่ระบบประมวลผลเรียบร้อยแล้ว</p>
+      </div>
       <a href="{% url 'restart' %}"
          class="inline-flex items-center gap-1.5 bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -69,8 +73,8 @@
         </button>
       </div>
 
-      <div class="border border-gray-100 rounded-xl overflow-hidden">
-        <table class="w-full text-sm" id="resultTable">
+      <div class="border border-gray-100 rounded-xl overflow-x-auto">
+        <table class="min-w-[760px] w-full text-sm" id="resultTable">
           <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
             <tr>
               <th class="text-left px-4 py-2.5">ลำดับ</th>
@@ -122,7 +126,6 @@
       </div>
     </div>
 
-  </div>
 </div>
 
 <script src="{% static 'meters/js/done.js' %}" defer></script>

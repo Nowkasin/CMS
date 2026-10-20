@@ -1,12 +1,9 @@
-﻿{% load static %}<!DOCTYPE html>
+{% load static %}<!DOCTYPE html>
 <html lang="th">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{% block title %}ทะเบียนมิเตอร์น้ำ-ไฟ x สัญญา{% endblock %}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
   tailwind.config = {
@@ -19,87 +16,59 @@
           },
         },
         fontFamily: {
-          sans: ['Inter', 'sans-serif'],
+          sans: ['Prompt', 'sans-serif'],
         },
       },
     },
   };
 </script>
 <style>
+  @font-face {
+    font-family: 'Prompt';
+    src: url("{% static 'meters/webfonts/Prompt-Regular.ttf' %}") format('truetype');
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Prompt';
+    src: url("{% static 'meters/webfonts/Prompt-Medium.ttf' %}") format('truetype');
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Prompt';
+    src: url("{% static 'meters/webfonts/Prompt-SemiBold.ttf' %}") format('truetype');
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Prompt';
+    src: url("{% static 'meters/webfonts/Prompt-Bold.ttf' %}") format('truetype');
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+  }
   /* กันหน้าไม่ให้ชนกับ .wrap เดิม (จำกัดความกว้าง 1180px) */
   .wrap{ max-width: none; padding: 0; }
 </style>
 
 {% block extra_css %}{% endblock %}
 </head>
-<body>
-<nav class="w-full bg-white border-b border-gray-200 px-6 py-3 flex items-center flex-wrap gap-2">
-  <a href="{% url 'meter_list' %}"
-     class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
-            {% if request.path|slice:':8' == '/meters/' or request.path == '/meters' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
-    จัดการมิเตอร์
-  </a>
-  <a href="{% url 'step1' %}"
-    target="_blank"
-     class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
-            {% if request.resolver_match.url_name == 'step1' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
-    อัปโหลดไฟล์
-  </a>
+<body class="min-h-screen bg-slate-50 font-sans text-gray-900">
+{% include "meters/partials/top_nav.html" %}
 
-  <a href="{% url 'download_form' %}"
-    target="_blank"
-     class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
-            {% if request.resolver_match.url_name == 'download_form' or request.resolver_match.url_name == 'download_excel' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
-    ดาวน์โหลด Excel
-  </a>
-   <!-- <a href="/create_contract/"
-     class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
-            {% if request.path == '/create_contract/' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
-    สร้างสัญญา
-  </a> -->
-  <a href="{% url 'phase_list' %}"
-     class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
-            {% if request.resolver_match.url_name == 'phase_list' or request.resolver_match.url_name == 'phase_new' or request.resolver_match.url_name == 'phase_edit' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
-    Master ระบบไฟฟ้า
-  </a>
-  <a href="{% url 'dashboard' %}"
-    target="_blank"
-     class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
-            {% if request.resolver_match.url_name == 'dashboard' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
-    แดชบอร์ด
-  </a>
-  {% comment %}
-    ไฮไลต์ "ยกเลิกสัญญา" ครอบทุกหน้าในกลุ่มนี้ (รายการ/รายละเอียด) ไม่ใช่แค่หน้ารายการ
-    เดิมเข้าหน้ารายละเอียดแล้วไม่มีปุ่มไหนไฮไลต์เลย ทำให้ไม่รู้ว่าอยู่ส่วนไหนของระบบ
-  {% endcomment %}
-  <a href="{% url 'termination_search' %}"
-      target="_blank"
-     class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
-            {% if request.resolver_match.url_name == 'termination_search' or request.resolver_match.url_name == 'termination_detail' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
-    ยกเลิกสัญญา
-  </a>
-  <a href="{% url 'activity_log' %}"
-     class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
-            {% if request.resolver_match.url_name == 'activity_log' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
-    ประวัติการใช้งาน
-  </a>
-  <div class="ml-auto flex items-center gap-3 pl-4">
-    <div class="text-right leading-tight">
-      <div class="text-xs text-gray-400">ผู้ใช้งาน</div>
-      <div class="text-sm font-semibold text-gray-700">{{ request.user.username }}</div>
+<div class="flex min-h-[calc(100vh-65px)] flex-col lg:flex-row">
+  <aside class="w-full border-b border-gray-200 bg-white lg:sticky lg:top-16 lg:h-[calc(100vh-64px)] lg:w-64 lg:shrink-0 lg:border-b-0 lg:border-r">
+    {% include "meters/partials/sidebar.html" %}
+  </aside>
+  <main class="min-w-0 flex-1">
+    <div class="wrap px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      {% block content %}{% endblock %}
     </div>
-    <form method="post" action="{% url 'logout' %}">
-      {% csrf_token %}
-      <button type="submit"
-              class="px-3 py-2 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">
-        ออกจากระบบ
-      </button>
-    </form>
-  </div>
-</nav>
-
-<div class="wrap px-6 py-8">
-  {% block content %}{% endblock %}
+  </main>
 </div>
 
 {% comment %}

@@ -1,49 +1,90 @@
-<!DOCTYPE html>
+{% load static %}<!DOCTYPE html>
 <html lang="th">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>เข้าสู่ระบบ CMS</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @font-face {
+      font-family: 'Prompt';
+      src: url("{% static 'meters/webfonts/Prompt-Regular.ttf' %}") format('truetype');
+      font-style: normal;
+      font-weight: 400;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Prompt';
+      src: url("{% static 'meters/webfonts/Prompt-Medium.ttf' %}") format('truetype');
+      font-style: normal;
+      font-weight: 500;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Prompt';
+      src: url("{% static 'meters/webfonts/Prompt-SemiBold.ttf' %}") format('truetype');
+      font-style: normal;
+      font-weight: 600;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Prompt';
+      src: url("{% static 'meters/webfonts/Prompt-Bold.ttf' %}") format('truetype');
+      font-style: normal;
+      font-weight: 700;
+      font-display: swap;
+    }
+  </style>
 </head>
-<body class="min-h-screen bg-slate-50 flex items-center justify-center p-5 font-sans">
-  <main class="w-full max-w-md">
-    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-8">
-      <div class="w-12 h-12 rounded-xl bg-emerald-700 text-white flex items-center justify-center font-bold text-xl mb-6">
-        CMS
+<body class="flex min-h-screen items-center justify-center bg-[#e5f1ef] p-4 text-slate-900 sm:p-8" style="font-family: 'Prompt', sans-serif;">
+  <main class="w-full max-w-[1180px] overflow-hidden rounded-[28px] bg-white shadow-2xl ring-1 ring-slate-900/5 lg:grid lg:grid-cols-[minmax(0,1fr)_clamp(360px,39%,460px)]">
+    <section class="flex min-h-[280px] items-center justify-center bg-[#dff1ef] p-[5px] lg:min-h-0"
+             aria-label="ขั้นตอนการบริหารสัญญา">
+      <img src="{% static 'meters/images/cms-contract-flow.png' %}"
+           alt="แผนภาพขั้นตอนระบบบริหารสัญญา CMS ตั้งแต่สร้างสัญญาถึงจัดพิมพ์สัญญา"
+           class="block h-auto max-h-[450px] w-auto max-w-full"
+           style="border-radius: 32px; clip-path: inset(1px round 31px);">
+    </section>
+
+    <section class="flex items-center justify-center bg-white my-10 px-6 py-10 sm:px-10 lg:min-h-0 lg:px-12 lg:py-[5px]">
+      <div class="w-full max-w-sm">
+        <div class="mb-9">
+          <div class="mb-5 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[#087f78] text-lg font-bold text-white shadow-sm">
+            CMS
+          </div>
+          <p class="mb-2 text-sm font-semibold uppercase tracking-[0.16em] text-[#087f78]">Contract Management System</p>
+          <h1 class="text-3xl font-bold tracking-tight text-slate-900">เข้าสู่ระบบ</h1>
+        </div>
+
+        {% if form.errors %}
+          <div class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700" role="alert">
+            Buasri ID หรือรหัสผ่านไม่ถูกต้อง หรือบัญชีนี้ยังไม่มีสิทธิ์เข้าใช้งาน
+          </div>
+        {% endif %}
+
+        <form method="post" action="{% url 'login' %}" class="space-y-5">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ next }}">
+          <div>
+            <label for="id_username" class="mb-2 block text-sm font-semibold text-slate-700">Buasri ID</label>
+            <input id="id_username" name="username" type="text" value="{{ form.username.value|default:'' }}"
+                   autocomplete="username" autofocus required
+                   class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#087f78] focus:ring-4 focus:ring-[#087f78]/10">
+          </div>
+          <div>
+            <label for="id_password" class="mb-2 block text-sm font-semibold text-slate-700">รหัสผ่าน</label>
+            <input id="id_password" name="password" type="password" autocomplete="current-password" required
+                   class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-[#087f78] focus:ring-4 focus:ring-[#087f78]/10">
+          </div>
+          <button type="submit"
+                  class="w-full rounded-xl bg-[#087f78] px-4 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#066a65] focus:outline-none focus:ring-4 focus:ring-[#087f78]/20">
+            เข้าสู่ระบบ
+          </button>
+        </form>
+
+
       </div>
-      <h1 class="text-2xl font-bold text-slate-900">เข้าสู่ระบบ</h1>
-      <p class="text-sm text-slate-500 mt-2 mb-7">ใช้ Buasri ID สำหรับเข้าใช้งานระบบบริหารสัญญา</p>
-
-      {% if form.errors %}
-        <div class="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          Buasri ID หรือรหัสผ่านไม่ถูกต้อง หรือบัญชีนี้ยังไม่มีสิทธิ์เข้าใช้งาน
-        </div>
-      {% endif %}
-
-      <form method="post" action="{% url 'login' %}" class="space-y-5">
-        {% csrf_token %}
-        <input type="hidden" name="next" value="{{ next }}">
-        <div>
-          <label for="id_username" class="block text-sm font-semibold text-slate-700 mb-2">Buasri ID</label>
-          <input id="id_username" name="username" type="text" value="{{ form.username.value|default:'' }}"
-                 autocomplete="username" autofocus required
-                 class="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-slate-900 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
-        </div>
-        <div>
-          <label for="id_password" class="block text-sm font-semibold text-slate-700 mb-2">รหัสผ่าน</label>
-          <input id="id_password" name="password" type="password" autocomplete="current-password" required
-                 class="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-slate-900 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
-        </div>
-        <button type="submit"
-                class="w-full rounded-lg bg-emerald-700 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-200">
-          เข้าสู่ระบบ
-        </button>
-      </form>
-    </div>
-    <p class="text-center text-xs text-slate-400 mt-4">ระบบจะไม่จัดเก็บรหัสผ่าน Buasri</p>
+    </section>
   </main>
 </body>
 </html>

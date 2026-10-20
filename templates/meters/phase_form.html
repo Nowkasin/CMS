@@ -4,7 +4,7 @@
 {% block title %}{% if phase_id %}แก้ไขระบบไฟฟ้า{% else %}เพิ่มระบบไฟฟ้าใหม่{% endif %}{% endblock %}
 
 {% block content %}
-<div class="py-8 max-w-2xl">
+<div class="mx-auto w-full max-w-3xl">
 
   <div class="text-sm text-gray-400 mb-1">
     <a href="{% url 'phase_list' %}" class="hover:text-brand-600">Master ระบบไฟฟ้า</a>
@@ -12,7 +12,7 @@
     <span class="text-gray-500">{% if phase_id %}แก้ไข{% else %}เพิ่มใหม่{% endif %}</span>
   </div>
 
-  <h1 class="text-2xl font-bold text-gray-900 mb-6">
+  <h1 class="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl mb-6">
     {% if phase_id %}แก้ไขระบบไฟฟ้า{% else %}เพิ่มระบบไฟฟ้าใหม่{% endif %}
   </h1>
 
@@ -43,7 +43,7 @@
     หน้านี้เสี่ยงกว่าหน้าอื่น เพราะค่า Phase_type ถูกเก็บเป็นข้อความในทะเบียนมิเตอร์
     แก้ชื่อที่นี่แล้วข้อมูลมิเตอร์เดิมจะไม่ตามมา (ดูคำเตือนด้านบนของหน้า)
   {% endcomment %}
-  <form method="post" id="phaseForm" class="bg-white border border-gray-200 rounded-xl p-6 space-y-4"
+  <form method="post" id="phaseForm" class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 space-y-4"
         data-confirm-submit
         data-confirm-title="{% if phase_id %}ยืนยันการแก้ไขระบบไฟฟ้า{% else %}ยืนยันการเพิ่มระบบไฟฟ้า{% endif %}"
         data-confirm-message="{% if phase_id and meters_using %}ระบบไฟฟ้านี้มีมิเตอร์ใช้อยู่ {{ meters_using }} รายการ ถ้าแก้ชื่อ ข้อมูลในทะเบียนมิเตอร์จะยังเป็นชื่อเดิม ระบบไม่ตามไปแก้ให้{% else %}ค่านี้จะถูกบันทึกลงฐานข้อมูลทันที และเป็นค่าที่เขียนลงทะเบียนมิเตอร์จริง{% endif %}"

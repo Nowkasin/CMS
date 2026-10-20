@@ -4,7 +4,7 @@
 {% block title %}{% if meter_id %}แก้ไขมิเตอร์{% else %}เพิ่มมิเตอร์ใหม่{% endif %}{% endblock %}
 
 {% block content %}
-<div class="py-8 max-w-xl mx-auto">
+<div class="mx-auto w-full max-w-2xl">
 
   <div class="text-sm text-gray-400 mb-1">
     <a href="{% url 'dashboard' %}" class="hover:text-brand-600">แดชบอร์ด</a>
@@ -15,7 +15,7 @@
   </div>
 
   <div class="flex items-center justify-between gap-4 flex-wrap mb-6">
-    <h1 class="text-2xl font-bold text-gray-900">
+    <h1 class="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
       {% if meter_id %}แก้ไขมิเตอร์ #{{ meter_id }}{% else %}เพิ่มมิเตอร์ใหม่{% endif %}
     </h1>
     {% if meter_id %}
@@ -37,7 +37,7 @@
     data-confirm-submit -- กันเผลอกด Enter แล้วบันทึกทันที (ดู static/meters/js/confirm_submit.js)
     กด Enter ในช่องใดก็ตามจะไม่ส่งฟอร์มอีก และกดปุ่มบันทึกจะขึ้นกล่องยืนยันพร้อมสรุปค่าก่อน
   {% endcomment %}
-  <form id="meterForm" method="post" class="bg-white border border-gray-200 rounded-xl p-6 space-y-4"
+  <form id="meterForm" method="post" class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 space-y-4"
         data-confirm-submit
         data-confirm-title="{% if meter_id %}ยืนยันการแก้ไขมิเตอร์{% else %}ยืนยันการเพิ่มมิเตอร์ใหม่{% endif %}"
         data-confirm-message="{% if meter_id %}ระบบจะเขียนทับข้อมูลมิเตอร์ #{{ meter_id }} ทันที{% else %}ระบบจะสร้างมิเตอร์ใหม่ลงทะเบียนทันที{% endif %} กรุณาตรวจสอบข้อมูลด้านล่างก่อนยืนยัน"
