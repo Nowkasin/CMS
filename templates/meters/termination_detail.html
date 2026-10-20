@@ -7,8 +7,6 @@
 <div class="mx-auto w-full max-w-[1600px]">
 
   <div class="text-sm text-gray-400 mb-1">
-    <a href="{% url 'dashboard' %}" class="hover:text-brand-600">แดชบอร์ด</a>
-    <span class="mx-1">›</span>
     {% comment %}
       พา query string ของหน้ารายการกลับไปด้วย (view ส่งมาใน back_qs)
       ไม่งั้นกดลิงก์นี้จะเด้งไปแท็บเริ่มต้น ไม่ใช่ตัวกรองที่ผู้ใช้ตั้งไว้
@@ -16,9 +14,6 @@
     {% endcomment %}
     <a href="{% url 'termination_search' %}{% if back_qs %}?{{ back_qs }}{% endif %}"
        class="hover:text-brand-600">ยกเลิกสัญญา</a>
-    <span class="mx-1">·</span>
-    <a href="{% url 'activity_log' %}?contract={{ contract_id }}"
-       class="hover:text-brand-600">ดูประวัติ</a>
     <span class="mx-1">›</span>
     <span class="text-gray-500">สัญญา #{{ contract_id }}</span>
   </div>
@@ -60,6 +55,10 @@
       </p>
     </div>
     <div class="flex flex-col items-end gap-2">
+      <a href="{% url 'activity_log' %}?contract={{ contract_id }}"
+         class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50">
+        ดูประวัติสัญญา
+      </a>
       <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
         สถานะสัญญา: {{ contract.Status_contract_Desc|default:"—" }}
       </span>

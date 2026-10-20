@@ -17,19 +17,34 @@ def fetch_user_access(buasri_id):
         # DISTINCT กันกรณี View บุคลากรคืนข้อมูลบุคคลเดียวกันมากกว่าหนึ่งแถว
         cursor.execute(
             """
-            SELECT DISTINCT person.PERSON_ID
+            SELECT DISTINCT
+                person.PERSON_ID,
+                person.FOA_TH,
+                person.PERSON_FNAME_TH,
+                person.PERSON_LNAME_TH
             FROM [EMPLOYEE].[SAP_FI].[dbo].[v_sarabun_ess_Person] AS person
             WHERE person.BUASRI_ID COLLATE SQL_Latin1_General_CP1_CI_AS = ?
             """,
             buasri_id,
         )
-        person_rows = cursor.fetchmany(2)
+        person_rows = cursor.fetchall()
         if not person_rows:
             return None
-        if len(person_rows) > 1:
+
+        person_ids = {
+            str(row[0]).strip() for row in person_rows if row[0] is not None
+        }
+        if len(person_ids) != 1:
             raise ValueError('Buasri ID maps to more than one PERSON_ID')
 
-        person_id = str(person_rows[0][0]).strip()
+        person_id = person_ids.pop()
+        person_row = person_rows[0]
+        title = str(person_row[1] or '').strip()
+        first_name = str(person_row[2] or '').strip()
+        last_name = str(person_row[3] or '').strip()
+        display_name = ' '.join(
+            part for part in (f'{title}{first_name}', last_name) if part
+        )
         cursor.execute(
             """
             SELECT DISTINCT
@@ -47,6 +62,10 @@ def fetch_user_access(buasri_id):
         groups = [
             {'id': row[0], 'name': row[1]} for row in cursor.fetchall()
         ]
-        return {'person_id': person_id, 'groups': groups}
+        return {
+            'person_id': person_id,
+            'display_name': display_name or buasri_id,
+            'groups': groups,
+        }
     finally:
         conn.close()

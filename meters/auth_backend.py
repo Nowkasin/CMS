@@ -110,6 +110,7 @@ class BuasriLDAPBackend(ModelBackend):
 
             # ส่งกลุ่มไปให้ login view เก็บใน session โดยไม่สร้าง/แก้กลุ่มใน SQL Server
             user.cms_person_id = access['person_id']
+            user.cms_display_name = access['display_name']
             user.cms_groups = access['groups']
             logger.info('LDAP authentication succeeded for user=%s', buasri_id)
             return user

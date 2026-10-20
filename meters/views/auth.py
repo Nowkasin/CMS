@@ -30,6 +30,11 @@ def login_view(request):
         user = form.get_user()
         login(request, user)
         request.session['cms_person_id'] = getattr(user, 'cms_person_id', '')
+        request.session['cms_display_name'] = getattr(
+            user,
+            'cms_display_name',
+            user.username,
+        )
         request.session['cms_groups'] = getattr(user, 'cms_groups', [])
         return redirect(_safe_next_url(request))
 
