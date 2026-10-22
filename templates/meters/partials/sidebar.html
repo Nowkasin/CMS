@@ -13,7 +13,7 @@
   </a>
   <a href="{% url 'phase_list' %}"
      class="shrink-0 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors {% if request.resolver_match.url_name == 'phase_list' or request.resolver_match.url_name == 'phase_new' or request.resolver_match.url_name == 'phase_edit' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
-    Master ระบบไฟฟ้า
+    จัดการระบบไฟฟ้า
   </a>
   <a href="{% url 'dashboard' %}"
      class="shrink-0 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors {% if request.resolver_match.url_name == 'dashboard' or request.resolver_match.url_name == 'edit_meter' %}bg-brand-500 text-white{% else %}text-gray-600 hover:bg-brand-50 hover:text-brand-700{% endif %}">
