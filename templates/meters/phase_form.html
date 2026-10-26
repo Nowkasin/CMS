@@ -12,7 +12,7 @@
     <span class="text-gray-500">{% if phase_id %}แก้ไข{% else %}เพิ่มใหม่{% endif %}</span>
   </div>
 
-  <h1 class="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl mb-6">
+  <h1 class="text-xl font-bold tracking-tight text-gray-900 sm:text-3xl mb-5 sm:mb-6">
     {% if phase_id %}แก้ไขระบบไฟฟ้า{% else %}เพิ่มระบบไฟฟ้าใหม่{% endif %}
   </h1>
 
@@ -43,7 +43,7 @@
     หน้านี้เสี่ยงกว่าหน้าอื่น เพราะค่า Phase_type ถูกเก็บเป็นข้อความในทะเบียนมิเตอร์
     แก้ชื่อที่นี่แล้วข้อมูลมิเตอร์เดิมจะไม่ตามมา (ดูคำเตือนด้านบนของหน้า)
   {% endcomment %}
-  <form method="post" id="phaseForm" class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 space-y-4"
+  <form method="post" id="phaseForm" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-6 space-y-4"
         data-confirm-submit
         data-confirm-title="{% if phase_id %}ยืนยันการแก้ไขระบบไฟฟ้า{% else %}ยืนยันการเพิ่มระบบไฟฟ้า{% endif %}"
         data-confirm-message="{% if phase_id and meters_using %}ระบบไฟฟ้านี้มีมิเตอร์ใช้อยู่ {{ meters_using }} รายการ ถ้าแก้ชื่อ ข้อมูลในทะเบียนมิเตอร์จะยังเป็นชื่อเดิม ระบบไม่ตามไปแก้ให้{% else %}ค่านี้จะถูกบันทึกลงฐานข้อมูลทันที และเป็นค่าที่เขียนลงทะเบียนมิเตอร์จริง{% endif %}"
@@ -58,7 +58,7 @@
              maxlength="{{ max_len }}" required autocomplete="off"
              data-confirm-field="ระบบไฟฟ้า"
              placeholder="เช่น 1เฟส"
-             class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
+             class="w-full border border-gray-200 rounded-lg px-3 py-2.5 sm:py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
       <p class="text-xs text-gray-400 mt-1">
         ค่านี้คือค่าที่บันทึกลงทะเบียนมิเตอร์จริง ใส่ได้ไม่เกิน {{ max_len }} อักขระ และต้องไม่ซ้ำกับรายการอื่น
       </p>
@@ -70,12 +70,12 @@
              maxlength="100" autocomplete="off"
              data-confirm-field="คำบรรยาย"
              placeholder="เช่น ระบบไฟฟ้า 1 เฟส"
-             class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
+             class="w-full border border-gray-200 rounded-lg px-3 py-2.5 sm:py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
       <p class="text-xs text-gray-400 mt-1">ใช้แสดงบนหน้าจอเท่านั้น ไม่ได้บันทึกลงทะเบียนมิเตอร์</p>
     </div>
 
     {% if phase_id %}
-    <div class="grid grid-cols-2 gap-4 pt-2 border-t border-gray-100">
+    <div class="grid grid-cols-1 gap-3 pt-3 border-t border-gray-100 sm:grid-cols-2 sm:gap-4 sm:pt-2">
       <div>
         <label class="block text-xs font-medium text-gray-500 mb-1">ผู้บันทึก / วันที่บันทึก</label>
         <p class="text-sm text-gray-600">
@@ -100,27 +100,28 @@
     <input type="hidden" name="use_or_not" id="useOrNotField"
            value="{% if phase.UseOrNot or not phase_id %}on{% endif %}">
 
-    <div class="flex items-center justify-between gap-3 border-t border-gray-100 pt-4">
+    {# มือถือ: ปุ่มยกเลิก/บันทึกอยู่บน ปุ่มเปิด-ปิดใช้งานอยู่ล่าง (flex-col-reverse) / จอ sm ขึ้นไป: เหมือนเดิม #}
+    <div class="flex flex-col-reverse gap-3 border-t border-gray-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
         {% if phase_id and phase.UseOrNot %}
           <button type="button" id="openDisableBtn"
-                  class="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors">
+                  class="w-full px-4 py-3 sm:py-2 rounded-lg text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors sm:w-auto">
             ปิดใช้งาน
           </button>
         {% elif phase_id and not phase.UseOrNot %}
           <button type="button" id="enableBtn"
-                  class="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 transition-colors">
+                  class="w-full px-4 py-3 sm:py-2 rounded-lg text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 transition-colors sm:w-auto">
             เปิดใช้งาน
           </button>
         {% endif %}
       </div>
-      <div class="flex gap-3">
+      <div class="grid grid-cols-2 gap-3 sm:flex">
         <a href="{% url 'phase_list' %}"
-           class="px-5 py-2.5 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">
+           class="px-5 py-3 sm:py-2.5 rounded-lg text-center text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">
           ยกเลิก
         </a>
         <button type="submit"
-                class="px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600">
+                class="px-5 py-3 sm:py-2.5 rounded-lg text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600">
           บันทึก
         </button>
       </div>
@@ -135,7 +136,7 @@
        class="absolute inset-0 bg-black/50 opacity-0 transition-opacity duration-200"></div>
 
   <div id="confirmBox"
-       class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6 scale-90 opacity-0 transition-all duration-200">
+       class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-5 sm:p-6 max-h-[calc(100dvh-2rem)] overflow-y-auto scale-90 opacity-0 transition-all duration-200">
     <div class="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
       <svg class="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
@@ -147,11 +148,11 @@
     </p>
     <div class="flex gap-3">
       <button type="button" id="confirmNo"
-              class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">
+              class="flex-1 px-4 py-3 sm:py-2.5 rounded-lg text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">
         ไม่ต้องการ
       </button>
       <button type="button" id="confirmYes"
-              class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors">
+              class="flex-1 px-4 py-3 sm:py-2.5 rounded-lg text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors">
         ต้องการ
       </button>
     </div>

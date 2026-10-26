@@ -10,9 +10,9 @@
   <div class="text-sm text-gray-400 mb-1">
     <span class="text-gray-500">แดชบอร์ด</span>
   </div>
-  <div class="flex items-start justify-between gap-4 flex-wrap mb-8">
+  <div class="flex items-start justify-between gap-4 flex-wrap mb-6 sm:mb-8">
     <div>
-      <h1 class="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">กำหนดมิเตอร์น้ำและมิเตอร์ไฟ</h1>
+      <h1 class="text-xl font-bold tracking-tight text-gray-900 sm:text-3xl">กำหนดมิเตอร์น้ำและมิเตอร์ไฟ</h1>
       <p class="text-sm text-gray-500 mt-1">
         มิเตอร์น้ำ {{ stats.water_count|default:0 }} ตัว &middot; มิเตอร์ไฟฟ้า {{ stats.electric_count|default:0 }} ตัว
         &middot; ผูกกับสัญญา {{ stats.contract_count|default:0 }} ฉบับ
@@ -24,9 +24,9 @@
   </div>
 
   {# --- Stat cards --- #}
-  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
 
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5 flex items-center gap-4">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5 flex items-center gap-4">
       <div class="w-11 h-11 rounded-full bg-sky-50 text-sky-500 flex items-center justify-center shrink-0">
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 2.75c3.5 4.2 6 7.7 6 11a6 6 0 11-12 0c0-3.3 2.5-6.8 6-11z"/>
@@ -38,7 +38,7 @@
       </div>
     </div>
 
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5 flex items-center gap-4">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5 flex items-center gap-4">
       <div class="w-11 h-11 rounded-full bg-amber-50 text-amber-500 flex items-center justify-center shrink-0">
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/>
@@ -50,7 +50,7 @@
       </div>
     </div>
 
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5 flex items-center gap-4">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5 flex items-center gap-4">
       <div class="w-11 h-11 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6M9 8h6M5 4h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1z"/>
@@ -69,29 +69,29 @@
   {# --- Tabs (ทั้งหมด / น้ำ / ไฟฟ้า) --- #}
   {# ตัวเลขในวงเล็บคือ "จำนวนพื้นที่ที่จะแสดง" ของแท็บนั้น (= จำนวนแถวในตาราง) #}
   {# ไม่ใช่จำนวนมิเตอร์ (ดูการ์ดด้านบน) เพราะ 1 พื้นที่มีมิเตอร์ได้หลายตัว #}
-  <div class="flex items-center justify-between flex-wrap gap-3 mb-4">
-    <div class="inline-flex bg-gray-100 rounded-lg p-1">
+  <div class="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
+    <div class="grid w-full grid-cols-3 rounded-lg bg-gray-100 p-1 sm:inline-flex sm:w-auto">
       {# |urlencode จำเป็น -- ถ้าคำค้นมี & หรือ # จะทำให้ query string ถูกตัดกลางทาง #}
       <a href="?type=all{% if search %}&q={{ search|urlencode }}{% endif %}"
-         class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors
+         class="px-2 py-1.5 text-center rounded-md text-xs font-medium transition-colors sm:px-4 sm:text-sm
                 {% if active_filter == 'all' %}bg-white text-gray-900 shadow-sm{% else %}text-gray-500 hover:text-gray-700{% endif %}">
-        ทั้งหมด <span class="text-gray-400">({{ tab_counts.all|default:0 }})</span>
+        ทั้งหมด <span class="block text-gray-400 sm:inline">({{ tab_counts.all|default:0 }})</span>
       </a>
       <a href="?type=9{% if search %}&q={{ search|urlencode }}{% endif %}"
-         class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors
-                {% if active_filter == '9' %}bg-white text-gray-900 shadow-sm{% else %}text-gray-500 hover:text-gray-700{% endif %}">
-        มิเตอร์น้ำ <span class="text-gray-400">({{ tab_counts.water|default:0 }})</span>
+         class="px-2 py-1.5 text-center rounded-md text-xs font-medium transition-colors sm:px-4 sm:text-sm
+                {% if active_filter == '9' %}bg-white text-sky-700 shadow-sm{% else %}text-gray-500 hover:text-gray-700{% endif %}">
+        มิเตอร์น้ำ <span class="block text-gray-400 sm:inline">({{ tab_counts.water|default:0 }})</span>
       </a>
       <a href="?type=8{% if search %}&q={{ search|urlencode }}{% endif %}"
-         class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors
-                {% if active_filter == '8' %}bg-white text-gray-900 shadow-sm{% else %}text-gray-500 hover:text-gray-700{% endif %}">
-        มิเตอร์ไฟฟ้า <span class="text-gray-400">({{ tab_counts.electric|default:0 }})</span>
+         class="px-2 py-1.5 text-center rounded-md text-xs font-medium transition-colors sm:px-4 sm:text-sm
+                {% if active_filter == '8' %}bg-white text-amber-700 shadow-sm{% else %}text-gray-500 hover:text-gray-700{% endif %}">
+        มิเตอร์ไฟฟ้า <span class="block text-gray-400 sm:inline">({{ tab_counts.electric|default:0 }})</span>
       </a>
     </div>
 
     {# ส่ง type ไปด้วย ไม่ใช่แค่ q -- ไฟล์ที่ได้ต้องตรงกับแถวที่เห็นบนจอตอนกดปุ่ม #}
     <a href="{% url 'export_meters' %}?type={{ active_filter }}{% if search %}&q={{ search|urlencode }}{% endif %}"
-       class="inline-flex items-center gap-1.5 text-sm text-brand-600 hover:text-brand-700 font-medium">
+       class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-brand-100 bg-white px-4 py-2.5 text-sm font-medium text-brand-600 hover:bg-brand-50 hover:text-brand-700 sm:w-auto sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:hover:bg-transparent">
       <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
         <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/>
       </svg>
@@ -100,24 +100,98 @@
   </div>
 
   {# --- Search + filters --- #}
-  <form method="get" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-4 flex flex-wrap gap-3 items-center">
+  <form method="get" class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 sm:p-4 mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
     <input type="hidden" name="type" value="{{ active_filter }}">
-    <div class="relative flex-1 min-w-[220px]">
+    <div class="relative flex-1 sm:min-w-[220px]">
       <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
         <circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M21 21l-4.3-4.3"/>
       </svg>
       <input type="text" name="q" value="{{ search }}"
              placeholder="ค้นหาสัญญา / ชื่อลูกหนี้ / เลขมิเตอร์..."
-             class="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
+             class="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-base sm:text-sm sm:py-2 focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
     </div>
     <button type="submit"
-            class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-900 text-white hover:bg-gray-800">
+            class="w-full px-4 py-2.5 rounded-lg text-sm font-medium bg-gray-900 text-white hover:bg-gray-800 sm:w-auto sm:py-2">
       ค้นหา
     </button>
   </form>
 
-  {# --- Table: SubArea x (มิเตอร์น้ำ + มิเตอร์ไฟฟ้า) --- #}
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+  {# --- มือถือ: การ์ดต่อ SubArea (ปุ่มแก้ไขอยู่มุมขวาบนของการ์ด) --- #}
+  <div class="space-y-3 md:hidden">
+    {% for s in subareas %}
+    <article class="space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <div class="font-semibold text-brand-700 break-words">{{ s.contract_code|default:"—" }}</div>
+          <div class="mt-0.5 font-mono text-xs text-gray-400">{{ s.SubArea_id }}</div>
+        </div>
+        {% if s.contract_code %}
+        <a href="{% url 'edit_meter' s.SubArea_id %}"
+           class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-100 bg-brand-50 px-3.5 py-2 text-sm font-semibold text-brand-600 transition-colors hover:bg-brand-100">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 13.5V18a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V8.25A2.25 2.25 0 016 6h4.5"/>
+          </svg>
+          แก้ไข
+        </a>
+        {% endif %}
+      </div>
+
+      <div>
+        {% if s.contract_code %}
+          <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-brand-50 text-brand-600">พร้อมใช้งาน</span>
+        {% else %}
+          <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-600">รอดำเนินการ</span>
+        {% endif %}
+      </div>
+
+      <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+        <div>
+          <dt class="text-xs text-gray-400">รหัสลูกหนี้</dt>
+          <dd class="mt-0.5 text-gray-700 break-words">{{ s.customer_id|default:"—" }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs text-gray-400">ชื่อลูกหนี้</dt>
+          <dd class="mt-0.5 text-gray-700 break-words">{{ s.customer_name|default:"—" }}</dd>
+        </div>
+        <div class="col-span-2">
+          <dt class="text-xs text-gray-400">พื้นที่ / สถานที่ตั้ง</dt>
+          <dd class="mt-0.5 text-gray-700 break-words">{{ s.SubArea_name|default:"—" }}</dd>
+        </div>
+      </dl>
+
+      <div class="grid grid-cols-2 gap-2">
+        <div class="rounded-lg bg-sky-50 px-3 py-2">
+          <div class="flex items-center gap-1 text-[11px] text-sky-600/70">
+            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 2.75c3.5 4.2 6 7.7 6 11a6 6 0 11-12 0c0-3.3 2.5-6.8 6-11z"/>
+            </svg>
+            มิเตอร์น้ำ
+          </div>
+          <div class="mt-0.5 text-sm font-semibold text-sky-700 break-words">
+            {% if s.water_meter_no %}{{ s.water_meter_no }}{% else %}<span class="font-normal text-sky-300">—</span>{% endif %}
+          </div>
+        </div>
+        <div class="rounded-lg bg-amber-50 px-3 py-2">
+          <div class="flex items-center gap-1 text-[11px] text-amber-600/70">
+            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/>
+            </svg>
+            มิเตอร์ไฟฟ้า
+          </div>
+          <div class="mt-0.5 text-sm font-semibold text-amber-700 break-words">
+            {% if s.electric_meter_no %}{{ s.electric_meter_no }}{% else %}<span class="font-normal text-amber-300">—</span>{% endif %}
+          </div>
+        </div>
+      </div>
+    </article>
+    {% empty %}
+    <div class="rounded-xl border border-gray-200 bg-white px-4 py-10 text-center text-sm text-gray-400 shadow-sm">ยังไม่มีข้อมูลพื้นที่/มิเตอร์</div>
+    {% endfor %}
+  </div>
+
+  {# --- แท็บเล็ต/เดสก์ท็อป: ตาราง SubArea x (มิเตอร์น้ำ + มิเตอร์ไฟฟ้า) คอลัมน์จัดการติดขอบขวา --- #}
+  <div class="hidden bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden md:block">
     <div class="overflow-x-auto">
       <table class="min-w-[1100px] w-full text-sm">
         <thead class="bg-gray-50 border-b border-gray-200">
@@ -129,12 +203,12 @@
             <th class="px-5 py-3">มิเตอร์น้ำ</th>
             <th class="px-5 py-3">มิเตอร์ไฟฟ้า</th>
             <th class="px-5 py-3">สถานะ</th>
-            <th class="px-5 py-3 text-right">จัดการ</th>
+            <th class="sticky right-0 z-10 whitespace-nowrap border-l border-gray-200 bg-gray-50 px-5 py-3 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.12)]">จัดการ</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
           {% for s in subareas %}
-          <tr class="hover:bg-gray-50">
+          <tr class="group hover:bg-gray-50">
             <td class="px-5 py-3">
               <div class="font-medium text-brand-700">{{ s.contract_code|default:"—" }}</div>
               <div class="text-xs text-gray-400">{{ s.SubArea_id }}</div>
@@ -163,7 +237,7 @@
                 <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-600">รอดำเนินการ</span>
               {% endif %}
             </td>
-            <td class="px-5 py-3 text-right">
+            <td class="sticky right-0 z-10 whitespace-nowrap border-l border-gray-100 bg-white px-5 py-3 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.12)] group-hover:bg-gray-50">
               {% if s.contract_code %}
                 <a href="{% url 'edit_meter' s.SubArea_id %}"
                    title="แก้ไข"
