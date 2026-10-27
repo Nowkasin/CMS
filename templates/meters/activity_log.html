@@ -5,8 +5,9 @@
 
 {% comment %}
   หน้า log เหตุการณ์รวมของระบบ -- อ่านจาก Contract_activity_log
-  ทำเป็นหน้าเดียวรวมทุกเหตุการณ์ แล้วใช้ ?action= / ?contract= กรองเป็นมุมมองย่อย
-  ไม่แยกหน้า log ต่อเมนู (เหตุผลอยู่ใน meters/views/activity_log.py)
+  ทำเป็นหน้าเดียวรวมทุกเหตุการณ์ เรียงเวลาล่าสุดก่อน ไม่มีแท็บแยกตามประเภทเหตุการณ์
+  (เหตุการณ์ครอบคลุมทุกเมนูแล้ว ประเภทดูได้จากป้ายสีในแต่ละรายการ)
+  กรองได้ด้วย ?q= (คำค้น) และ ?contract= (เฉพาะสัญญา -- ลิงก์ "ดูประวัติสัญญา" จากหน้ายกเลิกสัญญา)
 {% endcomment %}
 
 {% block content %}
@@ -37,20 +38,7 @@
     </div>
   </div>
 
-  {# แท็บเหตุการณ์: มือถือเลื่อนซ้ายขวาได้ในแถวเดียว / จอใหญ่ขึ้นบรรทัดใหม่ตามปกติ #}
-  <div class="flex gap-2 mb-4 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
-    {% for a in actions %}
-    <a href="?action={{ a.key|urlencode }}&q={{ search|urlencode }}{% if contract_filter %}&contract={{ contract_filter }}{% endif %}"
-       class="shrink-0 whitespace-nowrap px-3.5 py-2 sm:px-3 sm:py-1.5 rounded-lg text-sm font-medium
-              {% if a.is_active %}bg-brand-500 text-white{% else %}text-gray-600 bg-white border border-gray-200 hover:bg-gray-50{% endif %}">
-      {{ a.label }}
-      <span class="{% if a.is_active %}text-white/80{% else %}text-gray-400{% endif %}">({{ a.count }})</span>
-    </a>
-    {% endfor %}
-  </div>
-
   <form method="get" class="flex flex-col gap-3 mb-2 sm:flex-row sm:flex-wrap">
-    <input type="hidden" name="action" value="{{ active_action }}">
     {% if contract_filter %}<input type="hidden" name="contract" value="{{ contract_filter }}">{% endif %}
     <input type="text" name="q" value="{{ search }}"
            placeholder="ค้นหา รหัสสัญญา / ชื่อลูกค้า / ผู้ทำรายการ / ชื่อไฟล์"
@@ -61,7 +49,7 @@
         ค้นหา
       </button>
       {% if search or contract_filter %}
-      <a href="?action={{ active_action|urlencode }}"
+      <a href="?"
          class="flex-1 rounded-lg border border-transparent px-4 py-2.5 text-center text-sm font-medium text-gray-500 hover:bg-gray-50 sm:flex-none sm:py-2">ล้างตัวกรอง</a>
       {% endif %}
     </div>
@@ -70,7 +58,7 @@
   {% if contract_filter %}
   <p class="text-xs text-gray-500 mb-4">
     กรองเฉพาะสัญญา Contract_id #{{ contract_filter }}
-    <a href="?action={{ active_action|urlencode }}" class="text-brand-600 hover:text-brand-700">(ดูทุกสัญญา)</a>
+    <a href="?{% if search %}q={{ search|urlencode }}{% endif %}" class="text-brand-600 hover:text-brand-700">(ดูทุกสัญญา)</a>
   </p>
   {% else %}
   <div class="mb-4"></div>
@@ -128,7 +116,7 @@
     </article>
     {% empty %}
     <div class="rounded-xl border border-gray-200 bg-white px-4 py-10 text-center text-sm text-gray-400 shadow-sm">
-      {% if search or contract_filter or active_action != 'all' %}
+      {% if search or contract_filter %}
         ไม่พบประวัติที่ตรงกับตัวกรอง
       {% else %}
         ยังไม่มีประวัติการใช้งานในระบบ -- จะเริ่มบันทึกเมื่อมีการนำเข้าไฟล์หรือยกเลิกสัญญา
@@ -192,7 +180,7 @@
         {% empty %}
         <tr>
           <td colspan="6" class="px-4 py-10 text-center text-gray-400 text-sm">
-            {% if search or contract_filter or active_action != 'all' %}
+            {% if search or contract_filter %}
               ไม่พบประวัติที่ตรงกับตัวกรอง
             {% else %}
               ยังไม่มีประวัติการใช้งานในระบบ -- จะเริ่มบันทึกเมื่อมีการนำเข้าไฟล์หรือยกเลิกสัญญา
@@ -211,14 +199,14 @@
     </p>
     <div class="flex items-center justify-between gap-1.5 sm:justify-end">
       {% if page_obj.has_previous %}
-      <a href="?action={{ active_action|urlencode }}&q={{ search|urlencode }}{% if contract_filter %}&contract={{ contract_filter }}{% endif %}&page={{ page_obj.previous_page_number }}"
+      <a href="?q={{ search|urlencode }}{% if contract_filter %}&contract={{ contract_filter }}{% endif %}&page={{ page_obj.previous_page_number }}"
          class="px-4 py-2 sm:px-3 sm:py-1.5 rounded-lg text-sm font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50">ก่อนหน้า</a>
       {% else %}
       <span class="sm:hidden px-4 py-2 invisible" aria-hidden="true">ก่อนหน้า</span>
       {% endif %}
       <span class="px-3 py-1.5 text-sm text-gray-500">หน้า {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
       {% if page_obj.has_next %}
-      <a href="?action={{ active_action|urlencode }}&q={{ search|urlencode }}{% if contract_filter %}&contract={{ contract_filter }}{% endif %}&page={{ page_obj.next_page_number }}"
+      <a href="?q={{ search|urlencode }}{% if contract_filter %}&contract={{ contract_filter }}{% endif %}&page={{ page_obj.next_page_number }}"
          class="px-4 py-2 sm:px-3 sm:py-1.5 rounded-lg text-sm font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50">ถัดไป</a>
       {% else %}
       <span class="sm:hidden px-4 py-2 invisible" aria-hidden="true">ถัดไป</span>

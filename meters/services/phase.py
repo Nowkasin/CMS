@@ -93,6 +93,34 @@ def fetch_phase_type_by_id(phase_id):
     finally:
         conn.close()
 
+def fetch_meters_by_phase_type(phase_type):
+    """
+    รายการมิเตอร์ที่บันทึก Phase_type นี้ไว้ใน Contract_meter_ms -- ใช้แสดงบนหน้าแก้ไขระบบไฟฟ้า
+
+    เงื่อนไขเดียวกับ meters_using ใน fetch_phase_types (Phase_type ตรงกัน ไม่กรองประเภท
+    หรือสถานะใช้งาน) จำนวนแถวที่ได้จึงต้องเท่ากับ meters_using
+    ต้องส่งชื่อที่อยู่ใน DB ตอนนี้เข้ามา ไม่ใช่ค่าที่ผู้ใช้เพิ่งพิมพ์แก้บนฟอร์ม
+    """
+    phase_type = (phase_type or '').strip()
+    if not phase_type:
+        return []
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT m.Meter_id, m.Meter_no, m.Meter_type_cd, m.UseOrNot, m.SubArea_id
+            FROM dbo.Contract_meter_ms m
+            WHERE m.Phase_type = ?
+            ORDER BY m.SubArea_id, m.Meter_id
+            """,
+            phase_type,
+        )
+        columns = [c[0] for c in cursor.description]
+        return [dict(zip(columns, row)) for row in cursor.fetchall()]
+    finally:
+        conn.close()
 
 def save_phase_type(phase_type, phase_desc, user_id, phase_id=None, use_or_not=1):
     """

@@ -33,6 +33,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.LoginRequiredMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
+    'meters.log_middleware.ActivityLogMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'

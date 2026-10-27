@@ -11,28 +11,75 @@ log เหตุการณ์รวมของระบบ (dbo.Contract_acti
 ใครเขียน log ที่ไหน
   - เหตุการณ์ยกเลิกสัญญา 3 อย่าง เขียนใน SP เอง (ทรานแซกชันเดียวกับข้อมูลหลัก)
     ดู sql/Contract_activity_log_Hook_Termination.sql
-  - เหตุการณ์นำเข้าไฟล์ Excel เขียนจากฝั่งนี้ เพราะชื่อไฟล์มีอยู่แค่ใน Python
+  - เหตุการณ์อื่นทั้งหมด เขียนจากฝั่ง Python (view) หลังงานหลัก commit สำเร็จแล้ว
+    ผ่าน log_activity_safe() -- ถ้าเขียน log พลาดจะไม่ทำให้งานหลักที่สำเร็จไปแล้วดูเหมือนล้ม
+
+ไม่บันทึก (ตั้งใจ):
+  - การติ๊กงวดทีละงวดในหน้ายกเลิกสัญญา -- เกิดบ่อย เป็นแค่ข้อมูลอ้างอิง
+    ถ้าลงทุกครั้ง หน้า log จะถูกกลบด้วยรายการเล็กๆ จนหาเหตุการณ์สำคัญไม่เจอ
+  - การเปิดดูหน้าต่างๆ (GET) -- log นี้เก็บเฉพาะการเปลี่ยนแปลงข้อมูลและการนำข้อมูลออก
 """
+import logging
+
 from .db import get_db_connection
 from .meters import _to_sql_like_pattern
 
+logger = logging.getLogger(__name__)
+
 # ประเภทเหตุการณ์ -- key คือค่าที่เก็บใน Contract_activity_log.Action_type
+# (ยาวสุดที่ใช้อยู่คือ termination_close_meters 24 ตัวอักษร -- ชื่อใหม่ให้ไม่ยาวกว่านี้
+#  เพราะยังไม่ได้เช็คขนาดคอลัมน์ Action_type จริง)
+
+# --- เดิม ---
 ACTION_UPLOAD_COMMIT = 'upload_commit'
 ACTION_TERMINATION_SAVE = 'termination_save'
 ACTION_TERMINATION_DELETE = 'termination_delete'
 ACTION_TERMINATION_CLOSE_METERS = 'termination_close_meters'
 
+# --- ใหม่: ทะเบียนมิเตอร์ ---
+ACTION_METER_CREATE = 'meter_create'          # เพิ่มมิเตอร์ใหม่ (หน้าจัดการมิเตอร์)
+ACTION_METER_UPDATE = 'meter_update'          # แก้ไขมิเตอร์ (หน้าจัดการมิเตอร์)
+ACTION_METER_TOGGLE = 'meter_toggle'          # เปิด/ปิดใช้งานมิเตอร์
+ACTION_READING_SAVE = 'reading_save'          # แก้เลขมิเตอร์/เลขอ่านรายรอบ (หน้าแดชบอร์ด > แก้ไข)
+
+# --- ใหม่: Master ระบบไฟฟ้า ---
+ACTION_PHASE_CREATE = 'phase_create'
+ACTION_PHASE_UPDATE = 'phase_update'
+ACTION_PHASE_TOGGLE = 'phase_toggle'          # เปิด/ปิดใช้งานอย่างเดียว ไม่ได้แก้ชื่อ
+
+# --- ใหม่: นำข้อมูลออก ---
+ACTION_DOWNLOAD_EXCEL = 'download_excel'      # ดาวน์โหลด Excel (เดือน-ปี + จำนวนรายการ)
+ACTION_EXPORT_METERS = 'export_meters'        # ส่งออก Excel จากแดชบอร์ด
+
+ACTION_OTHER = 'other_action'  
+
 # ลำดับในนี้คือลำดับแท็บบนหน้า log
 ACTIVITY_ACTIONS = [
     (ACTION_UPLOAD_COMMIT, 'นำเข้าไฟล์ Excel'),
+    (ACTION_DOWNLOAD_EXCEL, 'ดาวน์โหลด Excel'),
+    (ACTION_EXPORT_METERS, 'ส่งออกมิเตอร์'),
+    (ACTION_METER_CREATE, 'เพิ่มมิเตอร์'),
+    (ACTION_METER_UPDATE, 'แก้ไขมิเตอร์'),
+    (ACTION_METER_TOGGLE, 'เปิด/ปิดมิเตอร์'),
+    (ACTION_READING_SAVE, 'แก้เลขมิเตอร์/เลขอ่าน'),
+    (ACTION_PHASE_CREATE, 'เพิ่มระบบไฟฟ้า'),
+    (ACTION_PHASE_UPDATE, 'แก้ไขระบบไฟฟ้า'),
+    (ACTION_PHASE_TOGGLE, 'เปิด/ปิดระบบไฟฟ้า'),
     (ACTION_TERMINATION_SAVE, 'บันทึกยกเลิกสัญญา'),
     (ACTION_TERMINATION_DELETE, 'ลบรายการยกเลิก'),
     (ACTION_TERMINATION_CLOSE_METERS, 'ปิดการตั้งหนี้มิเตอร์'),
+    (ACTION_OTHER, 'การดำเนินการอื่น'),
+    
 ]
 
 # ชื่อเหตุการณ์ที่ไม่รู้จัก (เผื่อมี Action_type ในฐานข้อมูลที่ยังไม่ได้ลงทะเบียนที่นี่
 # เช่นถูกเขียนจาก SP ที่เพิ่มภายหลัง) -- แสดงค่าดิบดีกว่าซ่อนแถวนั้นไป
 ACTION_LABELS = dict(ACTIVITY_ACTIONS)
+
+# ตัดข้อความก่อนส่งเข้า SP กันล้นคอลัมน์ -- ยังไม่ได้เช็คขนาด Ref_text/Detail จริง
+# ถ้าคอลัมน์จริงสั้นกว่านี้ให้ลดค่าลงให้ตรง
+MAX_REF_TEXT_LEN = 200
+MAX_DETAIL_LEN = 500
 
 
 def add_activity_log(action_type, user_id, contract_id=None, meter_id=None,
@@ -73,6 +120,35 @@ def add_activity_log(action_type, user_id, contract_id=None, meter_id=None,
         raise
     finally:
         conn.close()
+
+
+def log_activity_safe(action_type, user_id, **kwargs):
+    """
+    เขียน log แบบ "พลาดได้โดยไม่กระทบงานหลัก" -- ใช้จาก view หลังงานหลัก commit แล้ว
+
+    ทำไมต้องมี: view ส่วนใหญ่ครอบงานหลักด้วย try/except Exception แล้วแสดง
+    "บันทึกไม่สำเร็จ" ถ้าเรียก add_activity_log ตรงๆ ในบล็อกเดียวกัน แล้ว log พลาด
+    ผู้ใช้จะเห็นว่าบันทึกไม่สำเร็จทั้งที่ข้อมูลหลักถูกบันทึกไปแล้ว และกดซ้ำจนซ้ำซ้อน
+
+    ฟังก์ชันนี้เปิด connection ของตัวเอง (ไม่รับ cursor) และกลืน error ลง logger
+    -- ผลเสียคือ log อาจหายเงียบๆ ได้ ให้ดู error ในล็อกของเซิร์ฟเวอร์ (logger 'meters.services.activity_log')
+
+    ห้ามใช้ในโค้ดที่อยู่ในทรานแซกชันเดียวกับงานหลัก (ที่ส่ง cursor เข้า add_activity_log)
+    เพราะต้องการให้ล้มพร้อมกัน
+
+    คืน True ถ้าเขียนสำเร็จ
+    """
+    for key, limit in (('ref_text', MAX_REF_TEXT_LEN), ('detail', MAX_DETAIL_LEN)):
+        value = kwargs.get(key)
+        if value is not None:
+            value = str(value)
+            kwargs[key] = value if len(value) <= limit else value[:limit - 1] + '…'
+    try:
+        add_activity_log(action_type, user_id, **kwargs)
+        return True
+    except Exception:
+        logger.exception('เขียน activity log ไม่สำเร็จ (action=%s, user=%s)', action_type, user_id)
+        return False
 
 
 def fetch_activity_log(search='', action='all'):
