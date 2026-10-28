@@ -51,7 +51,7 @@ ACTION_PHASE_TOGGLE = 'phase_toggle'          # เปิด/ปิดใช้�
 ACTION_DOWNLOAD_EXCEL = 'download_excel'      # ดาวน์โหลด Excel (เดือน-ปี + จำนวนรายการ)
 ACTION_EXPORT_METERS = 'export_meters'        # ส่งออก Excel จากแดชบอร์ด
 
-ACTION_OTHER = 'other_action'  
+ACTION_OTHER = 'other_action'
 
 # ลำดับในนี้คือลำดับแท็บบนหน้า log
 ACTIVITY_ACTIONS = [
@@ -69,7 +69,7 @@ ACTIVITY_ACTIONS = [
     (ACTION_TERMINATION_DELETE, 'ลบรายการยกเลิก'),
     (ACTION_TERMINATION_CLOSE_METERS, 'ปิดการตั้งหนี้มิเตอร์'),
     (ACTION_OTHER, 'การดำเนินการอื่น'),
-    
+
 ]
 
 # ชื่อเหตุการณ์ที่ไม่รู้จัก (เผื่อมี Action_type ในฐานข้อมูลที่ยังไม่ได้ลงทะเบียนที่นี่
