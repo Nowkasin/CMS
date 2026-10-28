@@ -1,5 +1,14 @@
-<header class="sticky top-0 z-40 flex min-h-16 w-full items-center border-b border-gray-200 bg-white px-5 py-3 shadow-sm sm:px-6">
-  <a href="{% url 'meter_list' %}" class="flex items-center gap-3">
+<header class="sticky top-0 z-40 flex min-h-16 w-full items-center border-b border-gray-200 bg-white px-4 py-3 shadow-sm sm:px-6">
+  {# ปุ่มขีด 3 ขีด: เปิดเมนูด้านข้างบนมือถือ/แท็บเล็ต (จอ lg ขึ้นไปซ่อน เพราะเมนูแสดงเป็นแถบข้างอยู่แล้ว) #}
+  <button type="button" id="sidebarOpen"
+          class="-ml-1 mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-gray-600 transition-colors hover:bg-gray-100 lg:hidden"
+          aria-label="เปิดเมนู" aria-controls="sidebarPanel" aria-expanded="false">
+    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+    </svg>
+  </button>
+
+  <a href="{% url 'meter_list' %}" class="flex shrink-0 items-center gap-3">
     <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500 text-sm font-bold text-white">CMS</span>
     <span class="hidden sm:block">
       <span class="block text-sm font-semibold text-gray-900">ระบบบริหารสัญญา</span>
@@ -7,15 +16,15 @@
     </span>
   </a>
 
-  <div class="ml-auto flex items-center gap-3 pl-4">
-    <div class="text-right leading-tight">
+  <div class="ml-auto flex min-w-0 items-center gap-2 pl-3 sm:gap-3 sm:pl-4">
+    <div class="min-w-0 text-right leading-tight">
       <div class="text-xs text-gray-400">ผู้ใช้งาน</div>
-      <div class="text-sm font-semibold text-gray-700">{{ request.session.cms_display_name|default:request.user.username }}</div>
+      <div class="max-w-[90px] truncate text-sm font-semibold text-gray-700 sm:max-w-none">{{ request.session.cms_display_name|default:request.user.username }}</div>
     </div>
-    <form method="post" action="{% url 'logout' %}">
+    <form method="post" action="{% url 'logout' %}" class="shrink-0">
       {% csrf_token %}
       <button type="submit"
-              class="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50">
+              class="whitespace-nowrap rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50">
         ออกจากระบบ
       </button>
     </form>
