@@ -68,8 +68,10 @@
     <input type="hidden" name="month" value="{{ billing_month }}">
     <input type="hidden" name="year" value="{{ billing_year }}">
 
-    {# --- ตารางรวมน้ำ-ไฟ (1 แถว = 1 สัญญา + 1 พื้นที่ย่อย) --- #}
+    {# --- ตารางรวมน้ำ-ไฟ (1 แถว = 1 สัญญา + 1 พื้นที่ย่อย + 1 ชุดมิเตอร์) --- #}
     {# มือถือ: แต่ละแถวแสดงเป็นการ์ด / จอ md ขึ้นไป: เป็นตารางปกติ (ใช้ checkbox ชุดเดียวกัน) #}
+    {# หมายเหตุเรื่องเลข 0: ทุกช่องตัวเลขใช้ `is not None` ไม่ใช้ |default เพราะ default ถือ 0 เป็นค่าว่าง #}
+    {# มิเตอร์ที่อ่านได้ 0 หรือยอดเงิน 0 จะกลายเป็น "—" เหมือนไม่มีข้อมูล #}
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 sm:p-6 mb-4 sm:mb-6">
       <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h2 class="text-base font-bold text-gray-900">รายการสัญญา ({{ combined_rows|length }} รายการ)</h2>
@@ -136,6 +138,8 @@
               <td class="text-gray-700 md:px-3 md:py-2">
                 <span class="mb-0.5 block text-[11px] text-gray-400 md:hidden">SubArea</span>
                 {{ r.SubArea_id|default:"—" }}
+                {# พื้นที่ที่มีมิเตอร์ประเภทเดียวกันหลายตัวจะแยกเป็นหลายแถว -- ป้ายนี้บอกว่าเป็นชุดที่เท่าไหร่ #}
+                {% if r.slot > 1 %}<span class="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">ชุดที่ {{ r.slot }}</span>{% endif %}
               </td>
 
               {# --- ค่าน้ำ --- #}
@@ -152,15 +156,15 @@
               </td>
               <td class="rounded-lg bg-sky-50 px-2.5 py-1.5 text-gray-700 md:rounded-none md:bg-sky-50/20 md:px-3 md:py-2">
                 <span class="mb-0.5 block text-[11px] text-sky-600/70 md:hidden">อ่านก่อน</span>
-                {{ r.water.Contract_read_number_before|default:"—" }}
+                {% if r.water.Contract_read_number_before is not None %}{{ r.water.Contract_read_number_before }}{% else %}—{% endif %}
               </td>
               <td class="rounded-lg bg-sky-50 px-2.5 py-1.5 text-gray-700 md:rounded-none md:bg-sky-50/20 md:px-3 md:py-2">
                 <span class="mb-0.5 block text-[11px] text-sky-600/70 md:hidden">อ่านหลัง</span>
-                {{ r.water.Contract_read_number_after|default:"—" }}
+                {% if r.water.Contract_read_number_after is not None %}{{ r.water.Contract_read_number_after }}{% else %}—{% endif %}
               </td>
               <td class="rounded-lg bg-sky-50 px-2.5 py-1.5 font-semibold text-sky-800 md:rounded-none md:bg-sky-50/20 md:px-3 md:py-2 md:font-normal md:text-gray-700">
                 <span class="mb-0.5 block text-[11px] font-normal text-sky-600/70 md:hidden">จำนวนเงิน</span>
-                {{ r.water.Contract_Installment_amt|default:"—" }}
+                {% if r.water.Contract_Installment_amt is not None %}{{ r.water.Contract_Installment_amt }}{% else %}—{% endif %}
               </td>
               {% else %}
               <td class="col-span-2 rounded-lg bg-sky-50/50 px-2.5 py-2 text-center text-gray-400 md:rounded-none md:bg-sky-50/20 md:px-3 md:text-gray-300" colspan="4">— ไม่มีมิเตอร์น้ำ —</td>
@@ -180,15 +184,15 @@
               </td>
               <td class="rounded-lg bg-amber-50 px-2.5 py-1.5 text-gray-700 md:rounded-none md:bg-amber-50/20 md:px-3 md:py-2">
                 <span class="mb-0.5 block text-[11px] text-amber-600/70 md:hidden">อ่านก่อน</span>
-                {{ r.electric.Contract_read_number_before|default:"—" }}
+                {% if r.electric.Contract_read_number_before is not None %}{{ r.electric.Contract_read_number_before }}{% else %}—{% endif %}
               </td>
               <td class="rounded-lg bg-amber-50 px-2.5 py-1.5 text-gray-700 md:rounded-none md:bg-amber-50/20 md:px-3 md:py-2">
                 <span class="mb-0.5 block text-[11px] text-amber-600/70 md:hidden">อ่านหลัง</span>
-                {{ r.electric.Contract_read_number_after|default:"—" }}
+                {% if r.electric.Contract_read_number_after is not None %}{{ r.electric.Contract_read_number_after }}{% else %}—{% endif %}
               </td>
               <td class="rounded-lg bg-amber-50 px-2.5 py-1.5 font-semibold text-amber-800 md:rounded-none md:bg-amber-50/20 md:px-3 md:py-2 md:font-normal md:text-gray-700">
                 <span class="mb-0.5 block text-[11px] font-normal text-amber-600/70 md:hidden">จำนวนเงิน</span>
-                {{ r.electric.Contract_Installment_amt|default:"—" }}
+                {% if r.electric.Contract_Installment_amt is not None %}{{ r.electric.Contract_Installment_amt }}{% else %}—{% endif %}
               </td>
               {% else %}
               <td class="col-span-2 rounded-lg bg-amber-50/50 px-2.5 py-2 text-center text-gray-400 md:rounded-none md:bg-amber-50/20 md:px-3 md:text-gray-300" colspan="4">— ไม่มีมิเตอร์ไฟ —</td>

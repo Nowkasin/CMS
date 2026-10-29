@@ -1,4 +1,4 @@
-# meters/views/wizard.py
+# meters/views/steppage.py
 import datetime
 
 from django.conf import settings
@@ -114,6 +114,11 @@ def step1_upload(request):
                     request.session['staged'] = {
                         'filename': excel_file.name,
                         'billing_period': billing_period,
+                        # เก็บเดือน (1-12) / ปี พ.ศ. เป็นตัวเลขด้วย -- billing_period เป็นข้อความ
+                        # ไว้โชว์/ลง log เท่านั้น เอาไปบันทึกเลขอ่านลง DB ตรงๆ ไม่ได้
+                        # (Contract_meter_reading_tr คีย์ด้วย Billing_year_be + Billing_month)
+                        'billing_month': month_idx,
+                        'billing_year_be': year_be,
                         'rows': parsed['rows'],
                         'summary': parsed['summary'],
                     }
@@ -175,10 +180,15 @@ def step3_confirm(request):
             try:
                 # ส่งชื่อไฟล์/รอบบิลไปด้วยเพื่อเขียน Contract_activity_log
                 # (สองค่านี้มีอยู่แค่ใน session ไม่มีใน DB)
+                # billing_month / billing_year_be (ตัวเลข) ใช้บันทึกเลขอ่านก่อน-หลังลง DB
+                # ใช้ .get() เพราะ session ที่ค้างจากเวอร์ชันก่อนไม่มีคีย์นี้ -- commit_staged_rows
+                # จะนำเข้ามิเตอร์ตามปกติแต่ข้ามเลขอ่านและแจ้งใน logs แทนที่จะ KeyError
                 result = services.commit_staged_rows(
                     staged['rows'], request.user.get_username(),
                     source_filename=staged.get('filename'),
                     billing_period=staged.get('billing_period'),
+                    billing_month=staged.get('billing_month'),
+                    billing_year_be=staged.get('billing_year_be'),
                 )
             except Exception:
                 # ไม่โชว์ข้อความดิบจาก pyodbc/SQL Server (มีชื่อตาราง/driver ติดมา)

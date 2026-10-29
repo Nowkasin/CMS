@@ -81,10 +81,10 @@
             <div class="mt-1 text-xs text-gray-400 break-words">{{ r.Ref_text }}</div>
           {% endif %}
         </div>
-        {% if r.Contract_id %}
-        <a href="{% url 'termination_detail' r.Contract_id %}"
+        {% if r.action_url %}
+        <a href="{{ r.action_url }}"
            class="shrink-0 whitespace-nowrap rounded-lg border border-brand-100 bg-brand-50 px-3.5 py-2 text-sm font-semibold text-brand-600 transition-colors hover:bg-brand-100">
-          ดูสัญญา ›
+          {{ r.action_text }}
         </a>
         {% endif %}
       </div>
@@ -110,7 +110,7 @@
       {% if r.Detail %}
       <div class="text-sm">
         <div class="text-xs text-gray-400">รายละเอียด</div>
-        <div class="mt-0.5 text-gray-600 break-words">{{ r.Detail }}</div>
+        <div class="mt-0.5 text-gray-600 break-words whitespace-pre-line">{{ r.Detail }}</div>
       </div>
       {% endif %}
     </article>
@@ -168,12 +168,12 @@
               <span class="text-xs text-gray-400">หลายสัญญา / ไม่ผูกสัญญา</span>
             {% endif %}
           </td>
-          <td class="px-4 py-2.5 text-gray-600 text-xs">{{ r.Detail|default:"—" }}</td>
+          <td class="px-4 py-2.5 text-gray-600 text-xs whitespace-pre-line">{{ r.Detail|default:"—" }}</td>
           <td class="px-4 py-2.5 text-gray-700 text-xs whitespace-nowrap">{{ r.UserEntry|default:"—" }}</td>
           <td class="sticky right-0 z-10 whitespace-nowrap border-l border-gray-100 bg-white px-4 py-2.5 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.12)] group-hover:bg-gray-50">
-            {% if r.Contract_id %}
-            <a href="{% url 'termination_detail' r.Contract_id %}"
-               class="text-sm font-medium text-brand-600 hover:text-brand-700">ดูสัญญา ›</a>
+            {% if r.action_url %}
+            <a href="{{ r.action_url }}"
+               class="text-sm font-medium text-brand-600 hover:text-brand-700">{{ r.action_text }}</a>
             {% endif %}
           </td>
         </tr>

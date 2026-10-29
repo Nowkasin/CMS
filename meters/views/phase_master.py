@@ -46,7 +46,9 @@ def _log_phase_change(user, old, saved_id, new_type, new_desc, new_use):
         changes.append(f'คำบรรยาย "{old.get("Phase_desc") or "-"}" → "{new_desc or "-"}"')
     status_changed = bool(old.get('UseOrNot')) != bool(new_use)
     if status_changed:
-        changes.append('เปิดใช้งาน' if new_use else 'ปิดใช้งาน')
+        old_label = 'เปิดใช้งาน' if old.get('UseOrNot') else 'ปิดใช้งาน'
+        new_label = 'เปิดใช้งาน' if new_use else 'ปิดใช้งาน'
+        changes.append(f'การใช้งาน {old_label} → {new_label}')
 
     if not changes:
         return   # กดบันทึกโดยไม่ได้เปลี่ยนอะไร ไม่ต้องลง log
@@ -54,7 +56,7 @@ def _log_phase_change(user, old, saved_id, new_type, new_desc, new_use):
     only_status = status_changed and len(changes) == 1
     activity.log_activity_safe(
         activity.ACTION_PHASE_TOGGLE if only_status else activity.ACTION_PHASE_UPDATE,
-        user, ref_text=new_type, detail=' · '.join(changes),
+        user, ref_text=new_type, detail='\n'.join(changes),   # บรรทัดละหนึ่งการเปลี่ยนแปลง
     )
 
 
