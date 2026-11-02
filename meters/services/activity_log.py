@@ -56,6 +56,11 @@ ACTION_EXPORT_METERS = 'export_meters'        # ส่งออก Excel จา�
 # --- ใหม่: POST ที่ยังไม่ได้ลงทะเบียนใน middleware ---
 ACTION_OTHER = 'other_action'
 
+# --- ใหม่: การเข้า/ออกระบบ (เขียนจาก meters/signals.py ไม่ผ่าน middleware) ---
+ACTION_LOGIN = 'login'
+ACTION_LOGOUT = 'logout'
+ACTION_LOGIN_FAILED = 'login_failed'
+
 # ลำดับในนี้คือลำดับแท็บบนหน้า log
 ACTIVITY_ACTIONS = [
     (ACTION_UPLOAD_COMMIT, 'นำเข้าไฟล์ Excel'),
@@ -71,6 +76,9 @@ ACTIVITY_ACTIONS = [
     (ACTION_TERMINATION_SAVE, 'บันทึกยกเลิกสัญญา'),
     (ACTION_TERMINATION_DELETE, 'ลบรายการยกเลิก'),
     (ACTION_TERMINATION_CLOSE_METERS, 'ปิดการตั้งหนี้มิเตอร์'),
+    (ACTION_LOGIN, 'เข้าสู่ระบบ'),
+    (ACTION_LOGOUT, 'ออกจากระบบ'),
+    (ACTION_LOGIN_FAILED, 'เข้าสู่ระบบไม่สำเร็จ'),
     (ACTION_OTHER, 'การดำเนินการอื่น'),
 ]
 
@@ -226,6 +234,28 @@ def fetch_activity_log(search='', action='all'):
         for r in rows:
             r['action_url'], r['action_text'] = _row_link(r)
         return rows
+    finally:
+        conn.close()
+
+
+def fetch_log_head(after_id=0):
+    """
+    ใช้กับการเช็ครายการใหม่ของหน้า log (polling) -- query เบา ไม่ join ไม่ดึงแถว
+    คืน (Log_id ล่าสุด, จำนวนรายการที่ Log_id > after_id)
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT ISNULL(MAX(Log_id), 0),
+                   ISNULL(SUM(CASE WHEN Log_id > ? THEN 1 ELSE 0 END), 0)
+            FROM dbo.Contract_activity_log
+            """,
+            int(after_id or 0),
+        )
+        latest, new = cursor.fetchone()
+        return int(latest), int(new)
     finally:
         conn.close()
 
