@@ -33,6 +33,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     # ทุกหน้าต้องล็อกอิน ยกเว้น view ที่ติด @login_not_required
     'django.contrib.auth.middleware.LoginRequiredMiddleware',
+    # ตรวจสิทธิ์เมนูจาก Session ซ้ำฝั่ง Server ป้องกันการพิมพ์ URL เข้าโดยตรง
+    'meters.permission_middleware.CMSMenuPermissionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'meters.log_middleware.ActivityLogMiddleware',

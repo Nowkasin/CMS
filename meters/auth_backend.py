@@ -48,7 +48,7 @@ class BuasriLDAPBackend(ModelBackend):
     """ตรวจ LDAP แปลง Buasri ID เป็น PERSON_ID แล้วตรวจสิทธิ์ K2 เดิม
 
     รหัสผ่านใช้ bind กับ LDAP เท่านั้นและไม่ถูกบันทึกลงฐานข้อมูลของระบบ
-    SQL Server ถูกอ่านเฉพาะ SysUserGroupAssiciate และ SysGroup โดยไม่มีการแก้ข้อมูล
+    SQL Server ถูกอ่านเฉพาะตารางผู้ใช้ กลุ่ม และเมนู โดยไม่มีการแก้ข้อมูล
     """
 
     def authenticate(self, request, username=None, password=None, **kwargs):
@@ -112,6 +112,10 @@ class BuasriLDAPBackend(ModelBackend):
             user.cms_person_id = access['person_id']
             user.cms_display_name = access['display_name']
             user.cms_groups = access['groups']
+            user.cms_has_access = access['has_cms_access']
+            user.cms_menus = access['menus']
+            user.cms_menu_ids = access['menu_ids']
+            user.cms_permissions = access['permissions']
             logger.info('LDAP authentication succeeded for user=%s', buasri_id)
             return user
         except (LDAPException, OSError, ValueError) as exc:

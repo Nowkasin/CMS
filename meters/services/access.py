@@ -3,11 +3,18 @@
 from .db import get_db_connection
 
 
+CMS_PARENT_MENU_ID = 41
+
+
 def fetch_user_access(buasri_id):
-    """แปลง Buasri ID เป็น PERSON_ID แล้วคืนกลุ่มที่เปิดใช้งาน
+    """แปลง Buasri ID เป็น PERSON_ID แล้วคืนกลุ่มและเมนู CMS ที่เปิดใช้งาน
 
     คืน None เมื่อไม่พบ Buasri ID ในข้อมูลบุคลากร และคืน dict ที่ groups เป็น []
     เมื่อพบบุคลากรแต่ยังไม่มีกลุ่มที่เปิดใช้งานในระบบ K2 เดิม
+
+    การอ่านเมนูใช้ความสัมพันธ์เดิมของ K2 เท่านั้น:
+    SysUserGroupAssiciate -> SysMenuGroupAssociate -> Sysmenu
+    โดย menuId 41 คือเมนูหลัก "ค่าน้ำประปา-ค่าไฟฟ้า"
     """
     conn = get_db_connection()
     try:
@@ -62,10 +69,63 @@ def fetch_user_access(buasri_id):
         groups = [
             {'id': row[0], 'name': row[1]} for row in cursor.fetchall()
         ]
+
+        cursor.execute(
+            """
+            SELECT DISTINCT
+                menu.menuId,
+                menu.menu_name_eng,
+                menu.MenuNameThai,
+                menu.MenuUrl,
+                menu.OrderNo,
+                menu.ParentMenu
+            FROM dbo.SysUserGroupAssiciate AS ug
+            INNER JOIN dbo.SysGroup AS g
+                ON g.GroupId = ug.GroupId
+            INNER JOIN dbo.SysMenuGroupAssociate AS menu_group
+                ON menu_group.GroupId = ug.GroupId
+            INNER JOIN dbo.Sysmenu AS menu
+                ON menu.menuId = menu_group.MenuId
+            WHERE ug.Person_Id = ?
+              AND ug.IsActive = 1
+              AND g.IsActive = 1
+              AND menu_group.IsActive = 1
+              AND menu.IsActive = 1
+              AND (
+                    menu.menuId = ?
+                    OR menu.ParentMenu = ?
+              )
+            ORDER BY menu.OrderNo, menu.menuId
+            """,
+            person_id,
+            CMS_PARENT_MENU_ID,
+            CMS_PARENT_MENU_ID,
+        )
+        menu_rows = cursor.fetchall()
+        menus = [
+            {
+                'id': row[0],
+                'key': str(row[1] or '').strip(),
+                'name': str(row[2] or '').strip(),
+                'url': str(row[3] or '').strip(),
+                'order': row[4],
+            }
+            for row in menu_rows
+            if row[5] == CMS_PARENT_MENU_ID
+        ]
+        permissions = {
+            menu['key']: True for menu in menus if menu['key']
+        }
         return {
             'person_id': person_id,
             'display_name': display_name or buasri_id,
             'groups': groups,
+            'has_cms_access': any(
+                row[0] == CMS_PARENT_MENU_ID for row in menu_rows
+            ),
+            'menus': menus,
+            'menu_ids': [menu['id'] for menu in menus],
+            'permissions': permissions,
         }
     finally:
         conn.close()
