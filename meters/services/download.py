@@ -78,7 +78,9 @@ def fetch_contracts_for_download(meter_type_cd, billing_year_be, billing_month):
                 dt.Contract_read_number_after,
                 dt.Contract_effective_date,
                 it.Contract_Installment_amt,
-                it.Contract_duedate
+                it.Contract_duedate,
+                -- ข้อมูลยกเลิกสัญญา (NULL ถ้าไม่เคยยกเลิก) -- ใช้ตัดสินช่วงผ่อนผัน + แสดงป้ายบนหน้าดาวน์โหลด
+                t.Notify_date, t.Termination_case, t.Last_installment_period
             FROM dbo.Contract_hrd_tr c
             JOIN dbo.Contract_Location_area_tr la ON la.Contract_id = c.Contract_id
             JOIN dbo.Contract_meter_tr mt
@@ -91,6 +93,8 @@ def fetch_contracts_for_download(meter_type_cd, billing_year_be, billing_month):
             LEFT JOIN dbo.Contract_location_area_ms am
                 ON am.Location_id = la.Location_id AND am.Area_id = la.Area_id
             LEFT JOIN dbo.Contract_status_ms st ON st.Status_contract_id = c.Status_contract_id
+            -- Contract_termination_tr มีได้ไม่เกิน 1 แถวต่อสัญญา (SP ปฏิเสธการบันทึกซ้ำ) จึงไม่ทำให้แถวงอก
+            LEFT JOIN dbo.Contract_termination_tr t ON t.Contract_id = c.Contract_id
             -- เลขอ่านของมิเตอร์ตัวนี้ในรอบบิลที่เลือก -- มี unique (Meter_id, Billing_year_be,
             -- Billing_month) จึงได้ไม่เกิน 1 แถวต่อมิเตอร์ ไม่ทำให้ผลลัพธ์งอกแถว
             -- (ปีเป็น พ.ศ. ตรงๆ ไม่ต้องแปลง -- ต่างจากตารางงวดเดิมที่ต้องใช้ ค.ศ. ด้านล่าง)
@@ -115,17 +119,31 @@ def fetch_contracts_for_download(meter_type_cd, billing_year_be, billing_month):
             -- query จะล้มทั้ง query ("Conversion failed ... to data type int") ทำให้หน้าดาวน์โหลดใช้ไม่ได้
             -- ยืนยันแล้วว่าสองรูปแบบคืนสัญญาชุดเดียวกันเป๊ะ (223 แถว ไม่มีแถวต่าง)
             --
-            -- หมายเหตุ: ตั้งใจไม่ตัดสถานะ '4' (ไม่ต่อสัญญา) ออก เพราะ case 2 ของการยกเลิกสัญญา
-            -- ให้ผ่อนผัน 1 เดือน จึงยังต้องส่งงวดสุดท้ายออกไปตั้งหนี้
-            WHERE c.Status_contract_id NOT IN ('5', '9')
+            -- ช่วงผ่อนผันหลังยกเลิกสัญญา (ตั้งแต่ sp_Contract_Termination_Save):
+            --   สถานะ '5' (ยกเลิกก่อนครบอายุ) ผ่อนผัน 2 เดือน / '4' (สิ้นสุด ไม่ต่อสัญญา) ผ่อนผัน 1 เดือน
+            --   นับจากเดือนของวันสิ้นสุดสัญญา -- SP คำนวณเป็นงวดสุดท้าย Last_installment_period (YYYYMM ค.ศ.)
+            --   ให้คงสัญญาไว้ในไฟล์ดาวน์โหลดจนถึงงวดนั้น เพื่อคีย์ค่าน้ำค่าไฟย้อนหลังได้
+            --   เดิมตัดสถานะ '5' ทิ้งทันทีที่บันทึกยกเลิก (ผ่อนผัน 2 เดือนจึงไม่เคยมีผล) ส่วน '4' ค้างอยู่
+            --   ไม่มีกำหนดจนกว่าจะกดปิดการตั้งหนี้มิเตอร์
+            -- '9' (ปิดสัญญา) ไม่ส่งออกเสมอ
+            -- สถานะ 4/5 ที่ไม่มีแถวยกเลิกในระบบนี้ (ถูกตั้งจากช่องทางอื่น) คงพฤติกรรมเดิม: 4 ส่งออก, 5 ไม่ส่งออก
+            -- Last_installment_period เป็น nvarchar(6) รูปแบบ YYYYMM -- เทียบเป็นข้อความได้ถูกต้อง
+            WHERE c.Status_contract_id <> '9'
+              AND (
+                    c.Status_contract_id NOT IN ('4', '5')
+                 OR (t.Contract_id IS NOT NULL AND t.Last_installment_period >= ?)
+                 OR (t.Contract_id IS NULL AND c.Status_contract_id = '4')
+              )
             ORDER BY c.Contract_id, la.Contract_Location_seq, m.Meter_id
             """,
             # ลำดับพารามิเตอร์ต้องตรงกับ ? ตามตำแหน่งที่ปรากฏใน SQL:
             #   1) ประเภทมิเตอร์ (int)  2-3) รอบบิลของตารางเลขอ่านใหม่ (พ.ศ., เดือน)
             #   4) ประเภทค่าใช้จ่าย (str)  5-6) รอบบิลของตารางงวดเดิม (ค.ศ., เดือน)
+            #   7) งวดที่เลือก YYYYMM (ค.ศ.) ใช้ตัดสินช่วงผ่อนผันของสัญญาที่ยกเลิกแล้ว
             meter_type_cd,
             billing_year_be, billing_month,
             price_type_id, ad_year, billing_month,
+            f'{ad_year}{int(billing_month):02d}',
         )
         columns = [col[0] for col in cursor.description]
         rows = [dict(zip(columns, row)) for row in cursor.fetchall()]

@@ -10,6 +10,7 @@ from openpyxl.styles import Font
 
 from .. import services
 from .dashboard import THAI_MONTHS, _current_year_be, _safe_int
+from .termination import _period_label, _thai_date
 
 
 WATER_HEADERS = [
@@ -71,6 +72,11 @@ def _merge_water_electric(water_rows, electric_rows):
                 'slot': r['_slot'],
                 'water': None,
                 'electric': None,
+                # สัญญาที่ยกเลิกแล้วแต่ยังอยู่ในช่วงผ่อนผัน -- เทมเพลตใช้แสดงป้ายบอกเหตุผลที่ยังอยู่ในรายการ
+                'in_grace': r.get('Last_installment_period') is not None,
+                'grace_case': r.get('Termination_case'),
+                'grace_notify_label': _thai_date(r.get('Notify_date')),
+                'grace_until_label': _period_label(r.get('Last_installment_period')),
             })
             entry[kind] = r
 

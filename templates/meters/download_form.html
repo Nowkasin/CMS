@@ -130,6 +130,13 @@
               <td class="text-gray-700 md:px-3 md:py-2">
                 <span class="mb-0.5 block text-[11px] text-gray-400 md:hidden">รหัสสัญญา</span>
                 {{ r.Contract_code|default:"—" }}
+                {% if r.in_grace %}
+                <span class="mt-1 block w-fit rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-600">
+                  {% if r.grace_case == 1 %}ยกเลิกสัญญา{% else %}สิ้นสุดสัญญา (ไม่ต่อ){% endif %}
+                  {% if r.grace_notify_label %}· แจ้ง {{ r.grace_notify_label }}{% endif %}
+                  · ผ่อนผันถึง {{ r.grace_until_label|default:"—" }}
+                </span>
+                {% endif %}
               </td>
               <td class="col-span-2 font-medium text-gray-900 md:col-span-1 md:px-3 md:py-2 md:font-normal md:text-gray-700">
                 <span class="mb-0.5 block text-[11px] font-normal text-gray-400 md:hidden">ชื่อลูกหนี้</span>

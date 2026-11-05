@@ -33,11 +33,6 @@
     <input type="text" name="q" value="{{ search }}"
            placeholder="ค้นหา รหัสสัญญา / ชื่อลูกค้า / ผู้ทำรายการ / ชื่อไฟล์"
            class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:col-span-2 sm:py-2 sm:text-sm lg:col-span-12">
-    <select name="user" aria-label="ผู้ทำรายการ"
-            class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:py-2 sm:text-sm lg:col-span-4">
-      <option value="">ผู้ทำรายการ: ทั้งหมด</option>
-      {% for u in user_options %}<option value="{{ u }}" {% if u == user_filter %}selected{% endif %}>{{ u }}</option>{% endfor %}
-    </select>
     <label class="flex items-center gap-2 text-sm text-gray-500 lg:col-span-3">
       <span class="shrink-0">ตั้งแต่</span>
       <input type="date" name="date_from" value="{{ date_from }}"
