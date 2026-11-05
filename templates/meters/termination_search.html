@@ -127,6 +127,8 @@
         </span>
         {% if m.Has_termination %}
           <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-600">บันทึกยกเลิกแล้ว</span>
+          {% if m.notify_date_label %}<span class="text-xs text-gray-500">แจ้งยกเลิก {{ m.notify_date_label }}</span>{% endif %}
+          {% if m.grace_until_label %}<span class="text-xs text-gray-400">ผ่อนผันถึง {{ m.grace_until_label }}</span>{% endif %}
         {% endif %}
         {% if m.is_expired %}
           <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-rose-50 text-rose-600">สิ้นสุดสัญญา</span>
@@ -206,6 +208,12 @@
                 บันทึกยกเลิกแล้ว
               </span>
             </div>
+            {% if m.notify_date_label %}
+              <div class="mt-1 text-xs text-gray-500">แจ้งยกเลิก {{ m.notify_date_label }}</div>
+            {% endif %}
+            {% if m.grace_until_label %}
+              <div class="text-xs text-gray-400">ผ่อนผันถึง {{ m.grace_until_label }}</div>
+            {% endif %}
             {% endif %}
           </td>
           {% comment %}

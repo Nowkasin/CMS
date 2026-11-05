@@ -56,6 +56,46 @@ def sp_bind_to_contract(cursor, contract_id, location_id, area_id, subarea_id, m
                           f"@Meter_id_list='{meter_id}'"))
 
 
+def sp_meter_reading_save(cursor, meter_id, billing_year_be, billing_month, reading_before,
+                          reading_after, user_id, contract_id=None, contract_code=None):
+    """
+    เรียก sp_Contract_Meter_Reading_Save บน cursor ที่ส่งเข้ามา "โดยไม่ commit"
+    คืนค่า Reading_id (None ถ้า SP ไม่คืนแถวผลลัพธ์)
+
+    แยกออกมาจาก save_meter_reading() เพราะฟังก์ชันนั้นเปิด connection ของตัวเองและ commit
+    ทันที -- ถ้า commit_staged_rows เรียกมันตรงๆ เลขอ่านจะ commit แยกจากการนำเข้ามิเตอร์
+    ถ้าขั้นหลังพังจะเหลือเลขอ่านครึ่งๆ กลางๆ ฟังก์ชันนี้ใช้ cursor เดียวกับ sp_meter_save /
+    sp_bind_to_contract จึงอยู่ใน transaction เดียวกันและ commit/rollback พร้อมกัน
+
+    ปีส่งเป็น พ.ศ. ตรงๆ (คอลัมน์ Billing_year_be เก็บ พ.ศ.) -- ดูรายละเอียดใน save_meter_reading
+    """
+    if reading_before is not None and not isinstance(reading_before, int):
+        raise ValueError(f"reading_before ต้องเป็น int หรือ None เท่านั้น ได้รับ: {reading_before!r}")
+    if reading_after is not None and not isinstance(reading_after, int):
+        raise ValueError(f"reading_after ต้องเป็น int หรือ None เท่านั้น ได้รับ: {reading_after!r}")
+
+    contract_id = int(contract_id) if contract_id else None
+    contract_code = (str(contract_code).strip() or None) if contract_code else None
+
+    cursor.execute(
+        """
+        EXEC dbo.sp_Contract_Meter_Reading_Save
+            @Meter_id        = ?,
+            @Billing_year_be = ?,
+            @Billing_month   = ?,
+            @Reading_before  = ?,
+            @Reading_after   = ?,
+            @UserId          = ?,
+            @Contract_id     = ?,
+            @Contract_code   = ?
+        """,
+        int(meter_id), billing_year_be, billing_month,
+        reading_before, reading_after, user_id, contract_id, contract_code,
+    )
+    row = cursor.fetchone()
+    return int(row[0]) if row else None
+
+
 def find_existing_meter(cursor, subarea_id, meter_type_cd, meter_no):
     """
     หามิเตอร์ที่ลงทะเบียนไว้แล้วในพื้นที่นี้ เพื่อใช้ Meter_id เดิมซ้ำแทนการสร้างแถวใหม่
@@ -107,17 +147,30 @@ def find_existing_meter(cursor, subarea_id, meter_type_cd, meter_no):
     return None
 
 
-def commit_staged_rows(rows, user_id, source_filename=None, billing_period=None):
+def commit_staged_rows(rows, user_id, source_filename=None, billing_period=None,
+                       billing_month=None, billing_year_be=None):
     """
     นำเข้าข้อมูลมิเตอร์จากไฟล์ Excel ที่ staged ไว้ลงฐานข้อมูลจริง
 
     source_filename / billing_period ใช้เขียน Contract_activity_log เท่านั้น
     (ชื่อไฟล์และรอบบิลมีอยู่แค่ใน session ฝั่ง Python ไม่มีใน DB) -- เป็น optional
     เพื่อให้ผู้เรียกเดิมที่ไม่ส่งมายังทำงานได้เหมือนเดิม
+
+    billing_month (1-12) / billing_year_be (พ.ศ.) เป็นตัวเลข ใช้บันทึกเลขอ่านก่อน-หลังของแต่ละแถว
+    ลง Contract_meter_reading_tr ผ่าน sp_Contract_Meter_Reading_Save ใน transaction เดียวกับ
+    การนำเข้ามิเตอร์ -- ถ้าไม่ส่งมา (เช่น session ค้างจากเวอร์ชันก่อน) จะนำเข้ามิเตอร์ตามปกติ
+    แต่ข้ามการบันทึกเลขอ่านและแจ้งใน logs
     """
     logs = []
-    stats = {'meter_ok': 0, 'meter_reused': 0, 'skipped': 0, 'errors': 0}
+    stats = {'meter_ok': 0, 'meter_reused': 0, 'reading_ok': 0, 'skipped': 0, 'errors': 0}
     result_rows = []
+
+    save_readings = bool(billing_month and billing_year_be)
+    if not save_readings and any(
+        r.get('reading_before') is not None or r.get('reading_after') is not None for r in rows
+    ):
+        logs.append(('skip', "ไม่บันทึกเลขอ่านมิเตอร์ -- ไม่พบรอบบิล (เดือน/ปี) ที่เป็นตัวเลขใน session "
+                             "กรุณาอัปโหลดไฟล์ใหม่อีกครั้ง"))
 
     conn = get_db_connection()
     try:
@@ -173,6 +226,28 @@ def commit_staged_rows(rows, user_id, source_filename=None, billing_period=None)
                         cursor, r['db_contract_id'], r['location_id'], r['area_id'],
                         r['subarea_id'], meter_id, user_id, logs,
                     )
+
+                # เลขอ่านก่อน-หลังของรอบบิลที่เลือกตอนอัปโหลด -- ใช้ cursor เดิม (transaction เดียวกัน)
+                # ค่าจาก session เป็น int อยู่แล้ว (parser กรองมาแล้ว) แต่ int() ซ้ำกันไว้เผื่อ
+                # session ค้างจากเวอร์ชันที่ยังเก็บเป็น float ที่ไม่มีทศนิยม
+                rb, ra = r.get('reading_before'), r.get('reading_after')
+                if save_readings and meter_id and (rb is not None or ra is not None):
+                    reading_id = sp_meter_reading_save(
+                        cursor, meter_id, billing_year_be, billing_month,
+                        int(rb) if rb is not None else None,
+                        int(ra) if ra is not None else None,
+                        user_id,
+                        contract_id=r.get('db_contract_id'),
+                        contract_code=r.get('contract_code'),
+                    )
+                    if not reading_id:
+                        raise RuntimeError('sp_Contract_Meter_Reading_Save ไม่คืน Reading_id')
+                    stats['reading_ok'] += 1
+                    row_result['reading_saved'] = True
+                    cls = 'water' if r['type_cd'] == 9 else 'electric'
+                    logs.append((cls, f"EXEC sp_Contract_Meter_Reading_Save  @Meter_id={meter_id}, "
+                                      f"{billing_month}/{billing_year_be}, ก่อน={rb}, หลัง={ra}  "
+                                      f"-> Reading_id={reading_id}"))
             except Exception as exc:
                 logs.append(('err', f"ERROR  SubArea={r['subarea_id']} -- {exc}"))
                 stats['errors'] += 1
@@ -190,7 +265,8 @@ def commit_staged_rows(rows, user_id, source_filename=None, billing_period=None)
         contract_ids = {r.get('db_contract_id') for r in rows if r.get('db_contract_id')}
         detail = (
             f"นำเข้าไฟล์ Excel -- บันทึกมิเตอร์ {stats['meter_ok']} รายการ "
-            f"(ใช้ทะเบียนเดิม {stats['meter_reused']}) · ข้าม {stats['skipped']} · "
+            f"(ใช้ทะเบียนเดิม {stats['meter_reused']}) · เลขอ่าน {stats['reading_ok']} รายการ · "
+            f"ข้าม {stats['skipped']} · "
             f"ผิดพลาด {stats['errors']} · สัญญาที่เกี่ยวข้อง {len(contract_ids)} ฉบับ"
         )
         if billing_period:
@@ -728,16 +804,9 @@ def fetch_dashboard_stats():
 def save_meter_reading(meter_id, billing_year_be, billing_month, reading_before, reading_after, user_id,
                        contract_id=None, contract_code=None):
     """
-    บันทึกเลขอ่านก่อน-หลังของมิเตอร์ 1 ตัว ในรอบบิลหนึ่ง ผ่าน sp_Contract_Meter_Reading_Save
-    คืนค่า Reading_id ที่บันทึก (None ถ้า SP ไม่คืนค่ากลับมา)
-
-    SP ทำ upsert ให้เอง: หาแถวของ (Meter_id + Billing_year_be + Billing_month)
-    ถ้ายังไม่มีจะ INSERT ถ้ามีอยู่แล้วจะ UPDATE ทับ
-
-    ปีส่งเป็น พ.ศ. ตรงๆ ไม่ต้องแปลง ค.ศ. เพราะคอลัมน์ Billing_year_be เก็บ พ.ศ. อยู่แล้ว
-
-    contract_id/contract_code เก็บเป็น snapshot ว่าเลขอ่านรอบนี้อยู่ภายใต้สัญญาไหน
-    SP ใช้ COALESCE ตอน UPDATE จึงไม่ล้างค่าเดิมเป็น NULL ถ้าผู้เรียกไม่ส่งสัญญามา
+    ฟังก์ชันนี้เปิด connection ของตัวเองและ commit ทันที (ใช้จากหน้าแก้ไขมิเตอร์) -- ส่วนที่ต้อง
+    อยู่ใน transaction เดียวกับงานอื่น (เช่น commit_staged_rows) ให้เรียก sp_meter_reading_save()
+    ด้วย cursor ของ transaction นั้นแทน
 
     ประวัติของฟังก์ชันนี้ (กันเข้าใจผิดซ้ำ):
       - เดิมเรียก SP ตัวนี้อยู่แล้ว แต่การเรียกหลุดหายไปตอน commit ที่แยก meters/services.py
@@ -746,35 +815,15 @@ def save_meter_reading(meter_id, billing_year_be, billing_month, reading_before,
       - คอลัมน์ Contract_id/Contract_code เพิ่มเข้าตารางทีหลัง SP จึงต้องถูกแก้ให้รองรับด้วย
         (ดู sql/sp_Contract_Meter_Reading_Save_AddContract.sql)
     """
-    if reading_before is not None and not isinstance(reading_before, int):
-        raise ValueError(f"reading_before ต้องเป็น int หรือ None เท่านั้น ได้รับ: {reading_before!r}")
-    if reading_after is not None and not isinstance(reading_after, int):
-        raise ValueError(f"reading_after ต้องเป็น int หรือ None เท่านั้น ได้รับ: {reading_after!r}")
-
-    contract_id = int(contract_id) if contract_id else None
-    contract_code = (str(contract_code).strip() or None) if contract_code else None
-
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute(
-            """
-            EXEC dbo.sp_Contract_Meter_Reading_Save
-                @Meter_id        = ?,
-                @Billing_year_be = ?,
-                @Billing_month   = ?,
-                @Reading_before  = ?,
-                @Reading_after   = ?,
-                @UserId          = ?,
-                @Contract_id     = ?,
-                @Contract_code   = ?
-            """,
-            int(meter_id), billing_year_be, billing_month,
-            reading_before, reading_after, user_id, contract_id, contract_code,
+        reading_id = sp_meter_reading_save(
+            cursor, meter_id, billing_year_be, billing_month, reading_before, reading_after,
+            user_id, contract_id=contract_id, contract_code=contract_code,
         )
-        row = cursor.fetchone()
         conn.commit()
-        return int(row[0]) if row else None
+        return reading_id
     finally:
         conn.close()
 

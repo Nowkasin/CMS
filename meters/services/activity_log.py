@@ -21,6 +21,8 @@ log เหตุการณ์รวมของระบบ (dbo.Contract_acti
 """
 import logging
 
+from django.urls import NoReverseMatch, reverse
+
 from .db import get_db_connection
 from .meters import _to_sql_like_pattern
 
@@ -51,7 +53,13 @@ ACTION_PHASE_TOGGLE = 'phase_toggle'          # เปิด/ปิดใช้�
 ACTION_DOWNLOAD_EXCEL = 'download_excel'      # ดาวน์โหลด Excel (เดือน-ปี + จำนวนรายการ)
 ACTION_EXPORT_METERS = 'export_meters'        # ส่งออก Excel จากแดชบอร์ด
 
+# --- ใหม่: POST ที่ยังไม่ได้ลงทะเบียนใน middleware ---
 ACTION_OTHER = 'other_action'
+
+# --- ใหม่: การเข้า/ออกระบบ (เขียนจาก meters/signals.py ไม่ผ่าน middleware) ---
+ACTION_LOGIN = 'login'
+ACTION_LOGOUT = 'logout'
+ACTION_LOGIN_FAILED = 'login_failed'
 
 # ลำดับในนี้คือลำดับแท็บบนหน้า log
 ACTIVITY_ACTIONS = [
@@ -68,8 +76,10 @@ ACTIVITY_ACTIONS = [
     (ACTION_TERMINATION_SAVE, 'บันทึกยกเลิกสัญญา'),
     (ACTION_TERMINATION_DELETE, 'ลบรายการยกเลิก'),
     (ACTION_TERMINATION_CLOSE_METERS, 'ปิดการตั้งหนี้มิเตอร์'),
+    (ACTION_LOGIN, 'เข้าสู่ระบบ'),
+    (ACTION_LOGOUT, 'ออกจากระบบ'),
+    (ACTION_LOGIN_FAILED, 'เข้าสู่ระบบไม่สำเร็จ'),
     (ACTION_OTHER, 'การดำเนินการอื่น'),
-
 ]
 
 # ชื่อเหตุการณ์ที่ไม่รู้จัก (เผื่อมี Action_type ในฐานข้อมูลที่ยังไม่ได้ลงทะเบียนที่นี่
@@ -151,6 +161,29 @@ def log_activity_safe(action_type, user_id, **kwargs):
         return False
 
 
+def _row_link(row):
+    """
+    ปุ่มลัดของคอลัมน์ "ดำเนินการ" -- คืน (url, ข้อความปุ่ม) หรือ (None, None) ถ้าไม่มีหน้าที่เกี่ยวข้อง
+
+    เลือกตามประเภทเหตุการณ์ ไม่ใช่ดูว่ามี id อะไรบ้าง เพราะเหตุการณ์ต่างชนิดเก็บ id ปนกันได้
+    (เช่นเลขอ่านเก็บทั้ง Contract_id และ SubArea_id แต่ปุ่มที่ควรเป็นคือไปหน้าพื้นที่นั้น)
+    ระบบไฟฟ้าไม่มีคอลัมน์เก็บ id ของรายการใน log จึงพาไปหน้ารายการ ไม่ใช่หน้าแก้ไขตรงตัว
+    """
+    action = row.get('Action_type')
+    try:
+        if action in (ACTION_METER_UPDATE, ACTION_METER_TOGGLE) and row.get('Meter_id'):
+            return reverse('meter_edit', args=[row['Meter_id']]), 'ดูมิเตอร์ ›'
+        if action == ACTION_READING_SAVE and row.get('SubArea_id'):
+            return reverse('edit_meter', args=[row['SubArea_id']]), 'ดูพื้นที่ ›'
+        if action in (ACTION_PHASE_CREATE, ACTION_PHASE_UPDATE, ACTION_PHASE_TOGGLE):
+            return reverse('phase_list'), 'ดูระบบไฟฟ้า ›'
+        if row.get('Contract_id'):
+            return reverse('termination_detail', args=[row['Contract_id']]), 'ดูสัญญา ›'
+    except NoReverseMatch:
+        pass
+    return None, None
+
+
 def fetch_activity_log(search='', action='all'):
     """
     ดึง log เหตุการณ์ เรียงเวลาล่าสุดก่อน
@@ -197,7 +230,32 @@ def fetch_activity_log(search='', action='all'):
 
         cursor.execute(sql, params)
         columns = [c[0] for c in cursor.description]
-        return [dict(zip(columns, row)) for row in cursor.fetchall()]
+        rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        for r in rows:
+            r['action_url'], r['action_text'] = _row_link(r)
+        return rows
+    finally:
+        conn.close()
+
+
+def fetch_log_head(after_id=0):
+    """
+    ใช้กับการเช็ครายการใหม่ของหน้า log (polling) -- query เบา ไม่ join ไม่ดึงแถว
+    คืน (Log_id ล่าสุด, จำนวนรายการที่ Log_id > after_id)
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT ISNULL(MAX(Log_id), 0),
+                   ISNULL(SUM(CASE WHEN Log_id > ? THEN 1 ELSE 0 END), 0)
+            FROM dbo.Contract_activity_log
+            """,
+            int(after_id or 0),
+        )
+        latest, new = cursor.fetchone()
+        return int(latest), int(new)
     finally:
         conn.close()
 

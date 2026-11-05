@@ -36,11 +36,19 @@ function bindModal(ids, onOpen) {
     }, 200);
   }
 
+  // กันส่งฟอร์มซ้ำ -- กล่องปิดช้า 200 ms ปุ่มยืนยันจึงยังกดได้อีกถ้ากดรัว
+  let submitting = false;
+
   openBtn.addEventListener('click', open);
   btnNo.addEventListener('click', close);
   backdrop.addEventListener('click', close);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !modal.classList.contains('hidden')) close();
+  });
   btnYes.addEventListener('click', () => {
-    if (btnYes.disabled) return;
+    if (btnYes.disabled || submitting) return;
+    submitting = true;
+    btnYes.disabled = true;
     close();
     form.submit();
   });
@@ -87,7 +95,7 @@ function bindModal(ids, onOpen) {
   function caseLabel() {
     if (!caseSelect || !caseSelect.value) return '';
     const opt = caseSelect.options[caseSelect.selectedIndex];
-    return opt ? opt.textContent.trim() : '';
+    return opt ? opt.textContent.trim().replace(/\s*\(.*\)\s*$/, '') : '';
   }
 
   // แปลง 'YYYY-MM-DD' เป็น {year, month} โดยอ่านจากสตริงตรงๆ
@@ -98,7 +106,11 @@ function bindModal(ids, onOpen) {
     const year = Number(m[1]);
     const month = Number(m[2]);
     const day = Number(m[3]);
-    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+    // เช็กแบบ round-trip ให้ปฏิเสธวันที่ที่ไม่มีจริง เช่น 31 ก.พ.
+    const dt = new Date(Date.UTC(year, month - 1, day));
+    if (dt.getUTCFullYear() !== year || dt.getUTCMonth() !== month - 1 || dt.getUTCDate() !== day) {
+      return null;
+    }
     return { year: year, month: month, day: day };
   }
 

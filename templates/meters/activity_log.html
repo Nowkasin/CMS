@@ -22,35 +22,35 @@
     <p class="text-sm text-gray-500 mt-1">เหตุการณ์ทั้งหมดในระบบ เรียงเวลาล่าสุดก่อน</p>
   </div>
 
-  {% comment %}
-    เตือน 2 เรื่องที่ผู้ใช้ต้องรู้ก่อนเชื่อหน้านี้:
-    1) ชื่อผู้ทำรายการยังเป็นค่าคงที่ (ไม่มีล็อกอิน)
-    2) ยังไม่ครอบคลุมทุกเมนู -- บอกตรงๆ ว่าอะไรยังไม่เข้า log
-  {% endcomment %}
-  <div class="bg-brand-50 border border-brand-100 text-brand-700 text-xs rounded-lg px-4 py-3 mb-4 space-y-1.5">
-    <div>
-      ผู้ใช้ปัจจุบัน: <span class="font-medium">{{ default_user }}</span>
-      — รายการใหม่จะบันทึก Buasri ID ของผู้ดำเนินการ
-    </div>
-    <div>
-      ยังไม่ครอบคลุมทุกเมนู -- ที่ยังไม่เข้าประวัติ:
-      {% for s in pending_sources %}{{ s }}{% if not forloop.last %} · {% endif %}{% endfor %}
-    </div>
+  {# แถบแจ้งรายการใหม่ -- ซ่อนไว้ก่อน JS ด้านล่างจะเปิดเองเมื่อพบรายการใหม่กว่าที่แสดงอยู่ #}
+  <div id="newLogBanner" class="hidden mb-4 items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800" role="status">
+    <span id="newLogText"></span>
+    <a href="?{{ qs }}" class="shrink-0 font-semibold text-amber-900 underline hover:no-underline">โหลดรายการใหม่</a>
   </div>
 
-  <form method="get" class="flex flex-col gap-3 mb-2 sm:flex-row sm:flex-wrap">
+  <form method="get" class="mb-2 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12">
     {% if contract_filter %}<input type="hidden" name="contract" value="{{ contract_filter }}">{% endif %}
     <input type="text" name="q" value="{{ search }}"
            placeholder="ค้นหา รหัสสัญญา / ชื่อลูกค้า / ผู้ทำรายการ / ชื่อไฟล์"
-           class="w-full sm:flex-1 sm:min-w-[260px] border border-gray-200 rounded-lg px-3 py-2.5 sm:py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
-    <div class="flex gap-3">
+           class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:col-span-2 sm:py-2 sm:text-sm lg:col-span-12">
+    <label class="flex items-center gap-2 text-sm text-gray-500 lg:col-span-3">
+      <span class="shrink-0">ตั้งแต่</span>
+      <input type="date" name="date_from" value="{{ date_from }}"
+             class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:py-2 sm:text-sm">
+    </label>
+    <label class="flex items-center gap-2 text-sm text-gray-500 lg:col-span-3">
+      <span class="shrink-0">ถึง</span>
+      <input type="date" name="date_to" value="{{ date_to }}"
+             class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:py-2 sm:text-sm">
+    </label>
+    <div class="flex gap-3 sm:col-span-2 lg:col-span-2">
       <button type="submit"
-              class="flex-1 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 sm:flex-none sm:py-2">
+              class="flex-1 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 sm:py-2">
         ค้นหา
       </button>
-      {% if search or contract_filter %}
+      {% if has_filters %}
       <a href="?"
-         class="flex-1 rounded-lg border border-transparent px-4 py-2.5 text-center text-sm font-medium text-gray-500 hover:bg-gray-50 sm:flex-none sm:py-2">ล้างตัวกรอง</a>
+         class="flex-1 rounded-lg border border-transparent px-4 py-2.5 text-center text-sm font-medium text-gray-500 hover:bg-gray-50 sm:py-2">ล้างตัวกรอง</a>
       {% endif %}
     </div>
   </form>
@@ -72,8 +72,9 @@
         <div class="min-w-0">
           {% comment %} สีแยกตามความรุนแรง: ลบ = แดง, ปิดการตั้งหนี้ = เหลือง, อื่นๆ = น้ำเงิน {% endcomment %}
           <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
-                       {% if r.Action_type == 'termination_delete' %}bg-red-50 text-red-600
+                       {% if r.Action_type == 'termination_delete' or r.Action_type == 'login_failed' %}bg-red-50 text-red-600
                        {% elif r.Action_type == 'termination_close_meters' %}bg-amber-50 text-amber-700
+                       {% elif r.Action_type == 'login' or r.Action_type == 'logout' %}bg-gray-100 text-gray-600
                        {% else %}bg-brand-50 text-brand-600{% endif %}">
             {{ r.action_label }}
           </span>
@@ -81,10 +82,10 @@
             <div class="mt-1 text-xs text-gray-400 break-words">{{ r.Ref_text }}</div>
           {% endif %}
         </div>
-        {% if r.Contract_id %}
-        <a href="{% url 'termination_detail' r.Contract_id %}"
+        {% if r.action_url %}
+        <a href="{{ r.action_url }}"
            class="shrink-0 whitespace-nowrap rounded-lg border border-brand-100 bg-brand-50 px-3.5 py-2 text-sm font-semibold text-brand-600 transition-colors hover:bg-brand-100">
-          ดูสัญญา ›
+          {{ r.action_text }}
         </a>
         {% endif %}
       </div>
@@ -110,13 +111,13 @@
       {% if r.Detail %}
       <div class="text-sm">
         <div class="text-xs text-gray-400">รายละเอียด</div>
-        <div class="mt-0.5 text-gray-600 break-words">{{ r.Detail }}</div>
+        <div class="mt-0.5 text-gray-600 break-words whitespace-pre-line">{{ r.Detail }}</div>
       </div>
       {% endif %}
     </article>
     {% empty %}
     <div class="rounded-xl border border-gray-200 bg-white px-4 py-10 text-center text-sm text-gray-400 shadow-sm">
-      {% if search or contract_filter %}
+      {% if has_filters %}
         ไม่พบประวัติที่ตรงกับตัวกรอง
       {% else %}
         ยังไม่มีประวัติการใช้งานในระบบ -- จะเริ่มบันทึกเมื่อมีการนำเข้าไฟล์หรือยกเลิกสัญญา
@@ -147,9 +148,10 @@
           <td class="px-4 py-2.5 whitespace-nowrap">
             {% comment %} สีแยกตามความรุนแรง: ลบ = แดง, ปิดการตั้งหนี้ = เหลือง, อื่นๆ = น้ำเงิน {% endcomment %}
             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
-                         {% if r.Action_type == 'termination_delete' %}bg-red-50 text-red-600
+                         {% if r.Action_type == 'termination_delete' or r.Action_type == 'login_failed' %}bg-red-50 text-red-600
                          {% elif r.Action_type == 'termination_close_meters' %}bg-amber-50 text-amber-700
-                         {% else %}bg-brand-50 text-brand-600{% endif %}">
+                         {% elif r.Action_type == 'login' or r.Action_type == 'logout' %}bg-gray-100 text-gray-600
+                       {% else %}bg-brand-50 text-brand-600{% endif %}">
               {{ r.action_label }}
             </span>
             {% if r.Ref_text %}
@@ -168,19 +170,19 @@
               <span class="text-xs text-gray-400">หลายสัญญา / ไม่ผูกสัญญา</span>
             {% endif %}
           </td>
-          <td class="px-4 py-2.5 text-gray-600 text-xs">{{ r.Detail|default:"—" }}</td>
+          <td class="px-4 py-2.5 text-gray-600 text-xs whitespace-pre-line">{{ r.Detail|default:"—" }}</td>
           <td class="px-4 py-2.5 text-gray-700 text-xs whitespace-nowrap">{{ r.UserEntry|default:"—" }}</td>
           <td class="sticky right-0 z-10 whitespace-nowrap border-l border-gray-100 bg-white px-4 py-2.5 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.12)] group-hover:bg-gray-50">
-            {% if r.Contract_id %}
-            <a href="{% url 'termination_detail' r.Contract_id %}"
-               class="text-sm font-medium text-brand-600 hover:text-brand-700">ดูสัญญา ›</a>
+            {% if r.action_url %}
+            <a href="{{ r.action_url }}"
+               class="text-sm font-medium text-brand-600 hover:text-brand-700">{{ r.action_text }}</a>
             {% endif %}
           </td>
         </tr>
         {% empty %}
         <tr>
           <td colspan="6" class="px-4 py-10 text-center text-gray-400 text-sm">
-            {% if search or contract_filter %}
+            {% if has_filters %}
               ไม่พบประวัติที่ตรงกับตัวกรอง
             {% else %}
               ยังไม่มีประวัติการใช้งานในระบบ -- จะเริ่มบันทึกเมื่อมีการนำเข้าไฟล์หรือยกเลิกสัญญา
@@ -199,14 +201,14 @@
     </p>
     <div class="flex items-center justify-between gap-1.5 sm:justify-end">
       {% if page_obj.has_previous %}
-      <a href="?q={{ search|urlencode }}{% if contract_filter %}&contract={{ contract_filter }}{% endif %}&page={{ page_obj.previous_page_number }}"
+      <a href="?{{ qs }}{% if qs %}&{% endif %}page={{ page_obj.previous_page_number }}"
          class="px-4 py-2 sm:px-3 sm:py-1.5 rounded-lg text-sm font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50">ก่อนหน้า</a>
       {% else %}
       <span class="sm:hidden px-4 py-2 invisible" aria-hidden="true">ก่อนหน้า</span>
       {% endif %}
       <span class="px-3 py-1.5 text-sm text-gray-500">หน้า {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
       {% if page_obj.has_next %}
-      <a href="?q={{ search|urlencode }}{% if contract_filter %}&contract={{ contract_filter }}{% endif %}&page={{ page_obj.next_page_number }}"
+      <a href="?{{ qs }}{% if qs %}&{% endif %}page={{ page_obj.next_page_number }}"
          class="px-4 py-2 sm:px-3 sm:py-1.5 rounded-lg text-sm font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50">ถัดไป</a>
       {% else %}
       <span class="sm:hidden px-4 py-2 invisible" aria-hidden="true">ถัดไป</span>
@@ -218,4 +220,32 @@
   {% endif %}
 
 </div>
+
+<script>
+  // เช็ครายการใหม่ทุก 15 วินาที (ถามแค่ตัวเลข ไม่ดึงรายการ) -- หยุดเมื่อแท็บถูกซ่อน
+  (function () {
+    var latest = parseInt('{{ latest_id|default:0 }}', 10) || 0;
+    var base = "{% url 'activity_log' %}";
+    var banner = document.getElementById('newLogBanner');
+    var text = document.getElementById('newLogText');
+    if (!banner || !text) return;
+    var timer = null;
+
+    function check() {
+      if (document.hidden) return;
+      fetch(base + '?poll=1&after=' + latest, {headers: {'Accept': 'application/json'}, credentials: 'same-origin'})
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          if (d && d.new > 0) {
+            text.textContent = 'มีรายการใหม่ ' + d.new + ' รายการ';
+            banner.classList.remove('hidden');
+            banner.classList.add('flex');
+          }
+        })
+        .catch(function () { /* เครือข่ายหลุดชั่วคราว -- รอบหน้าลองใหม่ */ });
+    }
+    timer = setInterval(check, 15000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) check(); });
+  })();
+</script>
 {% endblock %}

@@ -170,7 +170,7 @@
         <dl class="grid grid-cols-2 gap-x-3 gap-y-2">
           <div>
             <dt class="text-gray-400">สิ้นสุดสัญญา</dt>
-            <dd class="mt-0.5 text-gray-700">{{ g.Contract_end_date|date:"d/m/Y"|default:"—" }}</dd>
+            <dd class="mt-0.5 text-gray-700">{{ g.end_date_label|default:"—" }}</dd>
           </div>
           <div>
             <dt class="text-gray-400">งวดสุดท้าย</dt>
@@ -183,15 +183,15 @@
           <div>
             <dt class="text-gray-400">บันทึกโดย/เมื่อ</dt>
             <dd class="mt-0.5 text-gray-600">
-              {{ g.UserEntry|default:"—" }}<br>
-              <span class="text-gray-400">{{ g.DateEntry|date:"d/m/Y H:i" }}</span>
+              <span title="{{ g.UserEntry|default:'' }}">{{ g.UserEntry_name|default:"—" }}</span><br>
+              <span class="text-gray-400">{{ g.entry_label|default:"—" }}</span>
             </dd>
           </div>
           <div>
             <dt class="text-gray-400">ลบโดย/เมื่อ</dt>
             <dd class="mt-0.5 text-gray-600">
-              {{ g.UserDelete|default:"—" }}<br>
-              <span class="text-gray-400">{{ g.DateDelete|date:"d/m/Y H:i" }}</span>
+              <span title="{{ g.UserDelete|default:'' }}">{{ g.UserDelete_name|default:"—" }}</span><br>
+              <span class="text-gray-400">{{ g.delete_label|default:"—" }}</span>
             </dd>
           </div>
         </dl>
@@ -215,7 +215,7 @@
           {% for g in deleted_history %}
           <tr>
             <td class="px-3 py-2 text-gray-700">{{ g.Termination_case_name|default:"—" }}</td>
-            <td class="px-3 py-2 text-gray-700 whitespace-nowrap">{{ g.Contract_end_date|date:"d/m/Y"|default:"—" }}</td>
+            <td class="px-3 py-2 text-gray-700 whitespace-nowrap">{{ g.end_date_label|default:"—" }}</td>
             <td class="px-3 py-2 text-gray-700 whitespace-nowrap">
               {{ g.last_period_label|default:g.Last_installment_period|default:"—" }}
             </td>
@@ -223,21 +223,18 @@
               {{ g.Remark|default:"—" }}
             </td>
             <td class="px-3 py-2 text-gray-600 whitespace-nowrap">
-              {{ g.UserEntry|default:"—" }}<br>
-              <span class="text-gray-400">{{ g.DateEntry|date:"d/m/Y H:i" }}</span>
+              <span title="{{ g.UserEntry|default:'' }}">{{ g.UserEntry_name|default:"—" }}</span><br>
+              <span class="text-gray-400">{{ g.entry_label|default:"—" }}</span>
             </td>
             <td class="px-3 py-2 text-gray-600 whitespace-nowrap">
-              {{ g.UserDelete|default:"—" }}<br>
-              <span class="text-gray-400">{{ g.DateDelete|date:"d/m/Y H:i" }}</span>
+              <span title="{{ g.UserDelete|default:'' }}">{{ g.UserDelete_name|default:"—" }}</span><br>
+              <span class="text-gray-400">{{ g.delete_label|default:"—" }}</span>
             </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-    <p class="text-xs text-gray-500 mt-3">
-      ผู้ใช้ปัจจุบัน: {{ default_user }} — รายการใหม่จะบันทึก Buasri ID ของผู้ดำเนินการ
-    </p>
   </div>
   {% endif %}
 
@@ -469,6 +466,9 @@
             </button>
           {% endif %}
         </div>
+        {% if can_save %}
+        <p class="text-xs text-gray-500 text-right">ผู้ใช้ปัจจุบัน: {{ default_user }} — รายการนี้จะบันทึก Buasri ID ของผู้ดำเนินการ</p>
+        {% endif %}
       </form>
 
       {% if header %}
@@ -488,8 +488,9 @@
               <span class="text-gray-400">({{ header.Last_installment_period }})</span>
             {% endif %}
           </div>
-          <div>บันทึกโดย: <span class="text-gray-800">{{ header.UserEntry|default:"—" }}</span></div>
-          <div>วันที่บันทึก: <span class="text-gray-800">{{ header.DateEntry|date:"d/m/Y H:i"|default:"—" }}</span></div>
+          <div>บันทึกโดย: <span class="text-gray-800" title="{{ header.UserEntry|default:'' }}">{{ header.UserEntry_name|default:"—" }}</span></div>
+          <div>วันที่บันทึก: <span class="text-gray-800">{{ header.date_entry_label|default:"—" }}</span></div>
+          <div>วันที่แจ้งยกเลิก: <span class="text-gray-800">{{ header.notify_date_label|default:"—" }}</span></div>
           <div>สถานะก่อนยกเลิก:
             <span class="text-gray-800">{{ header.Prev_status_contract_Desc|default:"ไม่ได้บันทึกไว้" }}</span>
           </div>

@@ -120,8 +120,9 @@ def _meter_form_build(request, kwargs, before, response):
             'action': activity.ACTION_METER_CREATE,
             'ref_text': meter_no or f'มิเตอร์{type_label}ใหม่',
             'subarea_id': post.get('subarea_id') or None,
-            'detail': (f'เพิ่มมิเตอร์{type_label} · เลข {meter_no or "(ยังไม่มี/รอ Gen เลข)"}'
-                       f' · พื้นที่ย่อย {post.get("subarea_id") or "-"}'),
+            'detail': (f'เพิ่มมิเตอร์{type_label}\n'
+                       f'เลขมิเตอร์ {meter_no or "(ยังไม่มี/รอ Gen เลข)"}\n'
+                       f'พื้นที่ย่อย {post.get("subarea_id") or "-"}'),
         }
 
     after = fetch_meter_by_id(meter_id)
@@ -136,7 +137,7 @@ def _meter_form_build(request, kwargs, before, response):
         'ref_text': after.get('Meter_no') or f'Meter #{meter_id}',
         'meter_id': int(meter_id),
         'subarea_id': after.get('SubArea_id'),
-        'detail': ' · '.join(changes),
+        'detail': '\n'.join(changes),   # บรรทัดละหนึ่งการเปลี่ยนแปลง (หน้า log แสดงตามบรรทัด)
     }
 
 
@@ -199,9 +200,9 @@ def _edit_meter_build(request, kwargs, before, response):
     changes = _diff(before, after, SUBAREA_FIELDS)
     if not changes:
         return None
-    detail = ' · '.join(changes)
+    detail = '\n'.join(changes)
     if month and year:
-        detail = f'รอบบิล {month}/{year} -- {detail}'
+        detail = f'รอบบิล {month}/{year}\n{detail}'
     return {
         'action': activity.ACTION_READING_SAVE,
         'ref_text': f'SubArea {subarea_id}',

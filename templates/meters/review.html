@@ -81,7 +81,7 @@
 
       <!-- ตาราง -->
       <div class="border border-gray-100 rounded-xl overflow-x-auto">
-        <table class="min-w-[900px] w-full text-sm">
+        <table class="min-w-[1100px] w-full text-sm">
           <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
             <tr>
               <th class="text-left px-4 py-2.5">ลำดับ</th>
@@ -92,6 +92,8 @@
               <th class="text-left px-4 py-2.5">SubArea</th>
               <th class="text-left px-4 py-2.5">ประเภท</th>
               <th class="text-left px-4 py-2.5">เลขมิเตอร์</th>
+              <th class="text-right px-4 py-2.5">เลขที่อ่านก่อน</th>
+              <th class="text-right px-4 py-2.5">เลขที่อ่านหลัง</th>
               <th class="text-left px-4 py-2.5">สถานะ</th>
             </tr>
           </thead>
@@ -110,9 +112,19 @@
                 </span>
               </td>
               <td class="px-4 py-2.5 font-mono text-xs">{{ r.meter_no|default:"—" }}</td>
+              {# ใช้ is not None แทน |default เพราะเลข 0 เป็นค่าจริงที่ต้องแสดง และ session เก่าที่ไม่มีคีย์นี้จะขึ้น — #}
+              <td class="px-4 py-2.5 font-mono text-xs text-right">
+                {% if r.reading_before is not None %}{{ r.reading_before }}{% else %}<span class="text-gray-300">—</span>{% endif %}
+              </td>
+              <td class="px-4 py-2.5 font-mono text-xs text-right">
+                {% if r.reading_after is not None %}{{ r.reading_after }}{% else %}<span class="text-gray-300">—</span>{% endif %}
+              </td>
               <td class="px-4 py-2.5">
                 {% if r.status == 'ok' %}
                   <span class="text-xs font-medium text-brand-600">พร้อมนำเข้า</span>
+                  {% if r.reading_warning %}
+                    <div class="mt-0.5 text-[11px] leading-4 text-amber-600">{{ r.reading_warning }}</div>
+                  {% endif %}
                 {% elif r.status == 'duplicate' %}
                   <span class="text-xs font-medium text-amber-600 inline-flex items-center gap-1">
                     <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -133,7 +145,7 @@
               </td>
             </tr>
             {% empty %}
-            <tr><td colspan="9" class="text-center text-gray-400 text-sm py-10">ไม่พบข้อมูลที่ค้นหา</td></tr>
+            <tr><td colspan="11" class="text-center text-gray-400 text-sm py-10">ไม่พบข้อมูลที่ค้นหา</td></tr>
             {% endfor %}
           </tbody>
         </table>

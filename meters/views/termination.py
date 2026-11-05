@@ -10,6 +10,8 @@ from django.shortcuts import render, redirect
 from .. import services
 from .dashboard import THAI_MONTHS
 
+from ..services.access import fetch_user_access
+
 # ค่า Termination_case -- ยืนยันให้ตรงกับ sp_Contract_Termination_Save แล้ว
 # (ดู sql/sp_Contract_Termination_FixCaseMapping.sql -- เดิม SP คาดหวังค่าสลับกับที่นี่
 #  ทำให้ได้จำนวนเดือนผ่อนผันและสถานะสัญญาผิด จึงแก้ SP ให้ตรงกับเอกสาร requirement)
@@ -95,6 +97,24 @@ def _thai_date(value):
     try:
         return f'{value.day} {THAI_MONTHS[value.month - 1]} {value.year + 543}'
     except (AttributeError, IndexError, TypeError):
+        return None
+
+
+def _thai_datetime(value):
+    """datetime -> '2 พฤศจิกายน 2569 14:35' (พ.ศ.) คืน None ถ้าไม่ใช่วันที่"""
+    if not value:
+        return None
+    try:
+        return f'{value.day} {THAI_MONTHS[value.month - 1]} {value.year + 543} {value:%H:%M}'
+    except (AttributeError, IndexError, TypeError, ValueError):
+        return None
+
+
+def _parse_iso_date(text):
+    """'YYYY-MM-DD' -> date หรือ None ถ้าไม่ใช่วันที่จริง (เช่น 2569-02-31)"""
+    try:
+        return datetime.datetime.strptime((text or '').strip(), '%Y-%m-%d').date()
+    except ValueError:
         return None
 
 
@@ -201,6 +221,8 @@ def _classify_contract(row, today):
     row['is_expired'] = bool(end and end < today)
     row['end_contract_label'] = _thai_date(end)
     row['expired_ago_label'] = _expired_ago_label(end, today)
+    row['notify_date_label'] = _thai_date(row.get('Notify_date'))
+    row['grace_until_label'] = _period_label(row.get('Last_installment_period'))
 
     if row['is_blocked']:
         return TAB_TERMINATED
@@ -382,8 +404,12 @@ def termination_detail(request, contract_id):
             form_errors.append('กรุณาเลือกกรณีการยกเลิกสัญญา')
         if not form['contract_end_date']:
             form_errors.append('กรุณาระบุวันที่สิ้นสุดสัญญา')
+        elif not _parse_iso_date(form['contract_end_date']):
+            form_errors.append('วันที่สิ้นสุดสัญญาไม่ถูกต้อง')
         if form['termination_case'] == CASE_CANCEL_BEFORE_END and not form['notify_date']:
             form_errors.append('กรณียกเลิกสัญญาก่อนครบอายุ ต้องระบุวันที่แจ้งยกเลิกด้วย')
+        elif form['notify_date'] and not _parse_iso_date(form['notify_date']):
+            form_errors.append('วันที่แจ้งยกเลิกไม่ถูกต้อง')
 
         if not form_errors:
             try:
@@ -417,6 +443,8 @@ def termination_detail(request, contract_id):
         p['period_label'] = _period_label(p.get('Installment_period'))
     if header:
         header['last_period_label'] = _period_label(header.get('Last_installment_period'))
+        header['notify_date_label'] = _thai_date(header.get('Notify_date'))
+        header['date_entry_label'] = _thai_datetime(header.get('DateEntry'))
 
     # นับงวดที่เลือกไว้ -- โชว้ "เลือกอยู่ x จาก y งวด" คู่กับปุ่มเลือก/ไม่เลือกทั้งหมด
     selected_count = sum(1 for p in periods if p.get('Is_selected'))
@@ -430,6 +458,31 @@ def termination_detail(request, contract_id):
     deleted_history = services.fetch_termination_history(contract_id)
     for row in deleted_history:
         row['last_period_label'] = _period_label(row.get('Last_installment_period'))
+        row['end_date_label'] = _thai_date(row.get('Contract_end_date'))
+        row['entry_label'] = _thai_datetime(row.get('DateEntry'))
+        row['delete_label'] = _thai_datetime(row.get('DateDelete'))
+
+    # แปลง Buasri ID เป็นชื่อ-สกุลจริงเพื่อแสดงผล (ค่าในฐานข้อมูลยังเป็น ID เดิม)
+    # ไม่พบชื่อหรือดึงไม่ได้ -> แสดง ID เดิมแทน ไม่ให้หน้าล่ม
+    ids = {header.get('UserEntry')} if header else set()
+    for row in deleted_history:
+        ids.update((row.get('UserEntry'), row.get('UserDelete')))
+
+    names = {}
+    for uid in ids:
+        if not uid:
+            continue
+        try:
+            info = fetch_user_access(uid)
+        except Exception:
+            info = None
+        names[uid] = info['display_name'] if info else uid
+
+    if header:
+        header['UserEntry_name'] = names.get(header.get('UserEntry'))
+    for row in deleted_history:
+        row['UserEntry_name'] = names.get(row.get('UserEntry'))
+        row['UserDelete_name'] = names.get(row.get('UserDelete'))
 
     # ยังไม่ได้บันทึกอะไร: เติม "วันที่สิ้นสุดสัญญา" จาก Contract_tr.End_contract ให้ล่วงหน้า
     # ยังแก้ได้ เพราะวันสิ้นสุดที่ใช้ยกเลิกอาจต่างจากในสัญญาเดิมโดยเจตนา
@@ -522,7 +575,12 @@ def termination_delete(request, contract_id):
             exc, 'ลบรายการยกเลิกไม่สำเร็จ -- เกิดข้อผิดพลาดจากระบบฐานข้อมูล')
         return redirect(detail_url)
 
-    if result and not result.get('Status_restored'):
+    if result is None:
+        request.session['termination_flash_warning'] = (
+            'ส่งคำสั่งลบรายการยกเลิกแล้ว แต่ระบบไม่ได้รับผลลัพธ์กลับมา '
+            '-- กรุณาตรวจสอบรายการและสถานะสัญญาด้วยตนเอง'
+        )
+    elif not result.get('Status_restored'):
         request.session['termination_flash_warning'] = (
             'ลบรายการยกเลิกแล้ว แต่ระบบคืนสถานะสัญญาให้อัตโนมัติไม่ได้ '
             'เพราะรายการนี้ไม่ได้บันทึกสถานะเดิมไว้ -- กรุณาตรวจสอบสถานะสัญญาด้วยตนเอง'

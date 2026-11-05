@@ -39,6 +39,8 @@ def fetch_contracts_for_termination(search='', status='all'):
                    c.Status_contract_id, s.Status_contract_Desc,
                    cu.CompanyName,
                    CAST(CASE WHEN t.Contract_id IS NULL THEN 0 ELSE 1 END AS int) AS Has_termination,
+                   -- วันที่แจ้งยกเลิก + งวดสุดท้ายที่ผ่อนผัน (NULL ถ้ายังไม่เคยบันทึกยกเลิก)
+                   t.Notify_date, t.Termination_case, t.Last_installment_period,
                    ct.Start_contract, ct.End_contract,
                    -- สถานะ workflow ของสัญญา -- ใช้แยกว่าเป็นสัญญาจริงหรือยังเป็นร่าง
                    -- (ชื่อคอลัมน์ใน Contract_hrd_tr มี underscore สองตัว แต่ใน master มีตัวเดียว)
