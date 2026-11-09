@@ -3,7 +3,7 @@
 from .db import get_db_connection
 
 
-CMS_PARENT_MENU_ID = 41
+CMS_PARENT_MENU_KEY = 'water_electric_new'
 
 
 def fetch_user_access(buasri_id):
@@ -14,7 +14,8 @@ def fetch_user_access(buasri_id):
 
     การอ่านเมนูใช้ความสัมพันธ์เดิมของ K2 เท่านั้น:
     SysUserGroupAssiciate -> SysMenuGroupAssociate -> Sysmenu
-    โดย menuId 41 คือเมนูหลัก "ค่าน้ำประปา-ค่าไฟฟ้า"
+    เมนูหลักของระบบใหม่ค้นด้วย key ``water_electric_new`` แทนการผูกกับ
+    menuId เพราะเลข Identity ของ Sysmenu อาจต่างกันระหว่าง DEV และ PRD
     """
     conn = get_db_connection()
     try:
@@ -72,13 +73,20 @@ def fetch_user_access(buasri_id):
 
         cursor.execute(
             """
+            WITH cms_root AS (
+                SELECT menuId
+                FROM dbo.Sysmenu
+                WHERE menu_name_eng = ?
+                  AND IsActive = 1
+            )
             SELECT DISTINCT
                 menu.menuId,
                 menu.menu_name_eng,
                 menu.MenuNameThai,
                 menu.MenuUrl,
                 menu.OrderNo,
-                menu.ParentMenu
+                menu.ParentMenu,
+                cms_root.menuId AS CmsRootMenuId
             FROM dbo.SysUserGroupAssiciate AS ug
             INNER JOIN dbo.SysGroup AS g
                 ON g.GroupId = ug.GroupId
@@ -86,20 +94,20 @@ def fetch_user_access(buasri_id):
                 ON menu_group.GroupId = ug.GroupId
             INNER JOIN dbo.Sysmenu AS menu
                 ON menu.menuId = menu_group.MenuId
+            CROSS JOIN cms_root
             WHERE ug.Person_Id = ?
               AND ug.IsActive = 1
               AND g.IsActive = 1
               AND menu_group.IsActive = 1
               AND menu.IsActive = 1
               AND (
-                    menu.menuId = ?
-                    OR menu.ParentMenu = ?
+                    menu.menuId = cms_root.menuId
+                    OR menu.ParentMenu = cms_root.menuId
               )
             ORDER BY menu.OrderNo, menu.menuId
             """,
+            CMS_PARENT_MENU_KEY,
             person_id,
-            CMS_PARENT_MENU_ID,
-            CMS_PARENT_MENU_ID,
         )
         menu_rows = cursor.fetchall()
         menus = [
@@ -111,7 +119,7 @@ def fetch_user_access(buasri_id):
                 'order': row[4],
             }
             for row in menu_rows
-            if row[5] == CMS_PARENT_MENU_ID
+            if row[5] == row[6]
         ]
         permissions = {
             menu['key']: True for menu in menus if menu['key']
@@ -121,7 +129,7 @@ def fetch_user_access(buasri_id):
             'display_name': display_name or buasri_id,
             'groups': groups,
             'has_cms_access': any(
-                row[0] == CMS_PARENT_MENU_ID for row in menu_rows
+                row[0] == row[6] for row in menu_rows
             ),
             'menus': menus,
             'menu_ids': [menu['id'] for menu in menus],

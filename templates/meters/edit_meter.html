@@ -10,11 +10,6 @@
     {% endfor %}
   </div>
   {% endif %}
-  <div class="text-sm text-gray-400 mb-1">
-    <a href="{% url 'dashboard' %}" class="hover:text-brand-600">แดชบอร์ด</a>
-    <span class="mx-1">›</span>
-    <span class="text-gray-500">แก้ไขมิเตอร์</span>
-  </div>
 
   {# --- Heading + status badge --- #}
   <div class="flex items-center justify-between gap-3 flex-wrap mb-5 sm:mb-6">
@@ -32,6 +27,7 @@
     <div>
       <label class="block text-xs font-medium text-gray-500 mb-1">รอบบิล — เดือน</label>
       <select name="month" onchange="this.form.submit()"
+              data-custom-select data-custom-select-label="รอบบิล เดือน"
               class="w-full sm:w-auto border border-gray-200 rounded-lg bg-white px-3 py-2.5 sm:py-2 text-base sm:text-sm text-gray-700">
         {% for m in thai_months %}
           <option value="{{ forloop.counter }}" {% if forloop.counter == billing_month %}selected{% endif %}>{{ m }}</option>
@@ -41,6 +37,7 @@
     <div>
       <label class="block text-xs font-medium text-gray-500 mb-1">ปี</label>
       <select name="year" onchange="this.form.submit()"
+              data-custom-select data-custom-select-label="รอบบิล ปี"
               class="w-full sm:w-auto border border-gray-200 rounded-lg bg-white px-3 py-2.5 sm:py-2 text-base sm:text-sm text-gray-700">
         {% for y in year_options %}
           <option value="{{ y }}" {% if y == billing_year %}selected{% endif %}>{{ y }}</option>
@@ -201,6 +198,7 @@
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">ระบบไฟฟ้า</label>
                 <select name="electric_phase" {% if not subarea.electric %}disabled{% endif %}
+                        data-custom-select data-custom-select-label="ระบบไฟฟ้า"
                         class="w-full border border-gray-200 rounded-lg px-3 py-2.5 sm:py-2 text-base sm:text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400">
                   <option value="">ไม่ระบุ</option>
                   {% for opt in phase_options %}

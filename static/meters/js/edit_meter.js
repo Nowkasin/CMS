@@ -12,7 +12,12 @@
       const on = checkbox.checked;
       fields.classList.toggle('opacity-40', !on);
       fields.classList.toggle('pointer-events-none', !on);
-      inputs.forEach((el) => (el.disabled = !on));
+      inputs.forEach((el) => {
+        el.disabled = !on;
+        if (el.matches('select[data-custom-select]')) {
+          el.dispatchEvent(new Event('custom-select:refresh'));
+        }
+      });
     }
 
     checkbox.addEventListener('change', sync);

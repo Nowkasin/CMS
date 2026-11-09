@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{% block title %}ทะเบียนมิเตอร์น้ำ-ไฟ x สัญญา{% endblock %}</title>
+<link rel="icon" type="image/png" href="{% static 'meters/images/Srinakharinwirot_Logo_TH_favicon.png' %}">
+<link rel="apple-touch-icon" href="{% static 'meters/images/Srinakharinwirot_Logo_TH_favicon.png' %}">
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
   tailwind.config = {
@@ -133,6 +135,7 @@
 </div>
 
 <script src="{% static 'meters/js/confirm_submit.js' %}" defer></script>
+<script src="{% static 'meters/js/custom_select.js' %}" defer></script>
 <script>
   // ลิ้นชักเมนูบนมือถือ: ปุ่มขีด 3 ขีดอยู่ใน top_nav.html (id=sidebarOpen)
   (function () {

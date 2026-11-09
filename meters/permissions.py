@@ -54,10 +54,11 @@ URL_PERMISSION_MAP = {
 }
 
 PUBLIC_URL_NAMES = frozenset({'login', 'logout', 'no_permission'})
+HOME_URL_NAMES = frozenset({'home'})
 
 
 def first_allowed_url_name(permissions):
-    """คืนชื่อ URL แรกที่ผู้ใช้มีสิทธิ์ หรือ None เมื่อไม่มีสิทธิ์เมนู"""
+    """คืน URL name แรกตามลำดับเมนูที่ผู้ใช้ได้รับสิทธิ์"""
     for permission, url_name in PERMISSION_HOME_ROUTES:
         if permissions.get(permission):
             return url_name

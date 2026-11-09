@@ -12,10 +12,6 @@
 {% block content %}
 <div class="mx-auto w-full max-w-[1600px]">
 
-  <div class="text-sm text-gray-400 mb-1">
-    <span class="text-gray-500">ยกเลิกสัญญา</span>
-  </div>
-
   <div class="flex flex-col gap-3 mb-5 sm:mb-6 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
     <div>
       <h1 class="text-xl font-bold tracking-tight text-gray-900 sm:text-3xl">ยกเลิกสัญญา</h1>
@@ -53,6 +49,7 @@
       ไม่ซ่อนถาวร -- สลับมาดูได้ เพราะยังแยกไม่ออกว่าแถวไหนจริงแถวไหนทดสอบ
     {% endcomment %}
     <select name="scope" onchange="this.form.submit()"
+            data-custom-select data-custom-select-label="ขอบเขตข้อมูล"
             class="w-full sm:w-auto border border-gray-200 rounded-lg bg-white px-3 py-2.5 sm:py-2 text-base sm:text-sm text-gray-700">
       {% for sc in scopes %}
       <option value="{{ sc.key }}" {% if sc.is_active %}selected{% endif %}>
@@ -61,6 +58,7 @@
       {% endfor %}
     </select>
     <select name="status" onchange="this.form.submit()"
+            data-custom-select data-custom-select-label="สถานะสัญญา"
             class="w-full sm:w-auto border border-gray-200 rounded-lg bg-white px-3 py-2.5 sm:py-2 text-base sm:text-sm text-gray-700">
       <option value="all" {% if status_filter == 'all' %}selected{% endif %}>ทุกสถานะ</option>
       {% for s in statuses %}
@@ -110,9 +108,22 @@
           </div>
         </div>
         <a href="{% url 'termination_detail' m.Contract_id %}?tab={{ active_tab|urlencode }}&scope={{ active_scope|urlencode }}&status={{ status_filter|urlencode }}&q={{ search|urlencode }}&page={{ page_obj.number }}"
-           class="shrink-0 whitespace-nowrap rounded-lg border px-3.5 py-2 text-sm font-semibold transition-colors
+           aria-label="{% if m.is_blocked %}ดูข้อมูลสัญญา{% else %}บันทึกยกเลิกสัญญา{% endif %} {{ m.Contract_code|default:m.Contract_id }}"
+           title="{% if m.is_blocked %}ดูข้อมูล{% else %}บันทึกยกเลิก{% endif %}"
+           class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border px-3.5 py-2 text-sm font-semibold transition-colors
                   {% if m.is_blocked %}border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100{% else %}border-brand-100 bg-brand-50 text-brand-600 hover:bg-brand-100{% endif %}">
-          {% if m.is_blocked %}ดูข้อมูล ›{% else %}บันทึกยกเลิก ›{% endif %}
+          {% if m.is_blocked %}
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12s3.75-6 9.75-6 9.75 6 9.75 6-3.75 6-9.75 6S2.25 12 2.25 12Z"/>
+              <circle cx="12" cy="12" r="2.25"/>
+            </svg>
+            ดูข้อมูล
+          {% else %}
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3.75h7.5l3 3v13.5H6.75zM14.25 3.75v3h3M9.5 11.5l5 5m0-5-5 5"/>
+            </svg>
+            บันทึกยกเลิก
+          {% endif %}
         </a>
       </div>
 
@@ -259,8 +270,21 @@
           {% endcomment %}
           <td class="sticky right-0 z-10 whitespace-nowrap border-l border-gray-100 bg-white px-4 py-2.5 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.12)] group-hover:bg-gray-50">
             <a href="{% url 'termination_detail' m.Contract_id %}?tab={{ active_tab|urlencode }}&scope={{ active_scope|urlencode }}&status={{ status_filter|urlencode }}&q={{ search|urlencode }}&page={{ page_obj.number }}"
-               class="text-sm font-medium {% if m.is_blocked %}text-gray-400 hover:text-gray-600{% else %}text-brand-600 hover:text-brand-700{% endif %}">
-              {% if m.is_blocked %}ดูข้อมูล ›{% else %}บันทึกยกเลิก ›{% endif %}
+               aria-label="{% if m.is_blocked %}ดูข้อมูลสัญญา{% else %}บันทึกยกเลิกสัญญา{% endif %} {{ m.Contract_code|default:m.Contract_id }}"
+               title="{% if m.is_blocked %}ดูข้อมูล{% else %}บันทึกยกเลิก{% endif %}"
+               class="inline-flex items-center gap-1.5 text-sm font-medium {% if m.is_blocked %}text-gray-400 hover:text-gray-600{% else %}text-brand-600 hover:text-brand-700{% endif %}">
+              {% if m.is_blocked %}
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12s3.75-6 9.75-6 9.75 6 9.75 6-3.75 6-9.75 6S2.25 12 2.25 12Z"/>
+                  <circle cx="12" cy="12" r="2.25"/>
+                </svg>
+                ดูข้อมูล
+              {% else %}
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3.75h7.5l3 3v13.5H6.75zM14.25 3.75v3h3M9.5 11.5l5 5m0-5-5 5"/>
+                </svg>
+                บันทึกยกเลิก
+              {% endif %}
             </a>
           </td>
         </tr>

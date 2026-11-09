@@ -1,766 +1,747 @@
 ﻿{% extends "meters/base.html" %}
 {% load static %}
-
 {% block title %}รายละเอียดการยกเลิกสัญญา{% endblock %}
-
 {% block content %}
-<div class="mx-auto w-full max-w-[1600px]">
-
-  <div class="text-sm text-gray-400 mb-1">
+  <div class="mx-auto w-full max-w-[1600px]">
     {% comment %}
-      พา query string ของหน้ารายการกลับไปด้วย (view ส่งมาใน back_qs)
-      ไม่งั้นกดลิงก์นี้จะเด้งไปแท็บเริ่มต้น ไม่ใช่ตัวกรองที่ผู้ใช้ตั้งไว้
-      (ปุ่ม back ของเบราว์เซอร์ทำงานอยู่แล้วเพราะหน้ารายการเป็น GET แต่ลิงก์นี้ควรตรงกัน)
-    {% endcomment %}
-    <a href="{% url 'termination_search' %}{% if back_qs %}?{{ back_qs }}{% endif %}"
-       class="hover:text-brand-600">ยกเลิกสัญญา</a>
-    <span class="mx-1">›</span>
-    <span class="text-gray-500">สัญญา #{{ contract_id }}</span>
-  </div>
-
-  {% comment %}
     หัวหน้าต้องระบุตัวสัญญาให้ชัด -- เดิมขึ้นแค่ "Contract_id #1" ซึ่งไม่บอกอะไรเลย
     หน้านี้บันทึกได้ครั้งเดียวและแก้ไม่ได้ ถ้าเข้าผิดสัญญาต้องมองออกก่อนกดบันทึก
-  {% endcomment %}
-  <div class="flex flex-col gap-4 mb-5 sm:mb-6 sm:flex-row sm:items-start sm:justify-between">
-    <div class="min-w-0">
-      <h1 class="text-xl font-bold tracking-tight text-gray-900 sm:text-3xl">รายละเอียดการยกเลิกสัญญา</h1>
-      <p class="text-lg font-semibold text-gray-800 mt-2 break-words">{{ contract.Contract_code|default:"ไม่มีรหัสสัญญา" }}</p>
-      <p class="text-sm text-gray-600 break-words">{{ contract.CompanyName|default:"ไม่มีชื่อลูกค้าในระบบ" }}</p>
-      {% if contract.SAPVendor_Id %}
-        <p class="text-xs text-gray-400">
-          รหัสผู้ขาย SAP {{ contract.SAPVendor_Id }}
-          {% if contract.Customer_id and contract.Customer_id != contract.SAPVendor_Id %}
-            · รหัสลูกหนี้ {{ contract.Customer_id }}
-          {% endif %}
-        </p>
-      {% endif %}
-      {% comment %}
+    {% endcomment %}
+    <div class="flex flex-col gap-4 mb-5 sm:mb-6 sm:flex-row sm:items-start sm:justify-between">
+      <div class="min-w-0">
+        <h1 class="text-xl font-bold tracking-tight text-gray-900 sm:text-3xl">รายละเอียดการยกเลิกสัญญา</h1>
+        <p class="text-lg font-semibold text-gray-800 mt-2 break-words">{{ contract.Contract_code|default:"ไม่มีรหัสสัญญา" }}</p>
+        <p class="text-sm text-gray-600 break-words">{{ contract.CompanyName|default:"ไม่มีชื่อลูกค้าในระบบ" }}</p>
+        {% if contract.SAPVendor_Id %}
+          <p class="text-xs text-gray-400">
+            Vendor : {{ contract.SAPVendor_Id }}
+            {% if contract.Customer_id and contract.Customer_id != contract.SAPVendor_Id %}
+              · Vendor : {{ contract.Customer_id }}
+            {% endif %}
+          </p>
+        {% endif %}
+        {% comment %}
         ช่วงอายุสัญญาจาก Contract_tr (Start_contract / End_contract)
         เป็นที่มาของค่าที่เติมในช่อง "วันที่สิ้นสุดสัญญา" โชว้ไว้ให้ผู้ใช้ตรวจทานได้
-      {% endcomment %}
-      {% if contract.start_contract_label or contract.end_contract_label %}
-      <p class="text-sm text-gray-500 mt-1.5">
-        อายุสัญญา {{ contract.start_contract_label|default:"—" }} ถึง {{ contract.end_contract_label|default:"—" }}
-        {% if contract.Contract_Installment_age %}
-          <span class="text-gray-400">({{ contract.Contract_Installment_age }})</span>
+        {% endcomment %}
+        {% if contract.start_contract_label or contract.end_contract_label %}
+          <p class="text-sm text-gray-500 mt-1.5">
+            อายุสัญญา {{ contract.start_contract_label|default:"—" }} ถึง {{ contract.end_contract_label|default:"—" }}
+            {% if contract.Contract_Installment_age %}
+              <span class="text-gray-400">({{ contract.Contract_Installment_age }})</span>
+            {% endif %}
+          </p>
         {% endif %}
-      </p>
-      {% endif %}
-      <p class="text-xs text-gray-400 mt-1">
-        Contract_id #{{ contract_id }}
-        {% if contract.Contract_year %} · ปีสัญญา {{ contract.Contract_year }}{% endif %}
-        {% if contract.Vendor_tel %} · โทร {{ contract.Vendor_tel }}{% endif %}
-        {% if contract.Status_workflow_Desc %} · ขั้น {{ contract.Status_workflow_Desc }}{% endif %}
-      </p>
-    </div>
-    <div class="flex flex-wrap items-center gap-2 sm:flex-col sm:items-end">
-      <a href="{% url 'activity_log' %}?contract={{ contract_id }}"
-         class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50">
-        ดูประวัติสัญญา
-      </a>
-      <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
-        สถานะสัญญา: {{ contract.Status_contract_Desc|default:"—" }}
-      </span>
-      {% comment %}
+        <p class="text-xs text-gray-400 mt-1">
+          Contract_id #{{ contract_id }}
+          {% if contract.Contract_year %}· ปีสัญญา {{ contract.Contract_year }}{% endif %}
+          {% if contract.Vendor_tel %}· โทร {{ contract.Vendor_tel }}{% endif %}
+          {% if contract.Status_workflow_Desc %}· ขั้น {{ contract.Status_workflow_Desc }}{% endif %}
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2 sm:flex-col sm:items-end">
+        <a href="{% url 'activity_log' %}?contract={{ contract_id }}"
+           class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50">
+          ดูประวัติสัญญา
+        </a>
+        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
+          สถานะสัญญา: {{ contract.Status_contract_Desc|default:"—" }}
+        </span>
+        {% comment %}
         ป้าย "หมดอายุแล้ว" คำนวณจาก End_contract < วันนี้ ไม่ใช่ Status_contract_id
         ข้อมูลจริงมี 199 จาก 222 สัญญาที่หมดอายุแล้วแต่สถานะยังเป็น '1' (สัญญา)
         จึงต้องเขียนกำกับว่าอันนี้มาจากอายุสัญญา ไม่ใช่สถานะในระบบ
         ไม่บล็อกการยกเลิก -- สัญญาหมดอายุคือเคสที่ควรยกเลิก (case 2 สิ้นสุดตามอายุ)
-      {% endcomment %}
-      {% if end_date_is_past %}
-      <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-600"
-            title="คำนวณจากวันสิ้นสุดอายุสัญญา ไม่ใช่สถานะที่บันทึกในระบบ">
-        ตามอายุสัญญา: หมดอายุแล้ว{% if contract.expired_ago_label %} {{ contract.expired_ago_label }}{% endif %}
-      </span>
-      {% elif contract.End_contract %}
-      <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600"
-            title="คำนวณจากวันสิ้นสุดอายุสัญญา ไม่ใช่สถานะที่บันทึกในระบบ">
-        ตามอายุสัญญา: ยังไม่หมดอายุ
-      </span>
-      {% endif %}
-      {% if header %}
-        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-600">
-          มีข้อมูลยกเลิกแล้ว
-        </span>
-      {% else %}
-        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-600">
-          ยังไม่มีข้อมูลยกเลิก
-        </span>
-      {% endif %}
+        {% endcomment %}
+        {% if end_date_is_past %}
+          <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-600"
+                title="คำนวณจากวันสิ้นสุดอายุสัญญา ไม่ใช่สถานะที่บันทึกในระบบ">
+            ตามอายุสัญญา: หมดอายุแล้ว{% if contract.expired_ago_label %} {{ contract.expired_ago_label }}{% endif %}
+          </span>
+        {% elif contract.End_contract %}
+          <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600"
+                title="คำนวณจากวันสิ้นสุดอายุสัญญา ไม่ใช่สถานะที่บันทึกในระบบ">ตามอายุสัญญา: ยังไม่หมดอายุ</span>
+        {% endif %}
+        {% if header %}
+          <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-600">
+            มีข้อมูลยกเลิกแล้ว
+          </span>
+        {% else %}
+          <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-600">
+            ยังไม่มีข้อมูลยกเลิก
+          </span>
+        {% endif %}
+      </div>
     </div>
-  </div>
-
-  {% if errors %}
-  <div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-4 space-y-1">
-    {% for err in errors %}
-      <div>{{ err }}</div>
-    {% endfor %}
-  </div>
-  {% endif %}
-
-  {% if flash_success %}
-  <div class="bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg px-4 py-3 mb-4">
-    {{ flash_success }}
-  </div>
-  {% endif %}
-
-  {% if flash_warning %}
-  <div class="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-4 py-3 mb-4">
-    {{ flash_warning }}
-  </div>
-  {% endif %}
-
-  {% comment %}
+    {% if errors %}
+      <div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-4 space-y-1">
+        {% for err in errors %}
+          <div>{{ err }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% if flash_success %}
+      <div class="bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg px-4 py-3 mb-4">
+        {{ flash_success }}
+      </div>
+    {% endif %}
+    {% if flash_warning %}
+      <div class="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-4 py-3 mb-4">
+        {{ flash_warning }}
+      </div>
+    {% endif %}
+    {% comment %}
     ชื่อลูกค้าในสัญญาไม่ตรงกับ master ฝั่ง SAP (Contract_Customer_SAP_ms)
     ข้อมูลจริงมี 3 สัญญาที่เป็นคนละคนกันเลย (Contract_id 9, 19, 189)
     ไม่เลือกข้างให้ -- แสดงทั้งสองค่าแล้วให้คนตรวจสอบ เพราะยังไม่รู้ว่าฝั่งไหนถูก
-  {% endcomment %}
-  {% if contract.sap_name_differs %}
-  <div class="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-4 py-3 mb-4">
-    <p class="font-medium mb-1">ชื่อลูกค้าไม่ตรงกับข้อมูล SAP</p>
-    <div class="text-xs space-y-0.5">
-      <div class="break-words">ในสัญญา (Contract_customer_tr): <span class="font-medium">{{ contract.CompanyName|default:"—" }}</span></div>
-      <div class="break-words">ใน SAP (รหัสผู้ขาย {{ contract.SAPVendor_Id|default:"—" }}): <span class="font-medium">{{ contract.SAP_CompanyName|default:"—" }}</span></div>
-    </div>
-    <p class="text-xs mt-1.5">กรุณาตรวจสอบว่ากำลังยกเลิกสัญญาของคู่สัญญารายที่ถูกต้องก่อนบันทึก</p>
-  </div>
-  {% endif %}
-
-  {% comment %}
+    {% endcomment %}
+    {% if contract.sap_name_differs %}
+      <div class="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-4 py-3 mb-4">
+        <p class="font-medium mb-1">ชื่อลูกค้าไม่ตรงกับข้อมูล SAP</p>
+        <div class="text-xs space-y-0.5">
+          <div class="break-words">ในสัญญา (Contract_customer_tr): <span class="font-medium">{{ contract.CompanyName|default:"—" }}</span></div>
+          <div class="break-words">ใน SAP (รหัสผู้ขาย {{ contract.SAPVendor_Id|default:"—" }}): <span class="font-medium">{{ contract.SAP_CompanyName|default:"—" }}</span></div>
+        </div>
+        <p class="text-xs mt-1.5">กรุณาตรวจสอบว่ากำลังยกเลิกสัญญาของคู่สัญญารายที่ถูกต้องก่อนบันทึก</p>
+      </div>
+    {% endif %}
+    {% comment %}
     เตือนถ้าสัญญายัง workflow ไม่เสร็จสมบูรณ์ -- ข้อมูลจริงมี 44 ฉบับแบบนี้
     ไม่บล็อก เพราะ 24 ฉบับในนั้นตั้งหนี้ไปแล้วจริง อาจต้องยกเลิกจริง
-  {% endcomment %}
-  {% if contract.Status_workflow__id and contract.Status_workflow__id != '40' and contract.Status_workflow__id != '50' %}
-  <div class="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-4 py-3 mb-4">
-    สัญญาฉบับนี้อยู่ขั้น "{{ contract.Status_workflow_Desc|default:"ไม่ทราบขั้น" }}"
-    ยังไม่ถึงขั้นสัญญาเสร็จสมบูรณ์ -- ตรวจสอบให้แน่ใจว่าเป็นสัญญาที่ต้องยกเลิกจริงก่อนบันทึก
-  </div>
-  {% endif %}
-
-  {% comment %}
+    {% endcomment %}
+    {% if contract.Status_workflow__id and contract.Status_workflow__id != "40" and contract.Status_workflow__id != "50" %}
+      <div class="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-4 py-3 mb-4">
+        สัญญาฉบับนี้อยู่ขั้น "{{ contract.Status_workflow_Desc|default:"ไม่ทราบขั้น" }}"
+        ยังไม่ถึงขั้นสัญญาเสร็จสมบูรณ์ -- ตรวจสอบให้แน่ใจว่าเป็นสัญญาที่ต้องยกเลิกจริงก่อนบันทึก
+      </div>
+    {% endif %}
+    {% comment %}
     สถานะสัญญาปิด/ยกเลิกไปแล้วแต่ไม่มีแถวใน Contract_termination_tr -- เกิดจากระบบอื่น
     ตั้งสถานะไว้ (ข้อมูลจริงมีอยู่ เช่น Contract_id 113) ต้องบอกให้ชัดว่าทำต่อไม่ได้
-  {% endcomment %}
-  {% if blocked_status and not header %}
-  <div class="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-4 py-3 mb-4">
-    สัญญานี้มีสถานะ "{{ contract.Status_contract_Desc|default:"—" }}" อยู่แล้ว
-    จึงบันทึกยกเลิกสัญญาซ้ำไม่ได้ (ไม่พบรายการยกเลิกในระบบนี้ -- สถานะน่าจะถูกตั้งจากช่องทางอื่น)
-    หากข้อมูลไม่ถูกต้องกรุณาติดต่อผู้ดูแลระบบ
-  </div>
-  {% endif %}
-
-  {% comment %}
+    {% endcomment %}
+    {% if blocked_status and not header %}
+      <div class="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-4 py-3 mb-4">
+        สัญญานี้มีสถานะ "{{ contract.Status_contract_Desc|default:"—" }}" อยู่แล้ว
+        จึงบันทึกยกเลิกสัญญาซ้ำไม่ได้ (ไม่พบรายการยกเลิกในระบบนี้ -- สถานะน่าจะถูกตั้งจากช่องทางอื่น)
+        หากข้อมูลไม่ถูกต้องกรุณาติดต่อผู้ดูแลระบบ
+      </div>
+    {% endif %}
+    {% comment %}
     ประวัติรายการยกเลิกที่ถูกลบของสัญญานี้ -- จาก Contract_termination_tr_log
     ข้อมูลถูกเก็บตอนลบอยู่แล้ว แต่เดิมไม่มีที่ไหนเอามาแสดง ถ้ามีคนลบแล้วบันทึกใหม่
     จะมองไม่เห็นว่ารายการก่อนหน้าเป็นอะไรและใครลบ
     มือถือ: การ์ดต่อรายการ / จอ md ขึ้นไป: ตาราง
-  {% endcomment %}
-  {% if deleted_history %}
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-6 mb-4 sm:mb-6">
-    <div class="flex items-baseline justify-between gap-3 mb-3">
-      <h2 class="text-base font-bold text-gray-900">ประวัติรายการยกเลิกที่ถูกลบ</h2>
-      <span class="text-xs text-gray-400 shrink-0">{{ deleted_history|length }} รายการ</span>
-    </div>
-
-    <div class="space-y-3 md:hidden">
-      {% for g in deleted_history %}
-      <div class="rounded-lg border border-gray-200 bg-gray-50/60 p-3 space-y-2 text-xs">
-        <div class="font-medium text-gray-800 text-sm">{{ g.Termination_case_name|default:"—" }}</div>
-        <dl class="grid grid-cols-2 gap-x-3 gap-y-2">
-          <div>
-            <dt class="text-gray-400">สิ้นสุดสัญญา</dt>
-            <dd class="mt-0.5 text-gray-700">{{ g.end_date_label|default:"—" }}</dd>
-          </div>
-          <div>
-            <dt class="text-gray-400">งวดสุดท้าย</dt>
-            <dd class="mt-0.5 text-gray-700">{{ g.last_period_label|default:g.Last_installment_period|default:"—" }}</dd>
-          </div>
-          <div class="col-span-2">
-            <dt class="text-gray-400">หมายเหตุ</dt>
-            <dd class="mt-0.5 text-gray-600 break-words">{{ g.Remark|default:"—" }}</dd>
-          </div>
-          <div>
-            <dt class="text-gray-400">บันทึกโดย/เมื่อ</dt>
-            <dd class="mt-0.5 text-gray-600">
-              <span title="{{ g.UserEntry|default:'' }}">{{ g.UserEntry_name|default:"—" }}</span><br>
-              <span class="text-gray-400">{{ g.entry_label|default:"—" }}</span>
-            </dd>
-          </div>
-          <div>
-            <dt class="text-gray-400">ลบโดย/เมื่อ</dt>
-            <dd class="mt-0.5 text-gray-600">
-              <span title="{{ g.UserDelete|default:'' }}">{{ g.UserDelete_name|default:"—" }}</span><br>
-              <span class="text-gray-400">{{ g.delete_label|default:"—" }}</span>
-            </dd>
-          </div>
-        </dl>
-      </div>
-      {% endfor %}
-    </div>
-
-    <div class="hidden overflow-x-auto md:block">
-      <table class="min-w-[900px] w-full text-xs text-left">
-        <thead>
-          <tr class="border-b border-gray-100 bg-gray-50">
-            <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">กรณี</th>
-            <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">สิ้นสุดสัญญา</th>
-            <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">งวดสุดท้าย</th>
-            <th class="px-3 py-2 font-semibold text-gray-500">หมายเหตุ</th>
-            <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">บันทึกโดย/เมื่อ</th>
-            <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">ลบโดย/เมื่อ</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-50">
+    {% endcomment %}
+    {% if deleted_history %}
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-6 mb-4 sm:mb-6">
+        <div class="flex items-baseline justify-between gap-3 mb-3">
+          <h2 class="text-base font-bold text-gray-900">ประวัติรายการยกเลิกที่ถูกลบ</h2>
+          <span class="text-xs text-gray-400 shrink-0">{{ deleted_history|length }} รายการ</span>
+        </div>
+        <div class="space-y-3 md:hidden">
           {% for g in deleted_history %}
-          <tr>
-            <td class="px-3 py-2 text-gray-700">{{ g.Termination_case_name|default:"—" }}</td>
-            <td class="px-3 py-2 text-gray-700 whitespace-nowrap">{{ g.end_date_label|default:"—" }}</td>
-            <td class="px-3 py-2 text-gray-700 whitespace-nowrap">
-              {{ g.last_period_label|default:g.Last_installment_period|default:"—" }}
-            </td>
-            <td class="px-3 py-2 text-gray-600 max-w-[200px] truncate" title="{{ g.Remark|default:'' }}">
-              {{ g.Remark|default:"—" }}
-            </td>
-            <td class="px-3 py-2 text-gray-600 whitespace-nowrap">
-              <span title="{{ g.UserEntry|default:'' }}">{{ g.UserEntry_name|default:"—" }}</span><br>
-              <span class="text-gray-400">{{ g.entry_label|default:"—" }}</span>
-            </td>
-            <td class="px-3 py-2 text-gray-600 whitespace-nowrap">
-              <span title="{{ g.UserDelete|default:'' }}">{{ g.UserDelete_name|default:"—" }}</span><br>
-              <span class="text-gray-400">{{ g.delete_label|default:"—" }}</span>
-            </td>
-          </tr>
+            <div class="rounded-lg border border-gray-200 bg-gray-50/60 p-3 space-y-2 text-xs">
+              <div class="font-medium text-gray-800 text-sm">{{ g.Termination_case_name|default:"—" }}</div>
+              <dl class="grid grid-cols-2 gap-x-3 gap-y-2">
+                <div>
+                  <dt class="text-gray-400">สิ้นสุดสัญญา</dt>
+                  <dd class="mt-0.5 text-gray-700">
+                    {{ g.end_date_label|default:"—" }}
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-gray-400">งวดสุดท้าย</dt>
+                  <dd class="mt-0.5 text-gray-700">
+                    {{ g.last_period_label|default:g.Last_installment_period|default:"—" }}
+                  </dd>
+                </div>
+                <div class="col-span-2">
+                  <dt class="text-gray-400">หมายเหตุ</dt>
+                  <dd class="mt-0.5 text-gray-600 break-words">
+                    {{ g.Remark|default:"—" }}
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-gray-400">บันทึกโดย/เมื่อ</dt>
+                  <dd class="mt-0.5 text-gray-600">
+                    <span title="{{ g.UserEntry|default:'' }}">{{ g.UserEntry_name|default:"—" }}</span>
+                    <br>
+                    <span class="text-gray-400">{{ g.entry_label|default:"—" }}</span>
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-gray-400">ลบโดย/เมื่อ</dt>
+                  <dd class="mt-0.5 text-gray-600">
+                    <span title="{{ g.UserDelete|default:'' }}">{{ g.UserDelete_name|default:"—" }}</span>
+                    <br>
+                    <span class="text-gray-400">{{ g.delete_label|default:"—" }}</span>
+                  </dd>
+                </div>
+              </dl>
+            </div>
           {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  {% endif %}
-
-  {% comment %}
+        </div>
+        <div class="hidden overflow-x-auto md:block">
+          <table class="min-w-[900px] w-full text-xs text-left">
+            <thead>
+              <tr class="border-b border-gray-100 bg-gray-50">
+                <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">กรณี</th>
+                <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">สิ้นสุดสัญญา</th>
+                <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">งวดสุดท้าย</th>
+                <th class="px-3 py-2 font-semibold text-gray-500">หมายเหตุ</th>
+                <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">บันทึกโดย/เมื่อ</th>
+                <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">ลบโดย/เมื่อ</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50">
+              {% for g in deleted_history %}
+                <tr>
+                  <td class="px-3 py-2 text-gray-700">{{ g.Termination_case_name|default:"—" }}</td>
+                  <td class="px-3 py-2 text-gray-700 whitespace-nowrap">{{ g.end_date_label|default:"—" }}</td>
+                  <td class="px-3 py-2 text-gray-700 whitespace-nowrap">
+                    {{ g.last_period_label|default:g.Last_installment_period|default:"—" }}
+                  </td>
+                  <td class="px-3 py-2 text-gray-600 max-w-[200px] truncate"
+                      title="{{ g.Remark|default:'' }}">{{ g.Remark|default:"—" }}</td>
+                  <td class="px-3 py-2 text-gray-600 whitespace-nowrap">
+                    <span title="{{ g.UserEntry|default:'' }}">{{ g.UserEntry_name|default:"—" }}</span>
+                    <br>
+                    <span class="text-gray-400">{{ g.entry_label|default:"—" }}</span>
+                  </td>
+                  <td class="px-3 py-2 text-gray-600 whitespace-nowrap">
+                    <span title="{{ g.UserDelete|default:'' }}">{{ g.UserDelete_name|default:"—" }}</span>
+                    <br>
+                    <span class="text-gray-400">{{ g.delete_label|default:"—" }}</span>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% endif %}
+    {% comment %}
     มิเตอร์ที่ผูกกับสัญญานี้ -- เดิมเป็น raw dump ที่วน .keys/.values ออกมาทั้ง 11 คอลัมน์
     หัวตารางเป็นชื่อคอลัมน์ภาษาอังกฤษ และมีแต่ Location_id/Area_id ที่เป็นรหัสล้วน
     ตอนนี้เลือกเฉพาะคอลัมน์ที่ใช้จริง หัวตารางเป็นไทย และ service เติมชื่อสถานที่/พื้นที่มาให้
     มือถือ: การ์ดต่อมิเตอร์ / จอ md ขึ้นไป: ตาราง
-  {% endcomment %}
-  {% if contract_meters %}
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-6 mb-4 sm:mb-6">
-    <div class="flex items-baseline justify-between gap-3 mb-4">
-      <h2 class="text-base font-bold text-gray-900">มิเตอร์ที่ผูกกับสัญญานี้</h2>
-      <span class="text-xs text-gray-400 shrink-0">{{ contract_meters|length }} รายการ</span>
-    </div>
-    {% comment %}
+    {% endcomment %}
+    {% if contract_meters %}
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-6 mb-4 sm:mb-6">
+        <div class="flex items-baseline justify-between gap-3 mb-4">
+          <h2 class="text-base font-bold text-gray-900">มิเตอร์ที่ผูกกับสัญญานี้</h2>
+          <span class="text-xs text-gray-400 shrink-0">{{ contract_meters|length }} รายการ</span>
+        </div>
+        {% comment %}
       ข้อมูลจริงมีมิเตอร์คนละตัว (Meter_id ต่างกัน) ที่พื้นที่ย่อย+ประเภท+เลขมิเตอร์เหมือนกัน
       เช่นสัญญา 226 มี Meter_id 1018 และ 1042 เลข 9429518 ทั้งคู่ -- บอกไว้ให้ชัด
       ไม่งั้นตารางจะดูเหมือนแสดงแถวซ้ำเอง
-    {% endcomment %}
-    {% if duplicate_meter_count %}
-    <div class="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2 mb-3">
-      พบมิเตอร์ที่พื้นที่ย่อย ประเภท และเลขมิเตอร์ซ้ำกัน เกินมา {{ duplicate_meter_count }} รายการ
-      (เป็นมิเตอร์คนละตัวในทะเบียน ดูได้จากคอลัมน์รหัสมิเตอร์) -- เป็นปัญหาข้อมูลซ้ำในทะเบียนมิเตอร์
-      ไม่ใช่การแสดงผลผิด กรุณาแจ้งผู้ดูแลระบบให้ตรวจสอบ
-    </div>
-    {% endif %}
-
-    <div class="space-y-3 md:hidden">
-      {% for row in contract_meters %}
-      <div class="rounded-lg border p-3 space-y-2 text-xs {% if row.is_duplicate %}border-amber-200 bg-amber-50/50{% else %}border-gray-200 bg-gray-50/60{% endif %}">
-        <div class="flex flex-wrap items-center gap-2">
-          <span class="text-sm font-semibold text-gray-800">รหัส {{ row.Meter_id|default:"—" }}</span>
-          {% if row.is_duplicate %}
-            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">ซ้ำ</span>
-          {% endif %}
-          <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{{ row.Meter_type_name|default:"—" }}</span>
-        </div>
-        <dl class="grid grid-cols-2 gap-x-3 gap-y-2">
-          <div>
-            <dt class="text-gray-400">เลขมิเตอร์</dt>
-            <dd class="mt-0.5 text-gray-700 break-words">{{ row.Meter_no|default:"ยังไม่มีเลขมิเตอร์" }}</dd>
+        {% endcomment %}
+        {% if duplicate_meter_count %}
+          <div class="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2 mb-3">
+            พบมิเตอร์ที่พื้นที่ย่อย ประเภท และเลขมิเตอร์ซ้ำกัน เกินมา {{ duplicate_meter_count }} รายการ
+            (เป็นมิเตอร์คนละตัวในทะเบียน ดูได้จากคอลัมน์รหัสมิเตอร์) -- เป็นปัญหาข้อมูลซ้ำในทะเบียนมิเตอร์
+            ไม่ใช่การแสดงผลผิด กรุณาแจ้งผู้ดูแลระบบให้ตรวจสอบ
           </div>
-          <div>
-            <dt class="text-gray-400">ระบบไฟฟ้า</dt>
-            <dd class="mt-0.5 text-gray-700">{{ row.Phase_type|default:"—" }}</dd>
-          </div>
-          <div class="col-span-2">
-            <dt class="text-gray-400">สถานที่</dt>
-            <dd class="mt-0.5 text-gray-700 break-words">
-              {{ row.Location_name|default:"—" }}
-              <span class="text-gray-400">({{ row.Location_id|default:"—" }})</span>
-            </dd>
-          </div>
-          <div>
-            <dt class="text-gray-400">พื้นที่</dt>
-            <dd class="mt-0.5 text-gray-700 break-words">
-              {{ row.Area_name|default:"—" }}
-              <span class="text-gray-400">({{ row.Area_id|default:"—" }})</span>
-            </dd>
-          </div>
-          <div>
-            <dt class="text-gray-400">พื้นที่ย่อย</dt>
-            <dd class="mt-0.5 text-gray-700 break-words">
-              {{ row.SubArea_name|default:"—" }}
-              <span class="text-gray-400">({{ row.SubArea_id|default:"—" }})</span>
-            </dd>
-          </div>
-        </dl>
-      </div>
-      {% endfor %}
-    </div>
-
-    <div class="hidden overflow-x-auto md:block">
-      <table class="min-w-[1000px] w-full text-xs text-left">
-        <thead>
-          <tr class="border-b border-gray-100 bg-gray-50">
-            <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">รหัสมิเตอร์</th>
-            <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">สถานที่</th>
-            <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">พื้นที่</th>
-            <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">พื้นที่ย่อย</th>
-            <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">ประเภทมิเตอร์</th>
-            <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">เลขมิเตอร์</th>
-            <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">ระบบไฟฟ้า</th>
-          </tr>
-        </thead>
-        <tbody>
+        {% endif %}
+        <div class="space-y-3 md:hidden">
           {% for row in contract_meters %}
-          <tr class="border-b border-gray-50 {% if row.is_duplicate %}bg-amber-50/40{% endif %}">
-            <td class="px-3 py-2 text-gray-700 whitespace-nowrap">
-              {{ row.Meter_id|default:"—" }}
-              {% if row.is_duplicate %}
-                <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">ซ้ำ</span>
-              {% endif %}
-            </td>
-            <td class="px-3 py-2 text-gray-700">
-              {{ row.Location_name|default:"—" }}
-              <span class="text-gray-400">({{ row.Location_id|default:"—" }})</span>
-            </td>
-            <td class="px-3 py-2 text-gray-700">
-              {{ row.Area_name|default:"—" }}
-              <span class="text-gray-400">({{ row.Area_id|default:"—" }})</span>
-            </td>
-            <td class="px-3 py-2 text-gray-700">
-              {{ row.SubArea_name|default:"—" }}
-              <span class="text-gray-400">({{ row.SubArea_id|default:"—" }})</span>
-            </td>
-            <td class="px-3 py-2 text-gray-700 whitespace-nowrap">{{ row.Meter_type_name|default:"—" }}</td>
-            <td class="px-3 py-2 text-gray-700 whitespace-nowrap">{{ row.Meter_no|default:"ยังไม่มีเลขมิเตอร์" }}</td>
-            <td class="px-3 py-2 text-gray-700 whitespace-nowrap">{{ row.Phase_type|default:"—" }}</td>
-          </tr>
+            <div class="rounded-lg border p-3 space-y-2 text-xs {% if row.is_duplicate %}border-amber-200 bg-amber-50/50{% else %}border-gray-200 bg-gray-50/60{% endif %}">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-sm font-semibold text-gray-800">รหัส {{ row.Meter_id|default:"—" }}</span>
+                {% if row.is_duplicate %}
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">ซ้ำ</span>
+                {% endif %}
+                <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{{ row.Meter_type_name|default:"—" }}</span>
+              </div>
+              <dl class="grid grid-cols-2 gap-x-3 gap-y-2">
+                <div>
+                  <dt class="text-gray-400">เลขมิเตอร์</dt>
+                  <dd class="mt-0.5 text-gray-700 break-words">
+                    {{ row.Meter_no|default:"ยังไม่มีเลขมิเตอร์" }}
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-gray-400">ระบบไฟฟ้า</dt>
+                  <dd class="mt-0.5 text-gray-700">
+                    {{ row.Phase_type|default:"—" }}
+                  </dd>
+                </div>
+                <div class="col-span-2">
+                  <dt class="text-gray-400">สถานที่</dt>
+                  <dd class="mt-0.5 text-gray-700 break-words">
+                    {{ row.Location_name|default:"—" }}
+                    <span class="text-gray-400">({{ row.Location_id|default:"—" }})</span>
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-gray-400">พื้นที่</dt>
+                  <dd class="mt-0.5 text-gray-700 break-words">
+                    {{ row.Area_name|default:"—" }}
+                    <span class="text-gray-400">({{ row.Area_id|default:"—" }})</span>
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-gray-400">พื้นที่ย่อย</dt>
+                  <dd class="mt-0.5 text-gray-700 break-words">
+                    {{ row.SubArea_name|default:"—" }}
+                    <span class="text-gray-400">({{ row.SubArea_id|default:"—" }})</span>
+                  </dd>
+                </div>
+              </dl>
+            </div>
           {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  {% else %}
-  <div class="bg-yellow-50 border border-yellow-200 text-yellow-700 text-xs rounded-lg px-4 py-3 mb-4 sm:mb-6">
-    ไม่พบมิเตอร์ที่ผูกกับสัญญานี้
-  </div>
-  {% endif %}
-
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-
-    {# --- ฝั่งซ้าย: ฟอร์มข้อมูลยกเลิก --- #}
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-6">
-      <h2 class="text-base font-bold text-gray-900 mb-1">ข้อมูลการยกเลิก</h2>
-      {% if header %}
-        {% comment %}
+        </div>
+        <div class="hidden overflow-x-auto md:block">
+          <table class="min-w-[1000px] w-full text-xs text-left">
+            <thead>
+              <tr class="border-b border-gray-100 bg-gray-50">
+                <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">รหัสมิเตอร์</th>
+                <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">สถานที่</th>
+                <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">พื้นที่</th>
+                <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">พื้นที่ย่อย</th>
+                <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">ประเภทมิเตอร์</th>
+                <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">เลขมิเตอร์</th>
+                <th class="px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">ระบบไฟฟ้า</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in contract_meters %}
+                <tr class="border-b border-gray-50 {% if row.is_duplicate %}bg-amber-50/40{% endif %}">
+                  <td class="px-3 py-2 text-gray-700 whitespace-nowrap">
+                    {{ row.Meter_id|default:"—" }}
+                    {% if row.is_duplicate %}
+                      <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">ซ้ำ</span>
+                    {% endif %}
+                  </td>
+                  <td class="px-3 py-2 text-gray-700">
+                    {{ row.Location_name|default:"—" }}
+                    <span class="text-gray-400">({{ row.Location_id|default:"—" }})</span>
+                  </td>
+                  <td class="px-3 py-2 text-gray-700">
+                    {{ row.Area_name|default:"—" }}
+                    <span class="text-gray-400">({{ row.Area_id|default:"—" }})</span>
+                  </td>
+                  <td class="px-3 py-2 text-gray-700">
+                    {{ row.SubArea_name|default:"—" }}
+                    <span class="text-gray-400">({{ row.SubArea_id|default:"—" }})</span>
+                  </td>
+                  <td class="px-3 py-2 text-gray-700 whitespace-nowrap">{{ row.Meter_type_name|default:"—" }}</td>
+                  <td class="px-3 py-2 text-gray-700 whitespace-nowrap">{{ row.Meter_no|default:"ยังไม่มีเลขมิเตอร์" }}</td>
+                  <td class="px-3 py-2 text-gray-700 whitespace-nowrap">{{ row.Phase_type|default:"—" }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% else %}
+      <div class="bg-yellow-50 border border-yellow-200 text-yellow-700 text-xs rounded-lg px-4 py-3 mb-4 sm:mb-6">
+        ไม่พบมิเตอร์ที่ผูกกับสัญญานี้
+      </div>
+    {% endif %}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+      {# --- ฝั่งซ้าย: ฟอร์มข้อมูลยกเลิก --- #}
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-6">
+        <h2 class="text-base font-bold text-gray-900 mb-1">ข้อมูลการยกเลิก</h2>
+        {% if header %}
+          {% comment %}
           sp_Contract_Termination_Save ปฏิเสธการบันทึกซ้ำ (RAISERROR ถ้าสัญญานี้มีข้อมูลยกเลิกแล้ว)
           ข้อความเดิมเขียนว่า "บันทึกทับข้อมูลเดิมได้" ซึ่งไม่ตรงกับพฤติกรรมจริง
-        {% endcomment %}
-        <p class="text-xs text-amber-600 mb-5">
-          สัญญานี้บันทึกข้อมูลยกเลิกไว้แล้ว -- แก้ไขค่าเดิมโดยตรงไม่ได้
-          ถ้ากรอกผิด ให้ลบรายการนี้ (ปุ่มด้านล่าง) แล้วบันทึกใหม่
-        </p>
-      {% elif blocked_status %}
-        <p class="text-xs text-amber-600 mb-5">
-          ฟอร์มถูกปิดเพราะสถานะสัญญาไม่อนุญาตให้ยกเลิก (ดูข้อความด้านบน)
-        </p>
-      {% else %}
-        <p class="text-xs text-gray-400 mb-5">
-          กรอกข้อมูลยกเลิกสัญญานี้ -- บันทึกได้ครั้งเดียว ตรวจให้แน่ใจก่อนกดยืนยัน
-        </p>
-      {% endif %}
-
-      <form id="terminationForm" method="post" class="space-y-4"
-            data-case-cancel-before-end="{{ case_cancel_before_end }}">
-        {% csrf_token %}
-
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1.5">กรณีการยกเลิก</label>
-          <select name="termination_case" id="terminationCase"
-                  {% if not can_save %}disabled{% endif %}
-                  class="w-full border border-gray-200 rounded-lg px-3 py-2.5 sm:py-2 text-base sm:text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500
-                         {% if not can_save %}bg-gray-50 text-gray-500 cursor-not-allowed{% endif %}">
-            <option value="">-- เลือกกรณี --</option>
-            {% comment %}
+          {% endcomment %}
+          <p class="text-xs text-amber-600 mb-5">
+            สัญญานี้บันทึกข้อมูลยกเลิกไว้แล้ว -- แก้ไขค่าเดิมโดยตรงไม่ได้
+            ถ้ากรอกผิด ให้ลบรายการนี้ (ปุ่มด้านล่าง) แล้วบันทึกใหม่
+          </p>
+        {% elif blocked_status %}
+          <p class="text-xs text-amber-600 mb-5">ฟอร์มถูกปิดเพราะสถานะสัญญาไม่อนุญาตให้ยกเลิก (ดูข้อความด้านบน)</p>
+        {% else %}
+          <p class="text-xs text-gray-400 mb-5">
+            กรอกข้อมูลยกเลิกสัญญานี้ -- บันทึกได้ครั้งเดียว ตรวจให้แน่ใจก่อนกดยืนยัน
+          </p>
+        {% endif %}
+        <form id="terminationForm"
+              method="post"
+              class="space-y-4"
+              data-case-cancel-before-end="{{ case_cancel_before_end }}">
+          {% csrf_token %}
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">กรณีการยกเลิก</label>
+            <select name="termination_case"
+                    id="terminationCase"
+                    data-custom-select
+                    data-custom-select-label="กรณีการยกเลิก"
+                    {% if not can_save %}disabled{% endif %}
+                    class="w-full border border-gray-200 rounded-lg px-3 py-2.5 sm:py-2 text-base sm:text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500 {% if not can_save %}bg-gray-50 text-gray-500 cursor-not-allowed{% endif %}">
+              <option value="">-- เลือกกรณี --</option>
+              {% comment %}
               เทียบด้วย form.termination_case ที่ view cast เป็น str มาแล้ว
               เดิมเทียบ header.Termination_case (int จาก DB) กับ code (str) -> ไม่ตรงกันเลย
               ทำให้ dropdown ไม่เคย preselect กรณีที่บันทึกไว้
-            {% endcomment %}
-            {% for code, label in termination_cases.items %}
-              <option value="{{ code }}" {% if form.termination_case == code %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
-          <p class="text-xs text-gray-400 mt-1">
-            เลือก "ยกเลิกก่อนครบอายุ" ต้องกรอกวันที่แจ้งยกเลิกด้วย
-          </p>
-        </div>
-
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-3">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1.5">
-              วันที่สิ้นสุดสัญญา <span class="text-red-500">*</span>
-            </label>
-            <input type="date" name="contract_end_date" value="{{ form.contract_end_date }}"
-                   {% if not can_save %}disabled{% endif %}
-                   class="w-full border border-gray-200 rounded-lg px-3 py-2.5 sm:py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500
-                          {% if not can_save %}bg-gray-50 text-gray-500 cursor-not-allowed{% endif %}">
-            {% comment %}
+              {% endcomment %}
+              {% for code, label in termination_cases.items %}
+                <option value="{{ code }}"
+                        {% if form.termination_case == code %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <p class="text-xs text-gray-400 mt-1">เลือก "ยกเลิกก่อนครบอายุ" ต้องกรอกวันที่แจ้งยกเลิกด้วย</p>
+          </div>
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                วันที่สิ้นสุดสัญญา <span class="text-red-500">*</span>
+              </label>
+              <input type="date"
+                     name="contract_end_date"
+                     value="{{ form.contract_end_date }}"
+                     {% if not can_save %}disabled{% endif %}
+                     class="w-full border border-gray-200 rounded-lg px-3 py-2.5 sm:py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500 {% if not can_save %}bg-gray-50 text-gray-500 cursor-not-allowed{% endif %}">
+              {% comment %}
               บอกที่มาของค่าที่เติมให้ชัด -- วันนี้เป็นตัวคำนวณจำนวนงวดและงวดสุดท้ายทั้งหมด
               ถ้าผู้ใช้ไม่รู้ว่าค่ามาจากไหน จะไม่รู้ว่าควรตรวจทานหรือปล่อยผ่าน
-            {% endcomment %}
-            {% if can_save %}
-              {% if end_date_missing %}
-                <p class="text-xs text-amber-600 mt-1">
-                  สัญญานี้ไม่มีวันสิ้นสุดในระบบ กรุณากรอกเอง
-                </p>
-              {% elif end_date_autofilled %}
-                <p class="text-xs mt-1 {% if end_date_is_past %}text-amber-600{% else %}text-gray-400{% endif %}">
-                  เติมจากอายุสัญญาในระบบ ({{ contract.end_contract_label }})
-                  {% if end_date_is_past %}-- สัญญานี้สิ้นสุดไปแล้ว ตรวจทานอีกครั้งก่อนบันทึก{% endif %}
-                </p>
+              {% endcomment %}
+              {% if can_save %}
+                {% if end_date_missing %}
+                  <p class="text-xs text-amber-600 mt-1">สัญญานี้ไม่มีวันสิ้นสุดในระบบ กรุณากรอกเอง</p>
+                {% elif end_date_autofilled %}
+                  <p class="text-xs mt-1 {% if end_date_is_past %}text-amber-600{% else %}text-gray-400{% endif %}">
+                    เติมจากอายุสัญญาในระบบ ({{ contract.end_contract_label }})
+                    {% if end_date_is_past %}-- สัญญานี้สิ้นสุดไปแล้ว ตรวจทานอีกครั้งก่อนบันทึก{% endif %}
+                  </p>
+                {% endif %}
               {% endif %}
-            {% endif %}
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">วันที่แจ้งยกเลิก</label>
+              <input type="date"
+                     name="notify_date"
+                     value="{{ form.notify_date }}"
+                     {% if not can_save %}disabled{% endif %}
+                     class="w-full border border-gray-200 rounded-lg px-3 py-2.5 sm:py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500 {% if not can_save %}bg-gray-50 text-gray-500 cursor-not-allowed{% endif %}">
+            </div>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1.5">วันที่แจ้งยกเลิก</label>
-            <input type="date" name="notify_date" value="{{ form.notify_date }}"
-                   {% if not can_save %}disabled{% endif %}
-                   class="w-full border border-gray-200 rounded-lg px-3 py-2.5 sm:py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500
-                          {% if not can_save %}bg-gray-50 text-gray-500 cursor-not-allowed{% endif %}">
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">หมายเหตุ</label>
+            <textarea name="remark"
+                      rows="3"
+                      placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"
+                      {% if not can_save %}disabled{% endif %}
+                      class="w-full border border-gray-200 rounded-lg px-3 py-2.5 sm:py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500 {% if not can_save %}bg-gray-50 text-gray-500 cursor-not-allowed{% endif %}">{{ form.remark }}</textarea>
           </div>
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1.5">หมายเหตุ</label>
-          <textarea name="remark" rows="3"
-                    placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"
-                    {% if not can_save %}disabled{% endif %}
-                    class="w-full border border-gray-200 rounded-lg px-3 py-2.5 sm:py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500
-                           {% if not can_save %}bg-gray-50 text-gray-500 cursor-not-allowed{% endif %}">{{ form.remark }}</textarea>
-        </div>
-
-        <div class="flex justify-end pt-2">
-          {% if header %}
-            <span class="w-full px-5 py-3 sm:py-2.5 rounded-lg text-center text-sm font-semibold text-gray-400 bg-gray-200 cursor-not-allowed sm:w-auto">
-              บันทึกแล้ว (ไม่สามารถบันทึกซ้ำ)
-            </span>
-          {% elif blocked_status %}
-            <span class="w-full px-5 py-3 sm:py-2.5 rounded-lg text-center text-sm font-semibold text-gray-400 bg-gray-200 cursor-not-allowed sm:w-auto">
-              สถานะสัญญาไม่อนุญาตให้ยกเลิก
-            </span>
-          {% else %}
-            <button type="button" id="openConfirmBtn"
-                    class="w-full px-5 py-3 sm:py-2.5 rounded-lg text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors sm:w-auto">
-              บันทึกข้อมูลยกเลิก
-            </button>
-          {% endif %}
-        </div>
-        {% if can_save %}
-        <p class="text-xs text-gray-500 text-right">ผู้ใช้ปัจจุบัน: {{ default_user }} — รายการนี้จะบันทึก Buasri ID ของผู้ดำเนินการ</p>
-        {% endif %}
-      </form>
-
-      {% if header %}
-      <div class="mt-6 pt-5 border-t border-gray-100 space-y-2">
-        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">ข้อมูลระบบ (อ่านอย่างเดียว)</p>
-        <div class="grid grid-cols-1 gap-y-1.5 text-xs text-gray-600 sm:grid-cols-2 sm:gap-x-4">
-          <div>กรณีปัจจุบัน: <span class="text-gray-800">{{ header.Termination_case_name|default:"—" }}</span></div>
-          <div>สถานะสัญญา: <span class="text-gray-800">{{ header.Status_contract_Desc|default:"—" }}</span></div>
-          <div>จำนวนเดือนผ่อนผัน: <span class="text-gray-800">{{ header.Buffer_month_count|default:"—" }} เดือน</span></div>
-          {% comment %}
-            งวดเก็บเป็น YYYYMM ปี ค.ศ. (ตรงกับ Contract_Installment_month_year) แต่โชว้เป็น พ.ศ.
-            ให้ตรงกับปีที่ผู้ใช้เห็นที่อื่นในระบบ -- ค่าดิบกำกับไว้ให้เทียบกับ DB ได้
-          {% endcomment %}
-          <div>งวดสุดท้ายที่จัดการได้:
-            <span class="text-gray-800">{{ header.last_period_label|default:header.Last_installment_period|default:"—" }}</span>
-            {% if header.last_period_label %}
-              <span class="text-gray-400">({{ header.Last_installment_period }})</span>
+          <div class="flex justify-end pt-2">
+            {% if header %}
+              <span class="w-full px-5 py-3 sm:py-2.5 rounded-lg text-center text-sm font-semibold text-gray-400 bg-gray-200 cursor-not-allowed sm:w-auto">
+                บันทึกแล้ว (ไม่สามารถบันทึกซ้ำ)
+              </span>
+            {% elif blocked_status %}
+              <span class="w-full px-5 py-3 sm:py-2.5 rounded-lg text-center text-sm font-semibold text-gray-400 bg-gray-200 cursor-not-allowed sm:w-auto">
+                สถานะสัญญาไม่อนุญาตให้ยกเลิก
+              </span>
+            {% else %}
+              <button type="button"
+                      id="openConfirmBtn"
+                      class="w-full px-5 py-3 sm:py-2.5 rounded-lg text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors sm:w-auto">
+                บันทึกข้อมูลยกเลิก
+              </button>
             {% endif %}
           </div>
-          <div>บันทึกโดย: <span class="text-gray-800" title="{{ header.UserEntry|default:'' }}">{{ header.UserEntry_name|default:"—" }}</span></div>
-          <div>วันที่บันทึก: <span class="text-gray-800">{{ header.date_entry_label|default:"—" }}</span></div>
-          <div>วันที่แจ้งยกเลิก: <span class="text-gray-800">{{ header.notify_date_label|default:"—" }}</span></div>
-          <div>สถานะก่อนยกเลิก:
-            <span class="text-gray-800">{{ header.Prev_status_contract_Desc|default:"ไม่ได้บันทึกไว้" }}</span>
+        </form>
+        {% if header %}
+          <div class="mt-6 pt-5 border-t border-gray-100 space-y-2">
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">ข้อมูลระบบ (อ่านอย่างเดียว)</p>
+            <div class="grid grid-cols-1 gap-y-1.5 text-xs text-gray-600 sm:grid-cols-2 sm:gap-x-4">
+              <div>กรณีปัจจุบัน: <span class="text-gray-800">{{ header.Termination_case_name|default:"—" }}</span></div>
+              <div>สถานะสัญญา: <span class="text-gray-800">{{ header.Status_contract_Desc|default:"—" }}</span></div>
+              <div>จำนวนเดือนผ่อนผัน: <span class="text-gray-800">{{ header.Buffer_month_count|default:"—" }} เดือน</span></div>
+              {% comment %}
+            งวดเก็บเป็น YYYYMM ปี ค.ศ. (ตรงกับ Contract_Installment_month_year) แต่โชว้เป็น พ.ศ.
+            ให้ตรงกับปีที่ผู้ใช้เห็นที่อื่นในระบบ -- ค่าดิบกำกับไว้ให้เทียบกับ DB ได้
+              {% endcomment %}
+              <div>
+                งวดสุดท้ายที่จัดการได้:
+                <span class="text-gray-800">{{ header.last_period_label|default:header.Last_installment_period|default:"—" }}</span>
+                {% if header.last_period_label %}
+                  <span class="text-gray-400">({{ header.Last_installment_period }})</span>
+                {% endif %}
+              </div>
+              <div>บันทึกโดย: <span class="text-gray-800"
+                                    title="{{ header.UserEntry|default:'' }}">{{ header.UserEntry_name|default:"—" }}</span></div>
+              <div>วันที่บันทึก: <span class="text-gray-800">{{ header.date_entry_label|default:"—" }}</span></div>
+              <div>วันที่แจ้งยกเลิก: <span class="text-gray-800">{{ header.notify_date_label|default:"—" }}</span></div>
+              <div>
+                สถานะก่อนยกเลิก:
+                <span class="text-gray-800">{{ header.Prev_status_contract_Desc|default:"ไม่ได้บันทึกไว้" }}</span>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-
-      {% comment %}
+          {% comment %}
         ทางแก้เมื่อบันทึกผิด -- SP ไม่ให้แก้ค่าเดิม ต้องลบแล้วบันทึกใหม่
         sp_Contract_Termination_Delete จะคืนสถานะสัญญากลับเป็น Prev_status_contract_id
         และล็อกแถวเดิมไว้ใน Contract_termination_tr_log ก่อนลบ
-      {% endcomment %}
-      {% comment %}
+          {% endcomment %}
+          {% comment %}
         ปิดการตั้งหนี้มิเตอร์ -- ตั้ง Contract_meter_tr.UseOrNot = 0 (ตัว transaction ที่ผูก
         มิเตอร์กับสัญญา) ไม่แตะ Contract_meter_ms เพราะมิเตอร์เป็นของกายภาพติดกับพื้นที่
         ผู้เช่ารายใหม่ยังต้องใช้ตัวเดิม
 
         กดได้เฉพาะเมื่อพ้นงวดสุดท้ายแล้ว -- ปิดก่อนนั้นสัญญาจะหลุดจากไฟล์ดาวน์โหลดทันที
         ทำให้งวดผ่อนผัน (1-2 เดือนตาม case) หายไปจากการตั้งหนี้
-      {% endcomment %}
-      <div class="mt-5 pt-5 border-t border-gray-100">
-        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">การตั้งหนี้มิเตอร์</p>
-        <p class="text-xs text-gray-500 mb-1">
-          มิเตอร์ที่ผูกกับสัญญานี้: ยังตั้งหนี้อยู่ {{ meter_bindings.active }} รายการ
-          {% if meter_bindings.closed %} · ปิดแล้ว {{ meter_bindings.closed }} รายการ{% endif %}
-        </p>
-
-        {% if meter_bindings.active == 0 and meter_bindings.closed %}
-          <p class="text-xs text-green-700 mb-3">
-            ปิดการตั้งหนี้มิเตอร์เรียบร้อยแล้ว -- ทะเบียนมิเตอร์ยังอยู่ นำไปผูกกับสัญญาใหม่ได้
-          </p>
-        {% elif meter_bindings.active == 0 %}
-          <p class="text-xs text-gray-400 mb-3">สัญญานี้ไม่มีมิเตอร์ผูกอยู่</p>
-        {% elif not buffer_passed %}
-          <p class="text-xs text-gray-400 mb-3">
-            ยังอยู่ในช่วงงวดผ่อนผัน (ถึงงวด {{ header.last_period_label|default:header.Last_installment_period }})
-            -- ยังต้องตั้งหนี้ต่อ จะปิดได้เมื่อพ้นงวดนี้แล้ว
-          </p>
-        {% else %}
-          <p class="text-xs text-gray-500 mb-3">
-            พ้นงวดสุดท้ายแล้ว ปิดการตั้งหนี้มิเตอร์ได้ -- ปิดเฉพาะการผูกกับสัญญานี้
-            ทะเบียนมิเตอร์ยังอยู่ ใช้กับสัญญาใหม่ได้
-          </p>
-          {# ปุ่มนี้เขียน Contract_meter_tr.UseOrNot = 0 ทันทีที่กด -- ต้องมียืนยันอีกชั้น #}
-          <form method="post" action="{% url 'termination_close_meters' contract_id %}"
-                data-confirm-submit
-                data-confirm-title="ยืนยันปิดการตั้งหนี้มิเตอร์"
-                data-confirm-message="มิเตอร์ที่ผูกกับสัญญานี้จะไม่ถูกนำไปตั้งหนี้อีก (ทะเบียนมิเตอร์ยังอยู่ ใช้กับสัญญาใหม่ได้) ต้องการดำเนินการต่อหรือไม่?"
-                data-confirm-yes="ยืนยันปิดการตั้งหนี้">
-            {% csrf_token %}
-            <button type="submit"
-                    class="w-full px-4 py-3 sm:py-2 rounded-lg text-sm font-semibold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors sm:w-auto">
-              ปิดการตั้งหนี้มิเตอร์ ({{ meter_bindings.active }} รายการ)
-            </button>
-          </form>
+          {% endcomment %}
+          <div class="mt-5 pt-5 border-t border-gray-100">
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">การตั้งหนี้มิเตอร์</p>
+            <p class="text-xs text-gray-500 mb-1">
+              มิเตอร์ที่ผูกกับสัญญานี้: ยังตั้งหนี้อยู่ {{ meter_bindings.active }} รายการ
+              {% if meter_bindings.closed %}· ปิดแล้ว {{ meter_bindings.closed }} รายการ{% endif %}
+            </p>
+            {% if meter_bindings.active == 0 and meter_bindings.closed %}
+              <p class="text-xs text-green-700 mb-3">
+                ปิดการตั้งหนี้มิเตอร์เรียบร้อยแล้ว -- ทะเบียนมิเตอร์ยังอยู่ นำไปผูกกับสัญญาใหม่ได้
+              </p>
+            {% elif meter_bindings.active == 0 %}
+              <p class="text-xs text-gray-400 mb-3">สัญญานี้ไม่มีมิเตอร์ผูกอยู่</p>
+            {% elif not buffer_passed %}
+              <p class="text-xs text-gray-400 mb-3">
+                ยังอยู่ในช่วงงวดผ่อนผัน (ถึงงวด {{ header.last_period_label|default:header.Last_installment_period }})
+                -- ยังต้องตั้งหนี้ต่อ จะปิดได้เมื่อพ้นงวดนี้แล้ว
+              </p>
+            {% else %}
+              <p class="text-xs text-gray-500 mb-3">
+                พ้นงวดสุดท้ายแล้ว ปิดการตั้งหนี้มิเตอร์ได้ -- ปิดเฉพาะการผูกกับสัญญานี้
+                ทะเบียนมิเตอร์ยังอยู่ ใช้กับสัญญาใหม่ได้
+              </p>
+              {# ปุ่มนี้เขียน Contract_meter_tr.UseOrNot = 0 ทันทีที่กด -- ต้องมียืนยันอีกชั้น #}
+              <form method="post"
+                    action="{% url 'termination_close_meters' contract_id %}"
+                    data-confirm-submit
+                    data-confirm-title="ยืนยันปิดการตั้งหนี้มิเตอร์"
+                    data-confirm-message="มิเตอร์ที่ผูกกับสัญญานี้จะไม่ถูกนำไปตั้งหนี้อีก (ทะเบียนมิเตอร์ยังอยู่ ใช้กับสัญญาใหม่ได้) ต้องการดำเนินการต่อหรือไม่?"
+                    data-confirm-yes="ยืนยันปิดการตั้งหนี้">
+                {% csrf_token %}
+                <button type="submit"
+                        class="w-full px-4 py-3 sm:py-2 rounded-lg text-sm font-semibold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors sm:w-auto">
+                  ปิดการตั้งหนี้มิเตอร์ ({{ meter_bindings.active }} รายการ)
+                </button>
+              </form>
+            {% endif %}
+          </div>
+          <div class="mt-5 pt-5 border-t border-gray-100">
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">แก้ไขกรณีบันทึกผิด</p>
+            <p class="text-xs text-gray-400 mb-3">
+              ลบรายการนี้แล้วบันทึกใหม่ได้ ระบบจะคืนสถานะสัญญากลับเป็นค่าก่อนยกเลิก
+              และเก็บรายการที่ลบไว้ในประวัติ
+            </p>
+            <form id="deleteForm"
+                  method="post"
+                  action="{% url 'termination_delete' contract_id %}">
+              {% csrf_token %}
+              <button type="button"
+                      id="openDeleteBtn"
+                      class="w-full px-4 py-3 sm:py-2 rounded-lg text-sm font-semibold text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 transition-colors sm:w-auto">
+                ลบรายการยกเลิกนี้
+              </button>
+            </form>
+          </div>
         {% endif %}
       </div>
-
-      <div class="mt-5 pt-5 border-t border-gray-100">
-        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">แก้ไขกรณีบันทึกผิด</p>
-        <p class="text-xs text-gray-400 mb-3">
-          ลบรายการนี้แล้วบันทึกใหม่ได้ ระบบจะคืนสถานะสัญญากลับเป็นค่าก่อนยกเลิก
-          และเก็บรายการที่ลบไว้ในประวัติ
-        </p>
-        <form id="deleteForm" method="post" action="{% url 'termination_delete' contract_id %}">
-          {% csrf_token %}
-          <button type="button" id="openDeleteBtn"
-                  class="w-full px-4 py-3 sm:py-2 rounded-lg text-sm font-semibold text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 transition-colors sm:w-auto">
-            ลบรายการยกเลิกนี้
-          </button>
-        </form>
-      </div>
-      {% endif %}
-    </div>
-
-    {# --- ฝั่งขวา: รายการงวด --- #}
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-6">
-      <div class="flex items-start justify-between gap-3 flex-wrap mb-1">
-        <h2 class="text-base font-bold text-gray-900">รายการงวดของสัญญา</h2>
-        {% comment %}
+      {# --- ฝั่งขวา: รายการงวด --- #}
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-6">
+        <div class="flex items-start justify-between gap-3 flex-wrap mb-1">
+          <h2 class="text-base font-bold text-gray-900">รายการงวดของสัญญา</h2>
+          {% comment %}
           ปุ่มเลือก/ไม่เลือกทั้งหมด -- เดิมต้องกดทีละงวด ซึ่งผ่อนผัน 2 เดือน
           อาจมีถึง 25 งวด (ขอบเขตที่ SP จำกัดไว้) = กด 25 ครั้ง
-        {% endcomment %}
-        {% if header and periods %}
-        <div class="flex items-center gap-2">
-          <form method="post" action="{% url 'termination_toggle_all' contract_id %}">
-            {% csrf_token %}
-            <input type="hidden" name="is_selected" value="1">
-            <button type="submit"
-                    class="px-3 py-2 sm:px-2.5 sm:py-1 rounded-md text-xs font-medium text-brand-600 bg-brand-50 border border-brand-200 hover:bg-brand-100 transition-colors">
-              เลือกทั้งหมด
-            </button>
-          </form>
-          <form method="post" action="{% url 'termination_toggle_all' contract_id %}">
-            {% csrf_token %}
-            <input type="hidden" name="is_selected" value="0">
-            <button type="submit"
-                    class="px-3 py-2 sm:px-2.5 sm:py-1 rounded-md text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 hover:bg-gray-100 transition-colors">
-              ไม่เลือกทั้งหมด
-            </button>
-          </form>
+          {% endcomment %}
+          {% if header and periods %}
+            <div class="flex items-center gap-2">
+              <form method="post" action="{% url 'termination_toggle_all' contract_id %}">
+                {% csrf_token %}
+                <input type="hidden" name="is_selected" value="1">
+                <button type="submit"
+                        class="px-3 py-2 sm:px-2.5 sm:py-1 rounded-md text-xs font-medium text-brand-600 bg-brand-50 border border-brand-200 hover:bg-brand-100 transition-colors">
+                  เลือกทั้งหมด
+                </button>
+              </form>
+              <form method="post" action="{% url 'termination_toggle_all' contract_id %}">
+                {% csrf_token %}
+                <input type="hidden" name="is_selected" value="0">
+                <button type="submit"
+                        class="px-3 py-2 sm:px-2.5 sm:py-1 rounded-md text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 hover:bg-gray-100 transition-colors">
+                  ไม่เลือกทั้งหมด
+                </button>
+              </form>
+            </div>
+          {% endif %}
         </div>
-        {% endif %}
-      </div>
-      <p class="text-xs text-gray-400 mb-2">
-        ติ๊กเลือกเฉพาะงวดที่ต้องการดำเนินการต่อหลังยกเลิกสัญญา
-        {% if not header %}(ต้องบันทึกข้อมูลยกเลิกทางซ้ายก่อน ถึงจะติ๊กงวดได้){% endif %}
-        {% if header and periods %}
-          <span class="text-gray-500">-- เลือกอยู่ {{ selected_count }} จาก {{ periods|length }} งวด</span>
-        {% endif %}
-      </p>
-
-      {% comment %}
+        <p class="text-xs text-gray-400 mb-2">
+          ติ๊กเลือกเฉพาะงวดที่ต้องการดำเนินการต่อหลังยกเลิกสัญญา
+          {% if not header %}(ต้องบันทึกข้อมูลยกเลิกทางซ้ายก่อน ถึงจะติ๊กงวดได้){% endif %}
+          {% if header and periods %}
+            <span class="text-gray-500">-- เลือกอยู่ {{ selected_count }} จาก {{ periods|length }} งวด</span>
+          {% endif %}
+        </p>
+        {% comment %}
         บอกให้ชัดว่าการติ๊กงวดเป็นการ "บันทึกไว้" ไม่ใช่ระบบตั้งหนี้ให้
         ค่า Is_selected ถูกอ่านโดย sp_Contract_Installment_CreateAfterTermination ตัวเดียว
         ซึ่งไม่เคยถูกเรียก (0 ครั้ง) และการตั้งหนี้เป็นงานของระบบ CMS (K2) ไม่ใช่เว็บนี้
         ถ้าไม่เขียนกำกับ ผู้ใช้จะเข้าใจว่าติ๊กแล้วระบบจัดการต่อให้เอง
-      {% endcomment %}
-      {% if header and periods %}
-      <div class="bg-gray-50 border border-gray-200 text-gray-600 text-xs rounded-lg px-3 py-2 mb-5">
-        การติ๊กงวดที่นี่เป็นการ <span class="font-medium">บันทึกไว้เป็นข้อมูลอ้างอิง</span> เท่านั้น
-        ระบบนี้ไม่ได้ตั้งหนี้ให้ -- การตั้งหนี้และออกใบแจ้งหนี้ทำที่ระบบ CMS
-      </div>
-      {% endif %}
-
-      {% if periods %}
-        <div class="divide-y divide-gray-100 border border-gray-100 rounded-lg overflow-hidden">
-          {% for p in periods %}
-          <div class="flex items-center justify-between gap-3 px-3 py-3 sm:px-4 hover:bg-gray-50">
-            <div class="min-w-0">
-              <div class="text-sm font-medium text-gray-800">
-                งวด {{ p.period_label|default:p.Installment_period }}
-              </div>
-              {% if p.period_label %}
-                <div class="text-xs text-gray-400 mt-0.5">{{ p.Installment_period }}</div>
-              {% endif %}
-            </div>
-            {% comment %}
+        {% endcomment %}
+        {% if header and periods %}
+          <div class="bg-gray-50 border border-gray-200 text-gray-600 text-xs rounded-lg px-3 py-2 mb-5">
+            การติ๊กงวดที่นี่เป็นการ <span class="font-medium">บันทึกไว้เป็นข้อมูลอ้างอิง</span> เท่านั้น
+            ระบบนี้ไม่ได้ตั้งหนี้ให้ -- การตั้งหนี้และออกใบแจ้งหนี้ทำที่ระบบ CMS
+          </div>
+        {% endif %}
+        {% if periods %}
+          <div class="divide-y divide-gray-100 border border-gray-100 rounded-lg overflow-hidden">
+            {% for p in periods %}
+              <div class="flex items-center justify-between gap-3 px-3 py-3 sm:px-4 hover:bg-gray-50">
+                <div class="min-w-0">
+                  <div class="text-sm font-medium text-gray-800">
+                    งวด {{ p.period_label|default:p.Installment_period }}
+                  </div>
+                  {% if p.period_label %}
+                    <div class="text-xs text-gray-400 mt-0.5">{{ p.Installment_period }}</div>
+                  {% endif %}
+                </div>
+                {% comment %}
               เดิมมี onchange="this.requestSubmit()" ที่ไม่เคยทำงาน -- ในฟอร์มมีแค่
               hidden input กับปุ่ม submit ซึ่ง hidden input ไม่ fire change event
               ตัวที่ส่งฟอร์มจริงคือปุ่ม submit อยู่แล้ว จึงลบออก
-            {% endcomment %}
-            <form method="post" class="shrink-0"
-                  action="{% url 'termination_toggle' contract_id p.Installment_period %}">
-              {% csrf_token %}
-              <input type="hidden" name="is_selected" value="{% if p.Is_selected %}0{% else %}1{% endif %}">
-              <button type="submit"
-                      {% if not header %}disabled{% endif %}
-                      class="inline-flex items-center px-3.5 py-2 sm:px-3 sm:py-1.5 rounded-lg text-xs font-semibold transition-colors
-                             {% if p.Is_selected %}bg-brand-50 text-brand-600 border border-brand-200{% else %}bg-gray-50 text-gray-500 border border-gray-200{% endif %}
-                             {% if not header %}opacity-40 cursor-not-allowed{% endif %}">
-                {% if p.Is_selected %}เลือกอยู่{% else %}ยังไม่เลือก{% endif %}
-              </button>
-            </form>
+                {% endcomment %}
+                <form method="post"
+                      class="shrink-0"
+                      action="{% url 'termination_toggle' contract_id p.Installment_period %}">
+                  {% csrf_token %}
+                  <input type="hidden"
+                         name="is_selected"
+                         value="{% if p.Is_selected %}0{% else %}1{% endif %}">
+                  <button type="submit"
+                          {% if not header %}disabled{% endif %}
+                          class="inline-flex items-center px-3.5 py-2 sm:px-3 sm:py-1.5 rounded-lg text-xs font-semibold transition-colors {% if p.Is_selected %}bg-brand-50 text-brand-600 border border-brand-200{% else %}bg-gray-50 text-gray-500 border border-gray-200{% endif %} {% if not header %}opacity-40 cursor-not-allowed{% endif %}">
+                    {% if p.Is_selected %}เลือกอยู่{% else %}ยังไม่เลือก{% endif %}
+                  </button>
+                </form>
+              </div>
+            {% endfor %}
           </div>
-          {% endfor %}
-        </div>
-      {% else %}
-        <div class="text-center text-gray-400 text-sm py-8">ไม่พบรายการงวดของสัญญานี้</div>
-      {% endif %}
+        {% else %}
+          <div class="text-center text-gray-400 text-sm py-8">ไม่พบรายการงวดของสัญญานี้</div>
+        {% endif %}
+      </div>
     </div>
-
   </div>
-
-</div>
-
-{# --- Custom confirm modal (แทน browser confirm()) --- #}
-<div id="confirmModal" class="fixed inset-0 z-50 hidden items-center justify-center">
-  <div id="confirmBackdrop"
-       class="absolute inset-0 bg-black/50 opacity-0 transition-opacity duration-200"></div>
-
-  <div id="confirmBox"
-       class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-5 sm:p-6 max-h-[calc(100dvh-2rem)] overflow-y-auto scale-90 opacity-0 transition-all duration-200">
-    <div class="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
-      <svg class="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
-      </svg>
-    </div>
-    <h3 class="text-center text-base font-bold text-gray-900 mb-1">ยืนยันการยกเลิกสัญญา</h3>
-    {% comment %}
+  {# --- Custom confirm modal (แทน browser confirm()) --- #}
+  <div id="confirmModal"
+       class="fixed inset-0 z-50 hidden items-center justify-center">
+    <div id="confirmBackdrop"
+         class="absolute inset-0 bg-black/50 opacity-0 transition-opacity duration-200"></div>
+    <div id="confirmBox"
+         class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-5 sm:p-6 max-h-[calc(100dvh-2rem)] overflow-y-auto scale-90 opacity-0 transition-all duration-200">
+      <div class="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
+        <svg class="w-6 h-6 text-red-500"
+             fill="none"
+             viewBox="0 0 24 24"
+             stroke="currentColor"
+             stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+        </svg>
+      </div>
+      <h3 class="text-center text-base font-bold text-gray-900 mb-1">ยืนยันการยกเลิกสัญญา</h3>
+      {% comment %}
       ย้ำตัวสัญญาในกล่องยืนยันด้วย -- บันทึกแล้วแก้ไม่ได้ จุดนี้เป็นด่านสุดท้าย
       ที่ผู้ใช้จะจับได้ว่าเปิดผิดสัญญา
-    {% endcomment %}
-    <div class="text-center mb-4">
-      <p class="text-sm font-semibold text-gray-800 break-words">{{ contract.Contract_code|default:"ไม่มีรหัสสัญญา" }}</p>
-      <p class="text-xs text-gray-500 mt-0.5 break-words">{{ contract.CompanyName|default:"ไม่มีชื่อลูกค้าในระบบ" }}</p>
-    </div>
-
-    {% comment %}
+      {% endcomment %}
+      <div class="text-center mb-4">
+        <p class="text-sm font-semibold text-gray-800 break-words">{{ contract.Contract_code|default:"ไม่มีรหัสสัญญา" }}</p>
+        <p class="text-xs text-gray-500 mt-0.5 break-words">{{ contract.CompanyName|default:"ไม่มีชื่อลูกค้าในระบบ" }}</p>
+      </div>
+      {% comment %}
       สรุปสิ่งที่จะเกิดขึ้นจากค่าที่กรอกไว้ -- JS เติมให้ตอนเปิดกล่อง
       เดิมกล่องนี้ถามลอยๆ ว่า "ต้องการจะยกเลิกสัญญาใช่หรือไม่?" โดยไม่บอกว่าจะบันทึกอะไร
       ตัวเลขงวดสุดท้ายเป็น "ประมาณการ" เพราะตัวจริงคำนวณใน sp_Contract_Termination_Save
-    {% endcomment %}
-    <div id="confirmSummary" class="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 mb-4 text-xs space-y-1.5"></div>
-
-    <div id="confirmMissing"
-         class="hidden bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-4 py-3 mb-4"></div>
-
-    <p id="confirmQuestion" class="text-center text-sm text-gray-500 mb-6">
-      บันทึกแล้วจะแก้ไขเองไม่ได้ ต้องการดำเนินการต่อหรือไม่?
-    </p>
-    <div class="flex gap-3">
-      <button type="button" id="confirmNo"
-              class="flex-1 px-4 py-3 sm:py-2.5 rounded-lg text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">
-        ไม่ต้องการ
-      </button>
-      <button type="button" id="confirmYes"
-              class="flex-1 px-4 py-3 sm:py-2.5 rounded-lg text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors
-                     disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed">
-        ต้องการ
-      </button>
+      {% endcomment %}
+      <div id="confirmSummary"
+           class="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 mb-4 text-xs space-y-1.5"></div>
+      <div id="confirmMissing"
+           class="hidden bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-4 py-3 mb-4"></div>
+      <p id="confirmQuestion" class="text-center text-sm text-gray-500 mb-6">
+        บันทึกแล้วจะแก้ไขเองไม่ได้ ต้องการดำเนินการต่อหรือไม่?
+      </p>
+      <div class="flex gap-3">
+        <button type="button"
+                id="confirmNo"
+                class="flex-1 px-4 py-3 sm:py-2.5 rounded-lg text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">
+          ไม่ต้องการ
+        </button>
+        <button type="button"
+                id="confirmYes"
+                class="flex-1 px-4 py-3 sm:py-2.5 rounded-lg text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed">
+          ต้องการ
+        </button>
+      </div>
     </div>
   </div>
-</div>
-
-{% comment %}
+  {% comment %}
   กล่องยืนยันการลบรายการยกเลิก -- แยกจากกล่องยืนยันการบันทึก
   เพราะเป็นการกระทำที่ต่างกันและต้องย้ำผลลัพธ์ที่ต่างกัน
-{% endcomment %}
-{% if header %}
-<div id="deleteModal" class="fixed inset-0 z-50 hidden items-center justify-center">
-  <div id="deleteBackdrop"
-       class="absolute inset-0 bg-black/50 opacity-0 transition-opacity duration-200"></div>
-
-  <div id="deleteBox"
-       class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-5 sm:p-6 max-h-[calc(100dvh-2rem)] overflow-y-auto scale-90 opacity-0 transition-all duration-200">
-    <div class="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
-      <svg class="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round"
-              d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/>
-      </svg>
-    </div>
-    <h3 class="text-center text-base font-bold text-gray-900 mb-1">ลบรายการยกเลิกสัญญา</h3>
-    <div class="text-center mb-4">
-      <p class="text-sm font-semibold text-gray-800 break-words">{{ contract.Contract_code|default:"ไม่มีรหัสสัญญา" }}</p>
-      <p class="text-xs text-gray-500 mt-0.5 break-words">{{ contract.CompanyName|default:"ไม่มีชื่อลูกค้าในระบบ" }}</p>
-    </div>
-    <div class="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 mb-4 text-xs text-gray-600 space-y-1">
-      <div>ระบบจะลบข้อมูลยกเลิกและรายการงวดทั้ง {{ periods|length }} งวด</div>
-      <div>คืนสถานะสัญญากลับเป็น
-        <span class="font-medium text-gray-800">
-          {% if header.Prev_status_contract_Desc %}
-            "{{ header.Prev_status_contract_Desc }}"
-          {% else %}
-            — ไม่ได้บันทึกสถานะเดิมไว้ ระบบจะไม่เปลี่ยนสถานะสัญญา
-          {% endif %}
-        </span>
+  {% endcomment %}
+  {% if header %}
+    <div id="deleteModal"
+         class="fixed inset-0 z-50 hidden items-center justify-center">
+      <div id="deleteBackdrop"
+           class="absolute inset-0 bg-black/50 opacity-0 transition-opacity duration-200"></div>
+      <div id="deleteBox"
+           class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-5 sm:p-6 max-h-[calc(100dvh-2rem)] overflow-y-auto scale-90 opacity-0 transition-all duration-200">
+        <div class="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
+          <svg class="w-6 h-6 text-red-500"
+               fill="none"
+               viewBox="0 0 24 24"
+               stroke="currentColor"
+               stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+          </svg>
+        </div>
+        <h3 class="text-center text-base font-bold text-gray-900 mb-1">ลบรายการยกเลิกสัญญา</h3>
+        <div class="text-center mb-4">
+          <p class="text-sm font-semibold text-gray-800 break-words">{{ contract.Contract_code|default:"ไม่มีรหัสสัญญา" }}</p>
+          <p class="text-xs text-gray-500 mt-0.5 break-words">{{ contract.CompanyName|default:"ไม่มีชื่อลูกค้าในระบบ" }}</p>
+        </div>
+        <div class="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 mb-4 text-xs text-gray-600 space-y-1">
+          <div>ระบบจะลบข้อมูลยกเลิกและรายการงวดทั้ง {{ periods|length }} งวด</div>
+          <div>
+            คืนสถานะสัญญากลับเป็น
+            <span class="font-medium text-gray-800">
+              {% if header.Prev_status_contract_Desc %}
+                "{{ header.Prev_status_contract_Desc }}"
+              {% else %}
+                — ไม่ได้บันทึกสถานะเดิมไว้ ระบบจะไม่เปลี่ยนสถานะสัญญา
+              {% endif %}
+            </span>
+          </div>
+          <div>เก็บรายการที่ลบไว้ในประวัติ (Contract_termination_tr_log)</div>
+        </div>
+        <p class="text-center text-sm text-gray-500 mb-6">ยืนยันลบรายการนี้หรือไม่?</p>
+        <div class="flex gap-3">
+          <button type="button"
+                  id="deleteNo"
+                  class="flex-1 px-4 py-3 sm:py-2.5 rounded-lg text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">
+            ไม่ต้องการ
+          </button>
+          <button type="button"
+                  id="deleteYes"
+                  class="flex-1 px-4 py-3 sm:py-2.5 rounded-lg text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors">
+            ลบรายการ
+          </button>
+        </div>
       </div>
-      <div>เก็บรายการที่ลบไว้ในประวัติ (Contract_termination_tr_log)</div>
     </div>
-    <p class="text-center text-sm text-gray-500 mb-6">ยืนยันลบรายการนี้หรือไม่?</p>
-    <div class="flex gap-3">
-      <button type="button" id="deleteNo"
-              class="flex-1 px-4 py-3 sm:py-2.5 rounded-lg text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">
-        ไม่ต้องการ
-      </button>
-      <button type="button" id="deleteYes"
-              class="flex-1 px-4 py-3 sm:py-2.5 rounded-lg text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors">
-        ลบรายการ
-      </button>
-    </div>
-  </div>
-</div>
-{% endif %}
-
-{% comment %}
+  {% endif %}
+  {% comment %}
   ส่งค่าคงที่ไปให้ JS ด้วย json_script (escape ให้เองและไม่ต้อง hardcode ซ้ำในไฟล์ JS)
   thai_months       -> ชื่อเดือนไทย ใช้ชุดเดียวกับฝั่ง Python
   case_buffer_months -> จำนวนเดือนผ่อนผันต่อ case (สะท้อนค่าใน sp_Contract_Termination_Save)
-{% endcomment %}
-{{ thai_months|json_script:"thaiMonths" }}
-{{ case_buffer_months|json_script:"caseBufferMonths" }}
-<script src="{% static 'meters/js/termination_detail.js' %}" defer></script>
+  {% endcomment %}
+  {{ thai_months|json_script:"thaiMonths" }}
+  {{ case_buffer_months|json_script:"caseBufferMonths" }}
+  <script src="{% static 'meters/js/termination_detail.js' %}" defer></script>
 {% endblock %}

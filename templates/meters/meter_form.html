@@ -6,12 +6,6 @@
 {% block content %}
 <div class="mx-auto w-full max-w-2xl">
 
-  <div class="text-sm text-gray-400 mb-1">
-    <a href="{% url 'meter_list' %}" class="hover:text-brand-600">จัดการมิเตอร์</a>
-    <span class="mx-1">›</span>
-    <span class="text-gray-500">{% if meter_id %}แก้ไข #{{ meter_id }}{% else %}เพิ่มใหม่{% endif %}</span>
-  </div>
-
   <div class="flex items-center justify-between gap-3 flex-wrap mb-5 sm:mb-6">
     <h1 class="text-xl font-bold tracking-tight text-gray-900 sm:text-3xl">
       {% if meter_id %}แก้ไขมิเตอร์ #{{ meter_id }}{% else %}เพิ่มมิเตอร์ใหม่{% endif %}
@@ -136,6 +130,7 @@
         </p>
       {% else %}
         <select name="meter_type_cd" id="meterTypeSelect" data-confirm-field="ประเภทมิเตอร์"
+                data-custom-select data-custom-select-label="ประเภทมิเตอร์"
                 class="w-full border border-gray-200 rounded-lg px-3 py-2.5 sm:py-2 text-base sm:text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
           <option value="9" {% if meter.Meter_type_cd == 9 %}selected{% endif %}>น้ำ</option>
           <option value="8" {% if meter.Meter_type_cd == 8 %}selected{% endif %}>ไฟ</option>
@@ -181,7 +176,8 @@
     {% if not meter_id or meter.Meter_type_cd == 8 %}
     <div id="phaseField" {% if not meter_id and meter.Meter_type_cd != 8 %}class="hidden"{% endif %}>
       <label class="block text-sm font-medium text-gray-700 mb-1.5">ระบบไฟฟ้า (เฉพาะมิเตอร์ไฟ)</label>
-      <select name="phase_type" data-confirm-field="ระบบไฟฟ้า"
+      <select name="phase_type" id="phaseTypeSelect" data-confirm-field="ระบบไฟฟ้า"
+              data-custom-select data-custom-select-label="ระบบไฟฟ้า"
               class="w-full border border-gray-200 rounded-lg px-3 py-2.5 sm:py-2 text-base sm:text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-500">
         <option value="">ไม่ระบุ</option>
         {% for opt in phase_options %}
@@ -190,9 +186,6 @@
           </option>
         {% endfor %}
       </select>
-      <p class="text-xs text-gray-400 mt-1">
-        ตัวเลือกมาจาก <a href="{% url 'phase_list' %}" class="text-brand-600 hover:underline">Master ระบบไฟฟ้า</a>
-      </p>
     </div>
     {% endif %}
 

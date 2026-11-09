@@ -6,10 +6,6 @@
 {% block content %}
 <div class="mx-auto w-full max-w-[1600px]">
 
-  <div class="text-sm text-gray-400 mb-1">
-    <span class="text-gray-500">จัดการระบบไฟฟ้า</span>
-  </div>
-
   <div class="flex flex-col gap-3 mb-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
     <h1 class="text-xl font-bold tracking-tight text-gray-900 sm:text-3xl">จัดการระบบไฟฟ้า</h1>
     <a href="{% url 'phase_new' %}"
@@ -53,7 +49,12 @@
           <div class="mt-0.5 font-mono text-xs text-gray-400">รหัส {{ p.Phase_id }}</div>
         </div>
         <a href="{% url 'phase_edit' p.Phase_id %}"
-           class="shrink-0 rounded-lg border border-brand-100 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-600 transition-colors hover:bg-brand-100">
+           aria-label="แก้ไขระบบไฟฟ้า {{ p.Phase_type }}" title="แก้ไข"
+           class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-100 bg-brand-50 px-3.5 py-2 text-sm font-semibold text-brand-600 transition-colors hover:bg-brand-100 focus:outline-none focus:ring-2 focus:ring-brand-100">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 13.5V18a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V8.25A2.25 2.25 0 016 6h4.5"/>
+          </svg>
           แก้ไข
         </a>
       </div>
@@ -114,7 +115,7 @@
           <th class="px-4 py-2.5 font-semibold text-gray-500">วันที่บันทึก</th>
           <th class="px-4 py-2.5 font-semibold text-gray-500">ผู้แก้ไข</th>
           <th class="px-4 py-2.5 font-semibold text-gray-500">วันที่แก้ไข</th>
-          <th class="sticky right-0 z-10 whitespace-nowrap border-l border-gray-200 bg-gray-50 px-4 py-2.5 text-right font-semibold text-gray-500 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.12)]">ดำเนินการ</th>
+          <th class="sticky right-0 z-10 whitespace-nowrap border-l border-gray-200 bg-gray-50 px-5 py-3 text-right font-semibold text-gray-500 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.12)]">จัดการ</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-50">
@@ -141,8 +142,15 @@
           <td class="px-4 py-2.5 text-gray-500 text-xs">{{ p.DateEntry|date:"d/m/Y H:i"|default:"—" }}</td>
           <td class="px-4 py-2.5 text-gray-500 text-xs">{{ p.UserUpdate|default:"—" }}</td>
           <td class="px-4 py-2.5 text-gray-500 text-xs">{{ p.DateUpdate|date:"d/m/Y H:i"|default:"—" }}</td>
-          <td class="sticky right-0 z-10 whitespace-nowrap border-l border-gray-100 bg-white px-4 py-2.5 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.12)] group-hover:bg-gray-50">
-            <a href="{% url 'phase_edit' p.Phase_id %}" class="text-brand-600 hover:underline text-xs font-medium">แก้ไข</a>
+          <td class="sticky right-0 z-10 whitespace-nowrap border-l border-gray-100 bg-white px-5 py-3 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.12)] group-hover:bg-gray-50">
+            <a href="{% url 'phase_edit' p.Phase_id %}"
+               aria-label="แก้ไขระบบไฟฟ้า {{ p.Phase_type }}" title="แก้ไข"
+               class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100">
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 13.5V18a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V8.25A2.25 2.25 0 016 6h4.5"/>
+              </svg>
+            </a>
           </td>
         </tr>
         {% empty %}

@@ -5,7 +5,7 @@ import logging
 from django.shortcuts import redirect, render
 
 from .permissions import (
-    PERMISSION_LABELS,
+    HOME_URL_NAMES,
     PUBLIC_URL_NAMES,
     URL_PERMISSION_MAP,
 )
@@ -28,6 +28,12 @@ class CMSMenuPermissionMiddleware:
         if url_name in PUBLIC_URL_NAMES or not request.user.is_authenticated:
             return None
 
+        permissions = request.session.get('cms_permissions', {})
+        if url_name in HOME_URL_NAMES:
+            if permissions:
+                return None
+            return redirect('no_permission')
+
         required_permission = URL_PERMISSION_MAP.get(url_name)
         if required_permission is None:
             logger.error(
@@ -37,12 +43,10 @@ class CMSMenuPermissionMiddleware:
             )
             return render(
                 request,
-                'meters/permission_denied.html',
-                {'required_permission_label': 'เมนูที่ร้องขอ'},
-                status=403,
+                'meters/404.html',
+                status=404,
             )
 
-        permissions = request.session.get('cms_permissions', {})
         if permissions.get(required_permission):
             return None
 
@@ -57,12 +61,6 @@ class CMSMenuPermissionMiddleware:
 
         return render(
             request,
-            'meters/permission_denied.html',
-            {
-                'required_permission_label': PERMISSION_LABELS.get(
-                    required_permission,
-                    'เมนูที่ร้องขอ',
-                ),
-            },
-            status=403,
+            'meters/404.html',
+            status=404,
         )

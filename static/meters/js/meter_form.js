@@ -31,6 +31,7 @@
       // มิเตอร์น้ำไม่มีระบบไฟฟ้า การส่งค่านี้ไปจึงไม่มีความหมาย (view ก็ล้างเป็น None อยู่แล้ว)
       // และทำให้กล่องยืนยันก่อนบันทึกสรุปค่าที่ไม่ได้ใช้ขึ้นมาให้สับสน
       if (phaseSelect) phaseSelect.disabled = !isElectric;
+      if (phaseSelect) phaseSelect.dispatchEvent(new Event('custom-select:refresh'));
     };
     typeSelect.addEventListener('change', syncPhaseField);
     syncPhaseField();

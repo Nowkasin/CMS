@@ -6,12 +6,6 @@
 {% block content %}
 <div class="mx-auto w-full max-w-3xl">
 
-  <div class="text-sm text-gray-400 mb-1">
-    <a href="{% url 'phase_list' %}" class="hover:text-brand-600">Master ระบบไฟฟ้า</a>
-    <span class="mx-1">›</span>
-    <span class="text-gray-500">{% if phase_id %}แก้ไข{% else %}เพิ่มใหม่{% endif %}</span>
-  </div>
-
   <h1 class="text-xl font-bold tracking-tight text-gray-900 sm:text-3xl mb-5 sm:mb-6">
     {% if phase_id %}แก้ไขระบบไฟฟ้า{% else %}เพิ่มระบบไฟฟ้าใหม่{% endif %}
   </h1>

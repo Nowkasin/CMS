@@ -15,6 +15,7 @@ Re-export ทุก view จากโมดูลย่อย เพื่อใ
   download.py     -> download_form, download_excel
   meter_master.py -> meter_list, meter_form
   phase_master.py -> phase_list, phase_form
+  home.py         -> home
 """
 from .steppage import (
     step1_upload,
@@ -47,6 +48,7 @@ from .meter_master import meter_list, meter_form
 
 from .phase_master import phase_list, phase_form
 from .auth import login_view, logout_view, no_permission_view
+from .home import home
 
 __all__ = [
     'step1_upload', 'step2_review', 'step3_confirm',
@@ -59,5 +61,6 @@ __all__ = [
     'download_form', 'download_excel',
     'meter_list', 'meter_form',
     'phase_list', 'phase_form',
+    'home',
     'login_view', 'logout_view', 'no_permission_view',
 ]

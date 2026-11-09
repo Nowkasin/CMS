@@ -19,6 +19,12 @@ CSRF_TRUSTED_ORIGINS = [
     o.strip() for o in config('DJANGO_CSRF_TRUSTED_ORIGINS', default='').split(',') if o.strip()
 ]
 
+# รองรับการวางระบบใต้ URL prefix เช่น https://server.example/cms/
+# ค่าเริ่มต้นว่างจึงไม่กระทบการรันที่ root URL ระหว่างพัฒนา
+_script_name_value = config('DJANGO_SCRIPT_NAME', default='').strip().strip('/')
+SCRIPT_NAME_PREFIX = f'/{_script_name_value}' if _script_name_value else ''
+FORCE_SCRIPT_NAME = SCRIPT_NAME_PREFIX or None
+
 INSTALLED_APPS = [
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -75,7 +81,7 @@ TIME_ZONE = 'Asia/Bangkok'
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = 'static/'
+STATIC_URL = f'{SCRIPT_NAME_PREFIX}/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
@@ -100,6 +106,8 @@ EXCEL_UPLOAD_MAX_ROWS = 5000
 
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 SESSION_COOKIE_AGE = 60 * 60 * 2  # 2 ชั่วโมง พอสำหรับทำ wizard ให้จบ
+SESSION_COOKIE_PATH = f'{SCRIPT_NAME_PREFIX}/' if SCRIPT_NAME_PREFIX else '/'
+CSRF_COOKIE_PATH = SESSION_COOKIE_PATH
 
 # -----------------------------------------------------------------------
 # Authentication

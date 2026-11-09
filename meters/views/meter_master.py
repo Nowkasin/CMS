@@ -1,22 +1,37 @@
 # meters/views/meter_master.py
+from django.core.paginator import Paginator
 from django.shortcuts import render, redirect
 
 from .. import services
 
 
+METERS_PER_PAGE = 20
+
+
 def meter_list(request):
     """
     หน้ารายการมิเตอร์ทั้งหมด (ระดับ Contract_meter_ms เอง ไม่ผูกกับสัญญา) พร้อมค้นหา/กรองประเภท
-    และกรองสถานะเปิด-ปิดใช้งาน (แท็บ: ใช้งานอยู่ / ปิดใช้งาน / ทั้งหมด)
+    และกรองสถานะเปิด-ปิดใช้งาน (แท็บ: ทั้งหมด / ใช้งาน / ปิดใช้งาน)
     """
     type_filter = request.GET.get('type', 'all')
     search = request.GET.get('q', '')
-    status_filter = request.GET.get('status', 'active')
+    status_filter = request.GET.get('status', 'all')
     if status_filter not in ('active', 'inactive', 'all'):
-        status_filter = 'active'
+        status_filter = 'all'
+
+    rows = services.fetch_meters(type_filter, search, status_filter)
+    paginator = Paginator(rows, METERS_PER_PAGE)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    # ลิงก์เปลี่ยนหน้าต้องคงตัวกรองเดิม และไม่พกเลขหน้าปัจจุบันซ้ำไปด้วย
+    params = request.GET.copy()
+    params.pop('page', None)
 
     context = {
-        'meters': services.fetch_meters(type_filter, search, status_filter),
+        'meters': page_obj.object_list,
+        'page_obj': page_obj,
+        'total_visible': paginator.count,
+        'filter_qs': params.urlencode(),
         'active_filter': type_filter,
         'search': search,
         'status_filter': status_filter,
