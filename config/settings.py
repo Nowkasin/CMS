@@ -20,10 +20,11 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 # รองรับการวางระบบใต้ URL prefix เช่น https://server.example/cms/
-# ค่าเริ่มต้นว่างจึงไม่กระทบการรันที่ root URL ระหว่างพัฒนา
+# URLconf จะรับ prefix นี้โดยตรง จึงใช้ได้ทั้ง runserver และ Web server ที่ส่ง
+# path /cms/... เข้า Django โดยไม่ตัด prefix ออก
 _script_name_value = config('DJANGO_SCRIPT_NAME', default='').strip().strip('/')
+URL_PREFIX = _script_name_value
 SCRIPT_NAME_PREFIX = f'/{_script_name_value}' if _script_name_value else ''
-FORCE_SCRIPT_NAME = SCRIPT_NAME_PREFIX or None
 
 INSTALLED_APPS = [
     'django.contrib.auth',
