@@ -14,6 +14,17 @@ logger = logging.getLogger(__name__)
 
 STEP_LABELS = ['อัปโหลดไฟล์', 'ตรวจสอบข้อมูล', 'ยืนยันนำเข้า', 'เสร็จสิ้น']
 
+# แท็บสถานะในหน้า Step 2 -- (key, ป้าย, โทนสี) key ตรงกับ row['status'] จาก parse_excel_staged
+REVIEW_STATUS_TABS = [
+    ('all', 'ทั้งหมด', 'gray'),
+    ('error', 'มีปัญหา', 'red'),
+    ('duplicate', 'มีในระบบแล้ว', 'amber'),
+    ('skip', 'ข้าม', 'gray'),
+    ('ok', 'พร้อมนำเข้า', 'brand'),
+]
+REVIEW_STATUS_KEYS = frozenset(key for key, _label, _tone in REVIEW_STATUS_TABS)
+
+
 def _safe_month(raw, fallback):
     """
     แปลงเดือนที่ POST มาเป็น int 1-12 -- ถ้าไม่ใช่ตัวเลขหรืออยู่นอกช่วง คืน fallback
@@ -129,10 +140,18 @@ def step2_review(request):
         return redirect('step1')
 
     rows = staged['rows']
+    summary = staged.get('summary') or {}
     q = request.GET.get('q', '').strip()
     type_filter = request.GET.get('type', 'all')
+    # แท็บสถานะ -- เดิมกรองได้แค่น้ำ/ไฟ ผู้ใช้ต้องไล่เปิดทีละหน้า (หน้าละ 10 แถว) เพื่อหาแถว error
+    # ถ้าไม่ได้เลือกแท็บและไฟล์มีแถว error ให้เปิดแท็บ "มีปัญหา" ก่อน เพราะต้องแก้ก่อนไปต่อได้
+    status_filter = request.GET.get('status')
+    if status_filter not in REVIEW_STATUS_KEYS:
+        status_filter = 'error' if summary.get('error') else 'all'
 
     filtered = rows
+    if status_filter != 'all':
+        filtered = [r for r in filtered if r.get('status') == status_filter]
     if type_filter in ('8', '9'):
         # ใช้ .get() ให้ตรงกับบรรทัดถัดไป -- เดิมเป็น r['type_cd'] ซึ่งถ้าคีย์หาย
         # (เช่น session ค้างจากโครงข้อมูลเวอร์ชันก่อน) จะเป็น KeyError -> หน้า 500
@@ -150,10 +169,20 @@ def step2_review(request):
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
 
+    status_tabs = [
+        {
+            'key': key, 'label': label, 'tone': tone,
+            'count': len(rows) if key == 'all' else summary.get(key, 0),
+            'is_active': key == status_filter,
+        }
+        for key, label, tone in REVIEW_STATUS_TABS
+    ]
+
     context = {
         'current_step': 2, 'step_labels': STEP_LABELS,
         'staged': staged, 'page_obj': page_obj,
         'search': q, 'active_filter': type_filter,
+        'status_filter': status_filter, 'status_tabs': status_tabs,
         'total_filtered': len(filtered),
     }
     return render(request, 'meters/review.html', context)

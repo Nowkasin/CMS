@@ -51,6 +51,36 @@ class RestartTests(NoDbTestCase):
         self.assertNotIn('committed', req.session)
 
 
+class ReviewStatusTabTests(NoDbTestCase):
+    def staged(self):
+        rows = [
+            {'idx': i, 'status': status, 'type_cd': 9, 'type_label': 'น้ำ', 'subarea_id': f'S{i}',
+             'contract_code': f'C{i}', 'meter_no': f'M{i}', 'message': ''}
+            for i, status in enumerate(['ok', 'error', 'error', 'duplicate', 'skip'], start=1)
+        ]
+        return {'filename': 'f.xlsx', 'billing_period': 'x', 'rows': rows,
+                'summary': {'ok': 1, 'error': 2, 'duplicate': 1, 'skip': 1}}
+
+    def render(self, query=''):
+        req = make_request('get', '/review/' + query)
+        req.session['staged'] = self.staged()
+        return steppage_view.step2_review(req)
+
+    def test_opens_error_tab_first_when_file_has_errors(self):
+        resp = self.render()
+        self.assertEqual(resp.status_code, 200)
+        body = resp.content.decode()
+        self.assertIn('แถวที่ 2', body)
+        self.assertIn('แถวที่ 3', body)
+        self.assertNotIn('แถวที่ 1<', body)
+
+    def test_explicit_status_and_all(self):
+        self.assertIn('แถวที่ 4', self.render('?status=duplicate').content.decode())
+        body = self.render('?status=all').content.decode()
+        for i in range(1, 6):
+            self.assertIn(f'แถวที่ {i}<', body)
+
+
 class StepThreeTests(NoDbTestCase):
     def test_import_row_error_shows_row_and_keeps_staged(self):
         req = make_request('post', '/confirm/', {'confirm': 'on'})
