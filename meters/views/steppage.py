@@ -1,23 +1,18 @@
 # meters/views/steppage.py
 import datetime
+import logging
 
 from django.conf import settings
 from django.shortcuts import render, redirect
 from django.core.paginator import Paginator
 
 from .. import services
+from ..utils import THAI_MONTHS, year_options
 from ..forms import ExcelUploadForm
+
+logger = logging.getLogger(__name__)
+
 STEP_LABELS = ['อัปโหลดไฟล์', 'ตรวจสอบข้อมูล', 'ยืนยันนำเข้า', 'เสร็จสิ้น']
-
-THAI_MONTHS = [
-    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-    'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
-]
-
-
-def _current_year_be():
-    return datetime.date.today().year + 543
-
 
 def _safe_month(raw, fallback):
     """
@@ -63,7 +58,7 @@ def step1_upload(request):
         'step_labels': STEP_LABELS,
         'thai_months': THAI_MONTHS,
         'current_month_idx': prev_month_idx,
-        'year_options': [_current_year_be() - 1, _current_year_be(), _current_year_be() + 1],
+        'year_options': year_options(),
         'current_year_be': prev_year_be,
     }
 
@@ -190,7 +185,12 @@ def step3_confirm(request):
                     billing_month=staged.get('billing_month'),
                     billing_year_be=staged.get('billing_year_be'),
                 )
+            except services.ImportRowError as exc:
+                # ทั้งไฟล์ถูก rollback แล้ว -- บอกแถวที่ล้ม ส่วนข้อความดิบเก็บใน logger เท่านั้น
+                logger.error('commit_staged_rows failed: %s', exc, exc_info=exc.__cause__)
+                error = exc.user_message()
             except Exception:
+                logger.exception('commit_staged_rows failed')
                 # ไม่โชว์ข้อความดิบจาก pyodbc/SQL Server (มีชื่อตาราง/driver ติดมา)
                 # คง staged ไว้ให้กดยืนยันซ้ำได้ ไม่ต้องอัปโหลดไฟล์ใหม่
                 error = (
@@ -227,6 +227,10 @@ def step4_done(request):
 
 
 def restart(request):
+    # ล้างข้อมูลที่ค้างอยู่เฉพาะ POST (ปุ่มในหน้า wizard ส่ง form="restartForm" พร้อม CSRF)
+    # GET เฉยๆ ไม่ล้าง -- กันลิงก์/การ prefetch ของเบราว์เซอร์ทิ้งงานที่ผู้ใช้ทำค้างไว้
+    if request.method != 'POST':
+        return redirect('step1')
     request.session.pop('staged', None)
     request.session.pop('committed', None)
     return redirect('step1')

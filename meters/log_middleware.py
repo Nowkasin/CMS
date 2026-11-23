@@ -1,4 +1,4 @@
-# meters/middleware.py
+# meters/log_middleware.py
 """
 บันทึก log เหตุการณ์ของทุกเมนูแบบรวมศูนย์ (เขียนลง dbo.Contract_activity_log)
 
@@ -9,23 +9,33 @@
        มีอะไรเปลี่ยน     -> ลง log พร้อมข้อความ "เลขมิเตอร์ 123 → 456 · ปิดใช้งาน"
   ความสำเร็จจึงตัดสินจาก "ข้อมูลเปลี่ยนจริง" ไม่ใช่จากการเดาว่า response เป็น redirect
 
-ที่ไม่ผ่าน middleware นี้ (EXCLUDE) เพราะมี log ของตัวเองอยู่แล้ว:
-  - ยกเลิกสัญญา (บันทึก/ลบ/ปิดการตั้งหนี้มิเตอร์) -- SP เขียน log ในทรานแซกชันเดียวกับงานหลัก
+ช่องทางลง log ทั้งระบบมี 3 ทางเท่านั้น -- เมนูใหม่ให้ใช้ทางที่ 1 เสมอ:
+  1) middleware นี้         -- ทุกการกระทำผ่านหน้าเว็บ ลงทะเบียนที่ REGISTRY ด้านล่าง
+  2) ในทรานแซกชันเดียวกับงาน -- ต้องล้มพร้อมงานหลัก จึงเขียนบน cursor/SP เดียวกัน:
+       นำเข้าไฟล์ Excel (services/meter_import.commit_staged_rows)
+       ยกเลิกสัญญา บันทึก/ลบ/ปิดการตั้งหนี้มิเตอร์ (เขียนใน SP ฝั่งฐานข้อมูล)
+  3) meters/signals.py      -- เข้า/ออกระบบ และล็อกอินไม่สำเร็จ
+
+view ส่งผลลัพธ์ให้ middleware ได้ทาง request.activity_result (dict) เช่น id ที่เพิ่งสร้าง
+(เพิ่มมิเตอร์ / บันทึกระบบไฟฟ้า) -- middleware อ่านข้อมูลจริงจาก DB ด้วย id นั้น
+แทนการเดาจากชื่อช่องในฟอร์มของ view
+
+ที่ไม่ผ่าน middleware นี้ (EXCLUDE):
+  - งานในทางที่ 2 ข้างบน (มี log ในทรานแซกชันของตัวเองแล้ว)
   - ติ๊กงวด -- ตั้งใจไม่ลง log (เกิดบ่อย เป็นแค่ข้อมูลอ้างอิง)
-  - นำเข้าไฟล์ Excel (step3) -- commit_staged_rows เขียน log เอง
-  - Master ระบบไฟฟ้า -- phase_master.py เขียน log เอง (มีรายละเอียดชื่อเดิม → ชื่อใหม่)
   - ขั้นตอนที่แค่พักข้อมูลใน session (step1/step2/step4/restart) และ login/logout
 
 POST ที่ไม่อยู่ในทั้งตารางลงทะเบียนและ EXCLUDE (เช่นเมนูใหม่ที่เพิ่มภายหลังแล้วลืมมาลงทะเบียน)
 จะถูกลง log เป็น "การดำเนินการอื่น" พร้อมชื่อ URL เมื่อ redirect สำเร็จ -- ไม่หลุดเงียบ
 
-ข้อผิดพลาดใดๆ ในไฟล์นี้ถูกกลืนลง logger ('meters.middleware') ไม่ทำให้หน้าเว็บล้ม
+ข้อผิดพลาดใดๆ ในไฟล์นี้ถูกกลืนลง logger ('meters.log_middleware') ไม่ทำให้หน้าเว็บล้ม
 """
 import logging
 
 from .services import activity_log as activity
 from .services import (
     fetch_meter_by_id,
+    fetch_phase_type_by_id,
     fetch_readings_for_meters,
     fetch_subarea_meters,
 )
@@ -38,7 +48,6 @@ EXCLUDE = frozenset({
     'step1', 'step2', 'step3', 'step4', 'restart',
     'termination_detail', 'termination_toggle', 'termination_toggle_all',
     'termination_delete', 'termination_close_meters',
-    'phase_new', 'phase_edit',
 })
 
 
@@ -81,6 +90,11 @@ def _is_redirect(response):
     return response.status_code in (301, 302, 303, 307, 308)
 
 
+def _result(request):
+    """ผลลัพธ์ที่ view ฝากไว้ใน request.activity_result -- ไม่มีคืน dict ว่าง"""
+    return getattr(request, 'activity_result', None) or {}
+
+
 def _to_int(value):
     try:
         return int(value)
@@ -109,20 +123,22 @@ def _meter_form_build(request, kwargs, before, response):
     meter_id = kwargs.get('meter_id')
 
     if not meter_id:
-        # เพิ่มใหม่: ยังไม่รู้ Meter_id ที่เพิ่งสร้าง (view ไม่ได้บอกกลับ) จึงยืนยันได้แค่จาก redirect
-        # และใช้ค่าที่ POST มาเป็นรายละเอียด -- ฟอร์มที่กรอกผิดจะ render หน้าเดิมกลับ (ไม่ redirect)
-        if not _is_redirect(response):
+        # เพิ่มใหม่: view ฝาก Meter_id ที่สร้างไว้ใน request.activity_result เมื่อบันทึกสำเร็จ
+        # (ฟอร์มที่กรอกผิดไม่ฝาก) อ่านข้อมูลจริงจาก DB รวมเลขที่ SP Gen ให้
+        new_id = _to_int(_result(request).get('meter_id'))
+        created = fetch_meter_by_id(new_id) if new_id else None
+        if not created:
             return None
-        post = request.POST
-        type_label = 'น้ำ' if post.get('meter_type_cd') == '9' else 'ไฟ'
-        meter_no = (post.get('meter_no') or '').strip()
+        type_label = 'น้ำ' if created.get('Meter_type_cd') == 9 else 'ไฟ'
+        meter_no = (created.get('Meter_no') or '').strip()
         return {
             'action': activity.ACTION_METER_CREATE,
             'ref_text': meter_no or f'มิเตอร์{type_label}ใหม่',
-            'subarea_id': post.get('subarea_id') or None,
-            'detail': (f'เพิ่มมิเตอร์{type_label}\n'
+            'meter_id': new_id,
+            'subarea_id': created.get('SubArea_id'),
+            'detail': (f'เพิ่มมิเตอร์{type_label} (Meter_id {new_id})\n'
                        f'เลขมิเตอร์ {meter_no or "(ยังไม่มี/รอ Gen เลข)"}\n'
-                       f'พื้นที่ย่อย {post.get("subarea_id") or "-"}'),
+                       f'พื้นที่ย่อย {created.get("SubArea_id") or "-"}'),
         }
 
     after = fetch_meter_by_id(meter_id)
@@ -213,6 +229,48 @@ def _edit_meter_build(request, kwargs, before, response):
 
 
 # --------------------------------------------------------------------------
+# Master ระบบไฟฟ้า (phase_new / phase_edit -> views.phase_form)
+# --------------------------------------------------------------------------
+PHASE_FIELDS = {
+    'Phase_type': 'ชื่อ',
+    'Phase_desc': 'คำบรรยาย',
+    'UseOrNot': 'การใช้งาน',
+}
+
+
+def _phase_before(request, kwargs):
+    phase_id = kwargs.get('phase_id')
+    return fetch_phase_type_by_id(phase_id) if phase_id else None
+
+
+def _phase_build(request, kwargs, before, response):
+    saved_id = _to_int(_result(request).get('phase_id'))
+    if not saved_id:
+        return None   # กรอกผิด / บันทึกไม่สำเร็จ -- view ไม่ฝาก id
+    after = fetch_phase_type_by_id(saved_id)
+    if not after:
+        return None
+    if before is None:
+        return {
+            'action': activity.ACTION_PHASE_CREATE,
+            'ref_text': after.get('Phase_type'),
+            'detail': f'เพิ่มระบบไฟฟ้า "{after.get("Phase_type")}" (Phase_id {saved_id})',
+        }
+    # UseOrNot เป็น bit -- แปลงเป็น bool ให้ _fmt แสดงเป็น เปิดใช้งาน/ปิดใช้งาน
+    before = {**before, 'UseOrNot': bool(before.get('UseOrNot'))}
+    after = {**after, 'UseOrNot': bool(after.get('UseOrNot'))}
+    changes = _diff(before, after, PHASE_FIELDS)
+    if not changes:
+        return None   # กดบันทึกโดยไม่ได้เปลี่ยนอะไร
+    only_status = len(changes) == 1 and changes[0].startswith('การใช้งาน')
+    return {
+        'action': activity.ACTION_PHASE_TOGGLE if only_status else activity.ACTION_PHASE_UPDATE,
+        'ref_text': after.get('Phase_type'),
+        'detail': '\n'.join(changes),
+    }
+
+
+# --------------------------------------------------------------------------
 # นำข้อมูลออก (ดาวน์โหลด Excel / ส่งออกมิเตอร์) -- ไม่มีข้อมูลเปลี่ยน ตัดสินจากว่าส่งไฟล์กลับ
 # --------------------------------------------------------------------------
 def _download_build(request, kwargs, before, response):
@@ -264,6 +322,8 @@ REGISTRY = {
     'meter_new':      {'methods': ('POST',), 'before': _meter_form_before, 'build': _meter_form_build},
     'meter_edit':     {'methods': ('POST',), 'before': _meter_form_before, 'build': _meter_form_build},
     'edit_meter':     {'methods': ('POST',), 'before': _edit_meter_before, 'build': _edit_meter_build},
+    'phase_new':      {'methods': ('POST',), 'before': _phase_before,      'build': _phase_build},
+    'phase_edit':     {'methods': ('POST',), 'before': _phase_before,      'build': _phase_build},
     'download_excel': {'methods': ('POST',), 'before': None, 'build': _download_build},
     'export_meters':  {'methods': ('GET',),  'before': None, 'build': _export_build},
 }

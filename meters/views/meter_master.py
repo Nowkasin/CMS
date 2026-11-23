@@ -98,11 +98,14 @@ def meter_form(request, meter_id=None):
 
         if not errors:
             try:
-                services.save_standalone_meter(
+                saved_id = services.save_standalone_meter(
                     subarea_id, int(meter_type_cd), meter_no, phase_type,
                     request.user.get_username(),
                     meter_id=meter_id, meter_remark=meter_remark, use_or_not=use_or_not,
                 )
+                # ส่ง Meter_id ให้ ActivityLogMiddleware -- ตอนเพิ่มใหม่ middleware จะอ่านข้อมูลจริง
+                # จาก DB (รวมเลขที่ SP Gen ให้) แทนการเดาจากช่องในฟอร์ม
+                request.activity_result = {'meter_id': saved_id}
                 return redirect('meter_list')
             except ValueError as exc:
                 # ValueError มาจากการ validate ของ service เอง -- ข้อความปลอดภัย แสดงให้ผู้ใช้ได้

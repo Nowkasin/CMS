@@ -1,6 +1,6 @@
 ﻿# meters/services/termination.py
 from .db import get_db_connection
-from .meters import _to_sql_like_pattern
+from .sql_utils import _to_sql_like_pattern
 
 # สถานะสัญญาที่ยกเลิกซ้ำไม่ได้ (อ้างจาก dbo.Contract_status_ms)
 #   '4' ไม่ต่อสัญญา / '5' ยกเลิกสัญญา -> เป็นผลลัพธ์ของการยกเลิกอยู่แล้ว

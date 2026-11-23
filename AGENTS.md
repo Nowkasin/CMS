@@ -41,6 +41,11 @@
 - หลีกเลี่ยงการสร้างไฟล์ขนาดใหญ่รวมหลายหน้าที่รับผิดชอบ ให้แยกตาม Feature ตามโครงสร้างปัจจุบัน
 - รักษาชื่อ URL, Form field, Session key และ DOM ID ที่ JavaScript ใช้อยู่ เว้นแต่แก้ทุกจุดที่อ้างอิงพร้อมกัน
 - เพิ่ม Comment เมื่ออธิบายข้อจำกัดของข้อมูลเดิมหรือเหตุผลที่มองจากโค้ดไม่ออก หลีกเลี่ยง Comment ที่เพียงทวนคำสั่งในโค้ด
+- ตัวช่วยที่หลาย View ใช้ร่วมกัน (วันที่ไทย/พ.ศ., แปลงค่าจากฟอร์ม) อยู่ที่ `meters/utils.py` ห้าม import ฟังก์ชันที่ขึ้นต้นด้วย `_` ข้ามไฟล์ View
+- `meters/models.py` ตั้งใจว่าง ระบบไม่ใช้ ORM กับตารางธุรกิจ
+- Activity log มี 3 ช่องทางเท่านั้น: `meters/log_middleware.py` (ทุกการกระทำผ่านหน้าเว็บ — เมนูใหม่ให้ลงทะเบียนที่ `REGISTRY`), ในทรานแซกชันเดียวกับงาน (นำเข้า Excel และ SP ยกเลิกสัญญา) และ `meters/signals.py` (เข้า/ออกระบบ) View ส่ง id ที่เพิ่งบันทึกให้ middleware ผ่าน `request.activity_result` ไม่ต้องเรียก log เอง
+- สิทธิ์เมนูถูกเก็บใน Session ด้วย `store_access_in_session()` ใน `meters/permissions.py` และถูกดึงใหม่จาก K2 ทุก `CMS_ACCESS_REFRESH_SECONDS`
+- การกระทำที่เปลี่ยนข้อมูล (รวมถึงล้าง Session อย่าง `restart`) ต้องเป็น POST พร้อม CSRF ห้ามใช้ลิงก์ GET
 
 ## Template และรูปแบบหน้าจอ
 
@@ -137,6 +142,14 @@
 ```powershell
 .\venv\Scripts\python.exe manage.py check
 ```
+
+รัน Test อัตโนมัติ (mock SQL Server ทั้งหมด ไม่เขียนข้อมูลจริง):
+
+```powershell
+.\venv\Scripts\python.exe manage.py test meters
+```
+
+เมื่อแก้ Logic ให้เพิ่มหรือแก้ Test ใน `meters/tests/` ด้วย และห้ามเขียน Test ที่ต่อ SQL Server หรือ LDAP จริง
 
 ตรวจปัญหา Whitespace:
 

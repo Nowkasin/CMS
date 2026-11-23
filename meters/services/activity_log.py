@@ -11,20 +11,23 @@ log เหตุการณ์รวมของระบบ (dbo.Contract_acti
 ใครเขียน log ที่ไหน
   - เหตุการณ์ยกเลิกสัญญา 3 อย่าง เขียนใน SP เอง (ทรานแซกชันเดียวกับข้อมูลหลัก)
     ดู sql/Contract_activity_log_Hook_Termination.sql
-  - เหตุการณ์อื่นทั้งหมด เขียนจากฝั่ง Python (view) หลังงานหลัก commit สำเร็จแล้ว
-    ผ่าน log_activity_safe() -- ถ้าเขียน log พลาดจะไม่ทำให้งานหลักที่สำเร็จไปแล้วดูเหมือนล้ม
+  - นำเข้าไฟล์ Excel เขียนบน cursor เดียวกับการนำเข้า (services/meter_import.py)
+  - เหตุการณ์จากหน้าเว็บอื่นทั้งหมด เขียนที่ meters/log_middleware.py หลังงานหลักสำเร็จแล้ว
+    และเข้า/ออกระบบเขียนที่ meters/signals.py -- ทั้งสองทางใช้ log_activity_safe()
+    ถ้าเขียน log พลาดจะไม่ทำให้งานหลักที่สำเร็จไปแล้วดูเหมือนล้ม
 
 ไม่บันทึก (ตั้งใจ):
   - การติ๊กงวดทีละงวดในหน้ายกเลิกสัญญา -- เกิดบ่อย เป็นแค่ข้อมูลอ้างอิง
     ถ้าลงทุกครั้ง หน้า log จะถูกกลบด้วยรายการเล็กๆ จนหาเหตุการณ์สำคัญไม่เจอ
   - การเปิดดูหน้าต่างๆ (GET) -- log นี้เก็บเฉพาะการเปลี่ยนแปลงข้อมูลและการนำข้อมูลออก
 """
+import datetime
 import logging
 
 from django.urls import NoReverseMatch, reverse
 
 from .db import get_db_connection
-from .meters import _to_sql_like_pattern
+from .sql_utils import _to_sql_like_pattern
 
 logger = logging.getLogger(__name__)
 
@@ -184,56 +187,116 @@ def _row_link(row):
     return None, None
 
 
-def fetch_activity_log(search='', action='all'):
-    """
-    ดึง log เหตุการณ์ เรียงเวลาล่าสุดก่อน
+_LOG_FROM = """
+    FROM dbo.Contract_activity_log g
+    LEFT JOIN dbo.Contract_hrd_tr c ON c.Contract_id = g.Contract_id
+    OUTER APPLY (
+        SELECT TOP 1 x.CompanyName
+        FROM dbo.Contract_customer_tr x
+        WHERE TRY_CONVERT(int, x.Contract_id) = g.Contract_id
+    ) cu
+"""
 
-    search -- รหัสสัญญา / ชื่อลูกค้า / ชื่อผู้ทำรายการ / ข้อความอ้างอิง
-    action -- Action_type ที่ต้องการ หรือ 'all'
+
+def _log_where(search='', action='all', contract_id=None, user=None,
+               date_from=None, date_to=None):
+    """
+    ประกอบ WHERE ของหน้า log -- ทุกตัวกรองทำใน SQL
+
+    เดิมดึง log ทั้งตารางมากรอง/แบ่งหน้าใน Python ซึ่งช้าลงเรื่อยๆ เพราะทุกการเข้า/ออกระบบ
+    ก็ถูกบันทึกด้วย (ตารางโตไม่หยุด)
+
+    date_to รวมทั้งวัน -- เทียบ DateEntry < วันถัดไป แทน <= date_to (ไม่งั้นตัดเวลาหลังเที่ยงคืนทิ้ง)
+    """
+    sql = ' WHERE 1 = 1'
+    params = []
+    if action and action != 'all':
+        sql += ' AND g.Action_type = ?'
+        params.append(action)
+    search = (search or '').strip()
+    if search:
+        like = _to_sql_like_pattern(search)
+        sql += """ AND (LTRIM(RTRIM(c.Contract_code)) LIKE ?
+                        OR cu.CompanyName LIKE ?
+                        OR g.UserEntry LIKE ?
+                        OR g.Ref_text LIKE ?)"""
+        params += [like, like, like, like]
+    if contract_id is not None:
+        sql += ' AND g.Contract_id = ?'
+        params.append(int(contract_id))
+    if user:
+        sql += ' AND g.UserEntry = ?'
+        params.append(user)
+    if date_from:
+        sql += ' AND g.DateEntry >= ?'
+        params.append(date_from)
+    if date_to:
+        sql += ' AND g.DateEntry < ?'
+        params.append(date_to + datetime.timedelta(days=1))
+    return sql, params
+
+
+def count_activity_log(**filters):
+    """จำนวนรายการ log ที่ตรงตัวกรอง (ใช้กับตัวแบ่งหน้า)"""
+    where, params = _log_where(**filters)
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*)' + _LOG_FROM + where, params)
+        return int(cursor.fetchone()[0])
+    finally:
+        conn.close()
+
+
+def fetch_activity_log(offset=0, limit=None, **filters):
+    """
+    ดึง log เหตุการณ์ เรียงเวลาล่าสุดก่อน เฉพาะช่วง offset/limit (แบ่งหน้าใน SQL)
+
+    ตัวกรอง (ดู _log_where): search, action, contract_id, user, date_from, date_to
+      search -- รหัสสัญญา / ชื่อลูกค้า / ชื่อผู้ทำรายการ / ข้อความอ้างอิง
 
     join Contract_hrd_tr เพื่อเอารหัสสัญญามาแสดง (log เก็บแค่ Contract_id)
     และ OUTER APPLY หาชื่อลูกค้า -- Contract_customer_tr.Contract_id เป็น nvarchar
     ส่วน Contract_hrd_tr.Contract_id เป็น int จึงต้องใช้ TRY_CONVERT ไม่ใช่ join ตรงๆ
     """
+    where, params = _log_where(**filters)
+    sql = """
+        SELECT g.Log_id, g.Action_type, g.Contract_id, g.Meter_id, g.SubArea_id,
+               g.Ref_text, g.Detail, g.UserEntry, g.DateEntry,
+               c.Contract_code, cu.CompanyName
+    """ + _LOG_FROM + where + ' ORDER BY g.DateEntry DESC, g.Log_id DESC'
+    if limit is not None:
+        sql += ' OFFSET ? ROWS FETCH NEXT ? ROWS ONLY'
+        params = params + [int(offset), int(limit)]
+
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        sql = """
-            SELECT g.Log_id, g.Action_type, g.Contract_id, g.Meter_id, g.SubArea_id,
-                   g.Ref_text, g.Detail, g.UserEntry, g.DateEntry,
-                   c.Contract_code, cu.CompanyName
-            FROM dbo.Contract_activity_log g
-            LEFT JOIN dbo.Contract_hrd_tr c ON c.Contract_id = g.Contract_id
-            OUTER APPLY (
-                SELECT TOP 1 x.CompanyName
-                FROM dbo.Contract_customer_tr x
-                WHERE TRY_CONVERT(int, x.Contract_id) = g.Contract_id
-            ) cu
-            WHERE 1 = 1
-        """
-        params = []
-
-        if action and action != 'all':
-            sql += ' AND g.Action_type = ?'
-            params.append(action)
-
-        search = (search or '').strip()
-        if search:
-            like = _to_sql_like_pattern(search)
-            sql += """ AND (LTRIM(RTRIM(c.Contract_code)) LIKE ?
-                            OR cu.CompanyName LIKE ?
-                            OR g.UserEntry LIKE ?
-                            OR g.Ref_text LIKE ?)"""
-            params += [like, like, like, like]
-
-        sql += ' ORDER BY g.DateEntry DESC, g.Log_id DESC'
-
         cursor.execute(sql, params)
         columns = [c[0] for c in cursor.description]
         rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
         for r in rows:
             r['action_url'], r['action_text'] = _row_link(r)
         return rows
+    finally:
+        conn.close()
+
+
+def fetch_activity_users(search='', action='all', contract_id=None):
+    """
+    รายชื่อผู้ทำรายการสำหรับ dropdown -- กรองด้วยตัวกรองอื่นยกเว้นผู้ใช้/วันที่
+    (เหมือนพฤติกรรมเดิม: เปลี่ยนผู้ใช้ได้ต่อเนื่องโดยรายชื่อไม่หดตามตัวที่เลือกอยู่)
+    """
+    where, params = _log_where(search=search, action=action, contract_id=contract_id)
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT DISTINCT g.UserEntry' + _LOG_FROM + where
+            + ' AND g.UserEntry IS NOT NULL ORDER BY g.UserEntry',
+            params,
+        )
+        return [row[0] for row in cursor.fetchall() if row[0]]
     finally:
         conn.close()
 

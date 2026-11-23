@@ -8,7 +8,8 @@ Re-export ทุก view จากโมดูลย่อย เพื่อใ
                       step4_done, restart
   dashboard.py    -> dashboard, edit_meter
   export.py       -> export_meters_excel
-  termination.py  -> termination_search, termination_detail,
+  termination_search.py -> termination_search
+  termination.py  -> termination_detail,
                       termination_toggle_installment,
                       termination_select_all_installments,
                       termination_delete
@@ -32,8 +33,8 @@ from .dashboard import (
 
 from .export import export_meters_excel
 
+from .termination_search import termination_search
 from .termination import (
-    termination_search,
     termination_detail,
     termination_toggle_installment,
     termination_select_all_installments,
