@@ -68,6 +68,7 @@
 - รายการยาวที่ต้องค้นหา เช่น SubArea ให้ใช้ Searchable Combobox เฉพาะงาน ไม่ใช้ Custom Dropdown รายการสั้น
 - URL ที่ไม่มีอยู่และ URL ของเมนูที่ผู้ใช้ไม่มีสิทธิ์ต้องแสดงหน้า `templates/meters/404.html` แบบกลาง เพื่อไม่เปิดเผยว่าหน้านั้นมีอยู่จริง
 - บัญชีที่ล็อกอินสำเร็จแต่ไม่ได้รับสิทธิ์เมนูใดเลยให้ใช้ `templates/meters/no_permission.html` แยกจากหน้า 404
+- ปิดปรับปรุงระบบใช้หน้า `templates/meters/503.html` (แสดงจาก `meters/maintenance.py`) เป็นหน้า Standalone ห้าม extends `base.html` หรือใช้ session/user/`{% url %}` เพราะต้องแสดงได้ขณะฐานข้อมูลใช้งานไม่ได้ เปิด/ปิดด้วย `manage.py maintenance on|off` ผู้ดูแลดูหน้าเว็บจริงระหว่างปรับปรุงได้ผ่านลิงก์ผ่าน/localhost และหน้าภายในต้องแสดงแถบเตือน `partials/maintenance_banner.html` (รวมอยู่ใน `base.html` แล้ว)
 - Stepper ใช้ `templates/meters/stepper.html` และต้องแสดงครบโดยไม่มี Scrollbar
 - ออกแบบ Responsive เสมอ บนจอเล็ก Form และปุ่มต้องเรียงลงมาโดยไม่ล้นหน้าจอ
 - อย่าเปลี่ยนข้อความทางธุรกิจหรือความหมายของสถานะเพื่อความสวยงามเพียงอย่างเดียว

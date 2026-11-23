@@ -36,6 +36,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # โหมดปรับปรุงระบบ (หน้า 503) -- ต้องอยู่ก่อน Session/Auth เพื่อไม่แตะฐานข้อมูลระหว่างปิดปรับปรุง
+    'meters.maintenance.MaintenanceModeMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',  # จำเป็นสำหรับ request.session
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     # ทุกหน้าต้องล็อกอิน ยกเว้น view ที่ติด @login_not_required
@@ -214,6 +216,26 @@ AUTHENTICATION_BACKENDS = ['meters.auth_backend.BuasriLDAPBackend']
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'meter_list'
 LOGOUT_REDIRECT_URL = 'login'
+
+# -----------------------------------------------------------------------
+# โหมดปรับปรุงระบบ (หน้า 503) -- ดูรายละเอียดที่ meters/maintenance.py
+# ปกติเปิด/ปิดด้วย `python manage.py maintenance on|off` (ไม่ต้อง restart)
+# CMS_MAINTENANCE_MODE=True ใช้เมื่อต้องการบังคับเปิดจาก .env
+# -----------------------------------------------------------------------
+CMS_MAINTENANCE_MODE = config('CMS_MAINTENANCE_MODE', default=False, cast=bool)
+CMS_MAINTENANCE_FLAG_FILE = config(
+    'CMS_MAINTENANCE_FLAG_FILE', default=str(BASE_DIR / 'var' / 'maintenance.json'),
+)
+CMS_MAINTENANCE_MESSAGE = config('CMS_MAINTENANCE_MESSAGE', default='')
+CMS_MAINTENANCE_UNTIL = config('CMS_MAINTENANCE_UNTIL', default='')
+CMS_MAINTENANCE_RETRY_AFTER = config('CMS_MAINTENANCE_RETRY_AFTER', default=3600, cast=int)
+# รหัสลิงก์ผ่านสำหรับโหมดที่เปิดจาก .env (โหมดที่เปิดด้วยคำสั่ง maintenance on สุ่มรหัสให้เอง)
+CMS_MAINTENANCE_BYPASS_TOKEN = config('CMS_MAINTENANCE_BYPASS_TOKEN', default='')
+# IP ที่ยังเข้าระบบได้ระหว่างปรับปรุง (คั่นด้วย ,) -- เทียบกับ REMOTE_ADDR
+# localhost (127.0.0.1 / ::1) ผ่านได้เสมอ ไม่ต้องใส่
+CMS_MAINTENANCE_ALLOW_IPS = [
+    ip.strip() for ip in config('CMS_MAINTENANCE_ALLOW_IPS', default='').split(',') if ip.strip()
+]
 
 # ดึงสิทธิ์เมนูจาก K2 ใหม่ทุกกี่วินาทีระหว่างที่ผู้ใช้ยังล็อกอินอยู่ (0 = ไม่ดึงใหม่ ใช้ค่าตอนล็อกอิน)
 CMS_ACCESS_REFRESH_SECONDS = config('CMS_ACCESS_REFRESH_SECONDS', default=600, cast=int)
