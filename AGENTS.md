@@ -70,6 +70,8 @@
 - บัญชีที่ล็อกอินสำเร็จแต่ไม่ได้รับสิทธิ์เมนูใดเลยให้ใช้ `templates/meters/no_permission.html` แยกจากหน้า 404
 - ปิดปรับปรุงระบบใช้หน้า `templates/meters/503.html` (แสดงจาก `meters/maintenance.py`) เป็นหน้า Standalone ห้าม extends `base.html` หรือใช้ session/user/`{% url %}` เพราะต้องแสดงได้ขณะฐานข้อมูลใช้งานไม่ได้ เปิด/ปิดด้วย `manage.py maintenance on|off` ผู้ดูแลดูหน้าเว็บจริงระหว่างปรับปรุงได้ผ่านลิงก์ผ่าน/localhost และหน้าภายในต้องแสดงแถบเตือน `partials/maintenance_banner.html` (รวมอยู่ใน `base.html` แล้ว)
 - Stepper ใช้ `templates/meters/stepper.html` และต้องแสดงครบโดยไม่มี Scrollbar
+- คู่มือการใช้งานอยู่ที่ `/help/` (`meters/views/help.py` + `templates/meters/help.html`) เนื้อหาแสดงตามสิทธิ์เมนู ภาพสาธิตเป็น CSS animation ใน `partials/help_demo.html` เมื่อเพิ่มหรือเปลี่ยน Flow ของเมนูใด ให้แก้ขั้นตอนใน `HELP_SECTIONS` ด้วย
+- ทัวร์พาคลิกอยู่ที่ `static/meters/js/tour.js` อ้าง element ด้วย `data-tour="..."` ใน Template และ ID เดิมของหน้า ห้ามลบหรือเปลี่ยนชื่อ `data-tour` โดยไม่แก้ `tour.js` (มี Test `test_help.py` ตรวจว่าทุก `data-tour` ที่ทัวร์อ้างมีอยู่จริง)
 - ออกแบบ Responsive เสมอ บนจอเล็ก Form และปุ่มต้องเรียงลงมาโดยไม่ล้นหน้าจอ
 - อย่าเปลี่ยนข้อความทางธุรกิจหรือความหมายของสถานะเพื่อความสวยงามเพียงอย่างเดียว
 

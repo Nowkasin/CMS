@@ -64,7 +64,7 @@
         แท็บสถานะ + กรองประเภท/ค้นหา -- ลิงก์ทุกอันพก status/type/q ไปด้วย
         ต้องใส่ |urlencode ทุกที่ที่เอาคำค้นต่อเข้า URL (คำค้นที่มี & หรือ # จะถูกตัดกลางทาง)
       {% endcomment %}
-      <div class="mb-3 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="สถานะรายการ">
+      <div class="mb-3 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="สถานะรายการ" data-tour="status-tabs">
         {% for t in status_tabs %}
           <a href="?status={{ t.key }}&type={{ active_filter|urlencode }}{% if search %}&q={{ search|urlencode }}{% endif %}"
              role="tab" aria-selected="{% if t.is_active %}true{% else %}false{% endif %}"
@@ -102,7 +102,7 @@
         ตาราง -- เดิม 11 คอลัมน์ (กว้าง 1,100px) สถานะ/ข้อความผิดพลาดอยู่ขวาสุด ต้องเลื่อนถึงจะเห็น
         ย้ายสถานะมาซ้ายสุด และรวมข้อมูลเป็นกลุ่ม: สัญญา / พื้นที่+มิเตอร์ / เลขอ่าน
       {% endcomment %}
-      <div class="border border-gray-100 rounded-xl overflow-x-auto">
+      <div class="border border-gray-100 rounded-xl overflow-x-auto" data-tour="table">
         <table class="min-w-[600px] w-full text-sm">
           <thead class="bg-gray-50 text-xs text-gray-500">
             <tr>
@@ -206,11 +206,11 @@
           ย้อนกลับ
         </a>
         {% if staged.summary.error > 0 %}
-          <span class="inline-flex items-center gap-2 bg-gray-200 text-gray-400 text-sm font-semibold px-5 py-2.5 rounded-lg cursor-not-allowed">
+          <span data-tour="next" class="inline-flex items-center gap-2 bg-gray-200 text-gray-400 text-sm font-semibold px-5 py-2.5 rounded-lg cursor-not-allowed">
             ถัดไป (แก้ไขข้อผิดพลาดก่อน)
           </span>
         {% else %}
-          <a href="{% url 'step3' %}"
+          <a data-tour="next" href="{% url 'step3' %}"
              class="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition">
             ถัดไป
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">

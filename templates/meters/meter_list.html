@@ -10,7 +10,7 @@
       <h1 class="text-xl font-bold tracking-tight text-gray-900 sm:text-3xl">จัดการมิเตอร์</h1>
       <p class="mt-1 text-sm text-gray-500">ค้นหา ตรวจสอบ และจัดการข้อมูลมิเตอร์ทั้งหมดในระบบ</p>
     </div>
-    <a href="{% url 'meter_new' %}"
+    <a data-tour="add" href="{% url 'meter_new' %}"
        class="inline-flex w-full items-center justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-600 focus:outline-none focus:ring-4 focus:ring-brand-100 sm:w-auto">
       <span class="mr-2 text-lg leading-none" aria-hidden="true">+</span>
       เพิ่มมิเตอร์ใหม่
@@ -18,7 +18,7 @@
   </header>
 
   <!-- ตัวกรอง -->
-  <section class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5" aria-label="ตัวกรองรายการมิเตอร์">
+  <section class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5" aria-label="ตัวกรองรายการมิเตอร์" data-tour="filters">
     <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
       <div>
         <div class="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
@@ -64,7 +64,7 @@
   </section>
 
   <!-- รายการมิเตอร์ -->
-  <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm" aria-labelledby="meter-table-title">
+  <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm" aria-labelledby="meter-table-title" data-tour="table">
     <div class="flex items-center justify-between gap-4 border-b border-gray-100 px-4 py-4 sm:px-5">
       <div>
         <h2 id="meter-table-title" class="font-semibold text-gray-900">รายการมิเตอร์</h2>

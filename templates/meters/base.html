@@ -59,7 +59,7 @@
 
 {% block extra_css %}{% endblock %}
 </head>
-<body class="min-h-screen bg-slate-50 font-sans text-gray-900">
+<body class="min-h-screen bg-slate-50 font-sans text-gray-900" data-page="{{ request.resolver_match.url_name|default:'' }}">
 {% include "meters/partials/top_nav.html" %}
 
 <div class="flex min-h-[calc(100vh-65px)] flex-col lg:flex-row">
@@ -138,6 +138,7 @@
 <script src="{% static 'meters/js/confirm_submit.js' %}" defer></script>
 <script src="{% static 'meters/js/custom_select.js' %}" defer></script>
 <script src="{% static 'meters/js/ui.js' %}" defer></script>
+<script src="{% static 'meters/js/tour.js' %}" defer></script>
 <script>
   // ลิ้นชักเมนูบนมือถือ: ปุ่มขีด 3 ขีดอยู่ใน top_nav.html (id=sidebarOpen)
   (function () {

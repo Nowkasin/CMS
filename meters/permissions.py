@@ -54,7 +54,9 @@ URL_PERMISSION_MAP = {
 }
 
 PUBLIC_URL_NAMES = frozenset({'login', 'logout', 'no_permission'})
-HOME_URL_NAMES = frozenset({'home'})
+# หน้าที่เปิดได้เมื่อมีสิทธิ์อย่างน้อยหนึ่งเมนู (ไม่ผูกกับเมนูใดเมนูหนึ่ง)
+# help = คู่มือการใช้งาน -- เนื้อหาในหน้ากรองตามสิทธิ์อีกชั้น (views/help.py)
+HOME_URL_NAMES = frozenset({'home', 'help'})
 
 
 def first_allowed_url_name(permissions):
