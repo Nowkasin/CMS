@@ -8,6 +8,7 @@ PERMISSION_HOME_ROUTES = (
     ('dashboard_view', 'dashboard'),
     ('contract_termination', 'termination_search'),
     ('activity_log_view', 'activity_log'),
+    ('invoice_print', 'invoice_search'),
 )
 
 PERMISSION_LABELS = {
@@ -18,6 +19,7 @@ PERMISSION_LABELS = {
     'dashboard_view': 'แดชบอร์ด',
     'contract_termination': 'ยกเลิกสัญญา',
     'activity_log_view': 'ประวัติการใช้งาน',
+    'invoice_print': 'ใบแจ้งหนี้',
 }
 
 URL_PERMISSION_MAP = {
@@ -51,6 +53,9 @@ URL_PERMISSION_MAP = {
     'phase_list': 'phase_management',
     'phase_new': 'phase_management',
     'phase_edit': 'phase_management',
+
+    'invoice_search': 'invoice_print',
+    'invoice_print': 'invoice_print',
 }
 
 PUBLIC_URL_NAMES = frozenset({'login', 'logout', 'no_permission'})

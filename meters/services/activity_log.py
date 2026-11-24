@@ -55,6 +55,7 @@ ACTION_PHASE_TOGGLE = 'phase_toggle'          # เปิด/ปิดใช้�
 # --- ใหม่: นำข้อมูลออก ---
 ACTION_DOWNLOAD_EXCEL = 'download_excel'      # ดาวน์โหลด Excel (เดือน-ปี + จำนวนรายการ)
 ACTION_EXPORT_METERS = 'export_meters'        # ส่งออก Excel จากแดชบอร์ด
+ACTION_INVOICE_PRINT = 'invoice_print'        # เปิดหน้าพิมพ์ใบแจ้งหนี้ (เลขตั้งหนี้ SAP ที่พิมพ์)
 
 # --- ใหม่: POST ที่ยังไม่ได้ลงทะเบียนใน middleware ---
 ACTION_OTHER = 'other_action'
@@ -69,6 +70,7 @@ ACTIVITY_ACTIONS = [
     (ACTION_UPLOAD_COMMIT, 'นำเข้าไฟล์ Excel'),
     (ACTION_DOWNLOAD_EXCEL, 'ดาวน์โหลด Excel'),
     (ACTION_EXPORT_METERS, 'ส่งออกมิเตอร์'),
+    (ACTION_INVOICE_PRINT, 'พิมพ์ใบแจ้งหนี้'),
     (ACTION_METER_CREATE, 'เพิ่มมิเตอร์'),
     (ACTION_METER_UPDATE, 'แก้ไขมิเตอร์'),
     (ACTION_METER_TOGGLE, 'เปิด/ปิดมิเตอร์'),

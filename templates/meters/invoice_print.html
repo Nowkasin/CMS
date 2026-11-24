@@ -1,0 +1,144 @@
+{% extends "meters/base.html" %}
+{% load static %}
+
+{% block title %}พิมพ์ใบแจ้งหนี้{% endblock %}
+
+{% comment %}
+  หน้าใบแจ้งหนี้ขนาด A4 หนึ่งหน้าต่อหนึ่งใบ (Contract_id + เลขตั้งหนี้ SAP) -- รูปแบบตามใบแจ้งหนี้ของ K2
+  ข้อมูลมาจาก sp_6000_Contact_Doc_invoice (meters/services/invoice.py)
+  ตอนพิมพ์ ซ่อนแถบบน เมนู และแถบเครื่องมือ (.no-print) เหลือเฉพาะใบแจ้งหนี้
+  ยังไม่มี QR Code รับชำระเงิน (รอกำหนดลิงก์) -- ตำแหน่งเดิมอยู่มุมซ้ายล่างของใบ
+  ข้อความช่องทางชำระเงินและเบอร์ติดต่อคัดลอกจากใบแจ้งหนี้ K2 ถ้าเปลี่ยนให้แก้ที่ไฟล์นี้
+{% endcomment %}
+
+{% block extra_css %}
+<style>
+  .invoice-sheet { width: 210mm; min-height: 297mm; margin: 0 auto 24px; background: #fff; color: #111827;
+                   padding: 14mm 16mm 12mm; box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 8px 24px rgba(0,0,0,.06);
+                   font-size: 13.5px; line-height: 1.55; position: relative; }
+  .invoice-sheet .inv-grid { width: 100%; border-collapse: collapse; }
+  .invoice-sheet .inv-grid td, .invoice-sheet .inv-grid th { border: 1px solid #D1D5DB; padding: 5px 8px; vertical-align: top; }
+  .invoice-sheet .inv-items th { font-weight: 700; text-align: left; }
+  .invoice-sheet .num { text-align: right; white-space: nowrap; }
+  @media screen and (max-width: 860px) {
+    .invoice-sheet { width: 100%; min-height: 0; padding: 18px; font-size: 12.5px; }
+  }
+  @page { size: A4; margin: 0; }
+  @media print {
+    body { background: #fff !important; }
+    header, #sidebarPanel, #sidebarBackdrop, .no-print { display: none !important; }
+    main > .wrap { padding: 0 !important; }
+    .invoice-sheet { box-shadow: none; margin: 0; page-break-after: always; break-after: page; }
+    .invoice-sheet:last-child { page-break-after: auto; break-after: auto; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="no-print mx-auto mb-4 flex max-w-[210mm] flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+  <div>
+    <h1 class="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">พิมพ์ใบแจ้งหนี้</h1>
+    <p class="mt-1 text-sm text-gray-500">
+      {{ documents|length }} ใบ · กดพิมพ์ แล้วเลือกเครื่องพิมพ์ หรือ "บันทึกเป็น PDF" (กระดาษ A4 ไม่ต้องตั้งขอบ)
+    </p>
+  </div>
+  <div class="flex gap-2">
+    <a href="javascript:history.back()" class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">กลับ</a>
+    {% if documents %}
+    <button type="button" data-print class="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-600">
+      พิมพ์ / บันทึก PDF
+    </button>
+    {% endif %}
+  </div>
+</div>
+
+{% if load_error %}
+  <div class="no-print mx-auto max-w-[210mm] rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{{ load_error }}</div>
+{% elif missing_count %}
+  <div class="no-print mx-auto mb-4 max-w-[210mm] rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">
+    ไม่พบข้อมูลใบแจ้งหนี้ {{ missing_count }} ใบจากที่เลือก (เลขตั้งหนี้อาจถูกเปลี่ยนแล้ว) -- แสดงเฉพาะใบที่พบ
+  </div>
+{% endif %}
+
+{% for doc in documents %}
+{% with h=doc.header %}
+<article class="invoice-sheet" aria-label="ใบแจ้งหนี้ {{ doc.invoice_no }}">
+  <div style="text-align:center">
+    <img src="{% static 'meters/images/swu-logo.png' %}" alt="ตรามหาวิทยาลัยศรีนครินทรวิโรฒ" style="height:30mm;width:auto;display:inline-block">
+  </div>
+  <div style="margin-top:6mm;font-size:16px">ใบแจ้งหนี้ / Invoice</div>
+
+  <table class="inv-grid" style="margin-top:2mm">
+    <tr>
+      <td style="width:50%">มหาวิทยาลัยศรีนครินทรวิโรฒ {{ h.Contract_swu_location_name|default:"" }}</td>
+      <td>เลขที่ใบแจ้งหนี้ {{ doc.invoice_no }}</td>
+    </tr>
+    <tr>
+      <td>{{ h.Contract_swu_address|default:"" }}</td>
+      <td>วันที่ {{ doc.date_label|default:"" }}</td>
+    </tr>
+    <tr><td colspan="2">รหัสผู้เช่า/Customer : {{ h.SAPVendor_Id|default:"" }}</td></tr>
+    <tr><td colspan="2">รหัสสัญญา : {{ h.Contract_code|default:"" }}</td></tr>
+    <tr><td colspan="2">ชื่อผู้เช่า / Name : {{ h.CompanyName|default:"" }}</td></tr>
+    <tr><td colspan="2">ที่อยู่ / Address : {{ h.customer_address|default:"" }}</td></tr>
+  </table>
+
+  <table class="inv-grid inv-items" style="margin-top:-1px">
+    <thead>
+      <tr>
+        <th style="width:8%;text-align:center">ที่</th>
+        <th style="width:42%">รายการ(Description)</th>
+        <th style="width:27%">ประจำเดือน(งวด)</th>
+        <th style="width:23%" class="num">จำนวนเงิน(บาท)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for line in doc.lines %}
+      <tr>
+        <td style="text-align:center">{{ forloop.counter }}</td>
+        <td>{{ line.description }}</td>
+        <td>{{ line.period_label|default:"" }}</td>
+        <td class="num">{{ line.Contract_Installment_amt|floatformat:"2g" }}</td>
+      </tr>
+      {% endfor %}
+      <tr>
+        <td></td>
+        <td colspan="2" style="font-weight:700;height:24mm">รวมเป็นจำนวนเงิน {{ doc.total_text }}</td>
+        <td class="num" style="font-weight:700">{{ doc.total|floatformat:"2g" }}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div style="margin-top:4mm;font-size:12.5px">
+    <div style="font-weight:700;text-decoration:underline">หมายเหตุ Remark (ช่องทางการชำระเงิน)</div>
+    <p style="margin-top:2mm">ผู้เช่าสามารถโอนเงินเข้าบัญชี มหาวิทยาลัยศรีนครินทรวิโรฒ และนำหลักฐานการชำระเงินมาแจ้งที่ ฝ่ายจัดการทรัพย์สิน ให้ได้รับทราบทุกครั้ง</p>
+    <ol style="margin-top:1mm;list-style:none;padding:0">
+      <li>1. ช่องทางการชำระเงิน ธนาคารกรุงไทย เลขที่บัญชี 980-2-12515-6</li>
+      <li>2. ช่องทางการชำระเงิน ธนาคารไทยพาณิชย์ เลขที่บัญชี 406-592-591-4</li>
+      <li>3. ช่องทางการชำระเงินสดได้ที่ ส่วนการคลัง (มศว ประสานมิตร อาคาร 9 ชั้น 2 หรือมศว องครักษ์ อาคารอำนวยการ)</li>
+      <li>4. ช่องทางการชำระเงินผ่านระบบรับชำระเงินรูปแบบอิเล็กทรอนิกส์ (QR Code)</li>
+      <li>5. กำหนดชำระไม่เกินวันที่ 10 ของทุกเดือน</li>
+    </ol>
+    <p>** ขออภัยหากท่านชำระเงินเรียบร้อยแล้ว **</p>
+  </div>
+
+  <div style="margin-top:12mm;text-align:center">
+    <div>ลงชื่อ/ signature ........................................................................................</div>
+    <div style="margin-top:3mm;font-weight:700">หัวหน้าฝ่ายจัดการทรัพย์สิน</div>
+  </div>
+
+  <div style="margin-top:14mm;font-size:12px">
+    ติดต่อได้ที่ : 02-6495000 ต่อ 15994 , 02-2600139 &nbsp;&nbsp; ผู้บันทึก : {{ recorder }}
+  </div>
+</article>
+{% endwith %}
+{% empty %}
+  {% if not load_error %}
+  <div class="mx-auto max-w-[210mm] rounded-xl border border-gray-200 bg-white px-4 py-10 text-center text-sm text-gray-500">
+    ไม่พบข้อมูลใบแจ้งหนี้ที่เลือก
+  </div>
+  {% endif %}
+{% endfor %}
+
+<script src="{% static 'meters/js/invoice.js' %}" defer></script>
+{% endblock %}

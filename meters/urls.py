@@ -56,4 +56,8 @@ urlpatterns = [
     path('phases/', views.phase_list, name='phase_list'),
     path('phases/new/', views.phase_form, name='phase_new'),
     path('phases/<int:phase_id>/edit/', views.phase_form, name='phase_edit'),
+
+    # --- ใบแจ้งหนี้ (แทนฟอร์ม K2 FRM_4019_Invoice_CMS) ---
+    path('invoice/', views.invoice_search, name='invoice_search'),
+    path('invoice/print/', views.invoice_print, name='invoice_print'),
 ]

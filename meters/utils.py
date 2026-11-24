@@ -94,6 +94,60 @@ def period_label(period):
     return f'{THAI_MONTHS[month - 1]} {year_ce + 543}'
 
 
+_THAI_DIGITS = ['', 'หนึ่ง', 'สอง', 'สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า']
+_THAI_PLACES = ['', 'สิบ', 'ร้อย', 'พัน', 'หมื่น', 'แสน']
+
+
+def _thai_number_words(number, after_million=False):
+    """จำนวนเต็มบวก -> คำอ่านไทย (ล้านซ้อนกันได้ เช่น 1,000,000,000,000 = หนึ่งล้านล้าน)
+    after_million -- ส่วนท้ายหลังคำว่าล้าน: หลักหน่วย 1 อ่าน "เอ็ด" (หนึ่งล้านเอ็ด)"""
+    if number == 0:
+        return ''
+    if number >= 1_000_000:
+        millions, rest = divmod(number, 1_000_000)
+        return _thai_number_words(millions) + 'ล้าน' + _thai_number_words(rest, after_million=True)
+    digits = str(number)
+    words = []
+    length = len(digits)
+    for index, char in enumerate(digits):
+        digit = int(char)
+        place = length - index - 1
+        if digit == 0:
+            continue
+        if place == 1 and digit == 1:
+            words.append('สิบ')
+        elif place == 1 and digit == 2:
+            words.append('ยี่สิบ')
+        elif place == 0 and digit == 1 and (length > 1 or after_million):
+            words.append('เอ็ด')
+        else:
+            words.append(_THAI_DIGITS[digit] + _THAI_PLACES[place])
+    return ''.join(words)
+
+
+def baht_text(amount):
+    """
+    จำนวนเงิน -> คำอ่านบาทไทย เช่น 36300 -> 'สามหมื่นหกพันสามร้อยบาทถ้วน'
+    ปัดสตางค์ 2 ตำแหน่งแบบปัดครึ่งขึ้น ใช้ในบรรทัด "รวมเป็นจำนวนเงิน" ของใบแจ้งหนี้
+    (ใบแจ้งหนี้ K2 ใช้ udf_Num2Thai ของฐานข้อมูลกับราคาสัญญา แต่ที่นี่อ่านจากยอดรวมจริงของใบ
+    จึงถูกต้องแม้ใบเดียวมีหลายบรรทัด)
+    """
+    from decimal import ROUND_HALF_UP, Decimal
+
+    value = Decimal(str(amount or 0)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    negative = value < 0
+    value = abs(value)
+    baht = int(value)
+    satang = int((value - baht) * 100)
+    if baht == 0 and satang == 0:
+        return 'ศูนย์บาทถ้วน'
+    text = ''
+    if baht:
+        text += _thai_number_words(baht) + 'บาท'
+    text += (_thai_number_words(satang) + 'สตางค์') if satang else 'ถ้วน'
+    return ('ลบ' if negative else '') + text
+
+
 def expired_ago_label(end_date, today=None):
     """
     หมดอายุมานานเท่าไหร่ -> '6 ปี 4 เดือน', '3 เดือน', 'เดือนนี้'

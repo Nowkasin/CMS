@@ -1,0 +1,170 @@
+{% extends "meters/base.html" %}
+{% load static %}
+
+{% block title %}ใบแจ้งหนี้{% endblock %}
+
+{% comment %}
+  หน้าค้นหาใบแจ้งหนี้ -- ตัวกรองและคอลัมน์ตามฟอร์ม K2 FRM_4019_Invoice_CMS
+  ค้นหาเป็น GET (ปีที่สร้างสัญญาบังคับ) ติ๊กเลือกแล้วส่งไป invoice_print ด้วย ?doc=<Contract_id>:<fi_doc>
+  หนึ่งใบแจ้งหนี้อาจมีหลายแถว (หลายรายการในเลขตั้งหนี้เดียวกัน) ติ๊กแถวใดก็ได้ใบเดียวกัน
+  JavaScript: static/meters/js/invoice.js (เลือกทั้งหมด / นับใบที่เลือก)
+{% endcomment %}
+
+{% block content %}
+<div class="mx-auto w-full max-w-[1600px] space-y-4 sm:space-y-6">
+  <header>
+    <h1 class="text-xl font-bold tracking-tight text-gray-900 sm:text-3xl">ใบแจ้งหนี้</h1>
+    <p class="mt-1 text-sm text-gray-500">ค้นหางวดที่ตั้งหนี้ใน SAP แล้ว เลือกรายการ แล้วพิมพ์หรือบันทึกใบแจ้งหนี้เป็น PDF</p>
+  </header>
+
+  <form method="get" data-tour="filters" class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+    <div class="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
+      <div>
+        <label for="inv-year" class="mb-1 block text-sm font-medium text-gray-700">ปีที่สร้างสัญญา <span class="text-red-500">*</span></label>
+        <select id="inv-year" name="year" required data-custom-select data-custom-select-label="ปีที่สร้างสัญญา"
+                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-base text-gray-700 sm:py-2 sm:text-sm">
+          <option value="">เลือกปี</option>
+          {% for y in years %}
+            <option value="{{ y }}" {% if y == params.contract_year %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="inv-period" class="mb-1 block text-sm font-medium text-gray-700">ประจำงวด (ปี ค.ศ. + เดือน)</label>
+        <input id="inv-period" type="text" name="period" value="{{ params.period }}" inputmode="numeric" maxlength="6"
+               pattern="[0-9]{6}" placeholder="เช่น 202611 = พฤศจิกายน 2569" data-period-for="inv-period-label"
+               class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:py-2 sm:text-sm">
+        <p id="inv-period-label" class="mt-1 min-h-[1rem] text-xs text-brand-700" aria-live="polite"></p>
+      </div>
+      <div>
+        <label for="inv-contract" class="mb-1 block text-sm font-medium text-gray-700">รหัสสัญญา</label>
+        <input id="inv-contract" type="search" name="contract" value="{{ params.contract_code }}" placeholder="เช่น AW7/2567"
+               class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:py-2 sm:text-sm">
+      </div>
+      <div>
+        <label for="inv-name" class="mb-1 block text-sm font-medium text-gray-700">ชื่อ-นามสกุล/ร้านค้า/บริษัท</label>
+        <input id="inv-name" type="text" name="name" value="{{ params.name }}"
+               class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:py-2 sm:text-sm">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label for="inv-start" class="mb-1 block text-sm font-medium text-gray-700">วันที่เริ่มสัญญา (ตั้งแต่)</label>
+          <input id="inv-start" type="date" name="start_from" value="{{ params.start_from_raw }}"
+                 class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:py-2 sm:text-sm">
+          <p class="mt-1 min-h-[1rem] text-xs text-brand-700" data-thai-date-for="inv-start" aria-live="polite"></p>
+        </div>
+        <div>
+          <label for="inv-end" class="mb-1 block text-sm font-medium text-gray-700">วันที่สิ้นสุด (ไม่เกิน)</label>
+          <input id="inv-end" type="date" name="end_to" value="{{ params.end_to_raw }}"
+                 class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:py-2 sm:text-sm">
+          <p class="mt-1 min-h-[1rem] text-xs text-brand-700" data-thai-date-for="inv-end" aria-live="polite"></p>
+        </div>
+      </div>
+      <div>
+        <label for="inv-location" class="mb-1 block text-sm font-medium text-gray-700">สถานที่ตั้ง</label>
+        <select id="inv-location" name="location" data-custom-select data-custom-select-label="สถานที่ตั้ง"
+                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-base text-gray-700 sm:py-2 sm:text-sm">
+          <option value="">ทุกสถานที่</option>
+          {% for loc in locations %}
+            <option value="{{ loc }}" {% if loc == params.location %}selected{% endif %}>{{ loc }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="mt-5 flex flex-col-reverse gap-2 border-t border-gray-100 pt-4 sm:flex-row sm:justify-end">
+      <a href="{% url 'invoice_search' %}" class="rounded-lg border border-gray-200 px-4 py-2 text-center text-sm font-medium text-gray-600 hover:bg-gray-50">ล้างการค้นหา</a>
+      <button type="submit" class="rounded-lg bg-brand-500 px-6 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-600">ค้นหา</button>
+    </div>
+  </form>
+
+  {% if errors or load_error %}
+    <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+      {% for e in errors %}<p>{{ e }}</p>{% endfor %}
+      {% if load_error %}<p>{{ load_error }}</p>{% endif %}
+    </div>
+  {% endif %}
+
+  {% if searched and not errors and not load_error %}
+  <form method="get" action="{% url 'invoice_print' %}" id="invoicePrintForm"
+        class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+    <div class="flex flex-col gap-3 border-b border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+      <div>
+        <h2 class="font-semibold text-gray-900">รายการตั้งหนี้</h2>
+        <p class="mt-0.5 text-xs text-gray-400">พบ {{ rows|length }} รายการ · เลือกพิมพ์ได้ครั้งละไม่เกิน {{ max_print }} ใบ</p>
+      </div>
+      {% if rows %}
+      <div class="flex flex-wrap items-center gap-3">
+        <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-600">
+          <input type="checkbox" id="invoiceSelectAll" class="h-4 w-4 rounded border-gray-300 text-brand-500">
+          เลือกทั้งหมด
+        </label>
+        <button type="submit" id="invoicePrintBtn" data-tour="print" disabled
+                class="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-600 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5Zm-3 0h.008v.008H15V10.5Z" />
+          </svg>
+          พิมพ์ใบแจ้งหนี้ <span id="invoiceSelectedCount" class="rounded-full bg-white/20 px-1.5 text-xs">0</span>
+        </button>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="overflow-x-auto" data-tour="table">
+      <table class="min-w-[860px] w-full text-left text-sm">
+        <thead class="border-b border-gray-200 bg-gray-50 text-xs text-gray-500">
+          <tr>
+            <th class="w-10 px-4 py-3"><span class="sr-only">เลือก</span></th>
+            <th class="px-4 py-3 font-semibold">สัญญา / ผู้เช่า</th>
+            <th class="px-4 py-3 font-semibold">ประจำงวด / รายการ</th>
+            <th class="px-4 py-3 text-right font-semibold whitespace-nowrap">จำนวนเงิน (บาท)</th>
+            <th class="px-4 py-3 font-semibold">ตั้งหนี้ SAP</th>
+            <th class="px-4 py-3 font-semibold whitespace-nowrap">ผู้สร้างสัญญา</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for r in rows %}
+          <tr class="align-top transition-colors hover:bg-brand-50/40">
+            <td class="px-4 py-3">
+              <input type="checkbox" name="doc" value="{{ r.doc_key }}" data-invoice-check
+                     aria-label="เลือกใบแจ้งหนี้ {{ r.Contract_fi_doc }} สัญญา {{ r.Contract_code }}"
+                     class="h-4 w-4 rounded border-gray-300 text-brand-500">
+            </td>
+            <td class="px-4 py-3">
+              <div class="font-semibold text-gray-900">{{ r.Contract_code|default:"—" }}</div>
+              <div class="text-gray-600">{{ r.CompanyName|default:"—" }}</div>
+              <div class="text-xs text-gray-400">เลขสัญญา {{ r.Contract_id }} · งวดที่ {{ r.Contract_Installment_seq }}{% if r.Contract_swu_location_name %} · {{ r.Contract_swu_location_name }}{% endif %}</div>
+            </td>
+            <td class="px-4 py-3">
+              <div class="font-medium text-gray-800">{{ r.period_label|default:r.Contract_Installment_month_year|default:"—" }}</div>
+              <div class="text-xs text-gray-500">{{ r.Contract_type_price_desc|default:"—" }}</div>
+              <div class="mt-0.5 flex flex-wrap gap-1">
+                {% if r.Contract_debt_desc %}<span class="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600">{{ r.Contract_debt_desc }}</span>{% endif %}
+                {% if r.Contract_meeting_adj %}<span class="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-700" title="มติปรับปรุงรายการ">มติ {{ r.Contract_meeting_adj }}</span>{% endif %}
+              </div>
+            </td>
+            <td class="px-4 py-3 text-right whitespace-nowrap">
+              <div class="font-semibold text-gray-900">{{ r.Amount|floatformat:"2g" }}</div>
+              <div class="text-xs text-gray-400">ชำระ {{ r.duedate_label|default:"—" }}</div>
+            </td>
+            <td class="px-4 py-3">
+              <span class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold {% if r.sap_status == 'ตั้งหนี้' %}bg-brand-50 text-brand-700{% else %}bg-amber-50 text-amber-700{% endif %}">{{ r.sap_status }}</span>
+              <div class="mt-1 font-mono text-xs text-gray-700">{{ r.Contract_fi_doc }}</div>
+              <div class="text-xs text-gray-400">{{ r.fi_date_label|default:"" }}</div>
+            </td>
+            <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{{ r.Contract_owner|default:"—" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="px-4 py-12 text-center text-sm text-gray-400">ไม่พบรายการตั้งหนี้ตามเงื่อนไข -- ลองระบุประจำงวด หรือเปลี่ยนปีที่สร้างสัญญา</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </form>
+  {% elif not searched %}
+    <div class="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-10 text-center text-sm text-gray-500">
+      เลือกปีที่สร้างสัญญา (และประจำงวดถ้าต้องการ) แล้วกด <b class="text-gray-700">ค้นหา</b>
+    </div>
+  {% endif %}
+</div>
+<script src="{% static 'meters/js/invoice.js' %}" defer></script>
+{% endblock %}

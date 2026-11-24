@@ -51,6 +51,7 @@ from .phase_master import phase_list, phase_form
 from .auth import login_view, logout_view, no_permission_view
 from .home import home
 from .help import help_page
+from .invoice import invoice_search, invoice_print
 
 __all__ = [
     'step1_upload', 'step2_review', 'step3_confirm',
@@ -64,5 +65,6 @@ __all__ = [
     'meter_list', 'meter_form',
     'phase_list', 'phase_form',
     'home', 'help_page',
+    'invoice_search', 'invoice_print',
     'login_view', 'logout_view', 'no_permission_view',
 ]
