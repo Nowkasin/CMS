@@ -8,7 +8,8 @@ Re-export ทุก view จากโมดูลย่อย เพื่อใ
                       step4_done, restart
   dashboard.py    -> dashboard, edit_meter
   export.py       -> export_meters_excel
-  termination.py  -> termination_search, termination_detail,
+  termination_search.py -> termination_search
+  termination.py  -> termination_detail,
                       termination_toggle_installment,
                       termination_select_all_installments,
                       termination_delete
@@ -32,8 +33,8 @@ from .dashboard import (
 
 from .export import export_meters_excel
 
+from .termination_search import termination_search
 from .termination import (
-    termination_search,
     termination_detail,
     termination_toggle_installment,
     termination_select_all_installments,
@@ -49,6 +50,7 @@ from .meter_master import meter_list, meter_form
 from .phase_master import phase_list, phase_form
 from .auth import login_view, logout_view, no_permission_view
 from .home import home
+from .help import help_page
 
 __all__ = [
     'step1_upload', 'step2_review', 'step3_confirm',
@@ -61,6 +63,6 @@ __all__ = [
     'download_form', 'download_excel',
     'meter_list', 'meter_form',
     'phase_list', 'phase_form',
-    'home',
+    'home', 'help_page',
     'login_view', 'logout_view', 'no_permission_view',
 ]

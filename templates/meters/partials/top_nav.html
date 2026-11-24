@@ -28,6 +28,27 @@
     </span>
   </a>
   <div class="ml-auto flex min-w-0 items-center gap-2 pl-3 sm:gap-3 sm:pl-4">
+    {% comment %}
+      ปุ่มทัวร์ -- ซ่อนไว้ก่อน static/meters/js/tour.js เปิดให้เฉพาะหน้าที่มีทัวร์
+      ปุ่มคู่มือ -- ไปหน้า /help/ (ซ่อนเมื่อบัญชีไม่มีสิทธิ์เมนูใดเลย เพราะหน้าคู่มือต้องมีสิทธิ์อย่างน้อยหนึ่งเมนู)
+    {% endcomment %}
+    <button type="button" id="tourStart" data-tour="tour-button" hidden
+            class="inline-flex h-10 items-center gap-1.5 rounded-lg border border-brand-100 bg-brand-50 px-2.5 text-sm font-medium text-brand-700 transition-colors hover:bg-brand-100 sm:px-3"
+            title="พาชมหน้านี้ทีละขั้น" aria-label="พาชมหน้านี้ทีละขั้น">
+      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15.042 21.672 13.684 16.6m0 0-2.51 2.225.569-9.47 5.227 7.917-3.286-.672ZM12 2.25V4.5m5.834.166-1.591 1.591M20.25 10.5H18M7.757 14.743l-1.59 1.59M6 10.5H3.75m4.007-4.243-1.59-1.59" />
+      </svg>
+      <span class="hidden md:inline">พาชมหน้านี้</span>
+    </button>
+    {% if request.session.cms_permissions %}
+    <a href="{% url 'help' %}" data-tour="help-link"
+       class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:bg-gray-50 hover:text-brand-700 {% if request.resolver_match.url_name == 'help' %}border-brand-200 bg-brand-50 text-brand-700{% endif %}"
+       title="คู่มือการใช้งาน" aria-label="คู่มือการใช้งาน">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+      </svg>
+    </a>
+    {% endif %}
     <div class="min-w-0 text-right leading-tight">
       <div class="text-xs text-gray-400">ผู้ใช้งาน</div>
       <div class="max-w-[90px] truncate text-sm font-semibold text-gray-700 sm:max-w-none">{{ request.session.cms_display_name|default:request.user.username }}</div>

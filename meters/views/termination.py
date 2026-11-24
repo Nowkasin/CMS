@@ -3,12 +3,13 @@ import datetime
 import re
 from urllib.parse import urlencode
 
-from django.core.paginator import Paginator
 from django.http import Http404
 from django.shortcuts import render, redirect
 
 from .. import services
-from .dashboard import THAI_MONTHS
+from ..utils import (
+    THAI_MONTHS, expired_ago_label, parse_iso_date, period_label, thai_date, thai_datetime,
+)
 
 from ..services.access import fetch_user_access
 
@@ -56,261 +57,6 @@ def _sp_error_message(exc, fallback):
     return msg or fallback
 
 
-def _expired_ago_label(end_date, today=None):
-    """
-    'หมดอายุมานานเท่าไหร่' จาก End_contract -> เช่น '6 ปี 4 เดือน', '3 เดือน', 'เดือนนี้'
-
-    คืน None ถ้ายังไม่หมดอายุหรือไม่มีวันที่
-    ข้อมูลจริงมีสัญญาที่เลยกำหนดมา 76 เดือน -- บอกเป็นเดือนล้วนจะอ่านยาก จึงแปลงเป็นปี+เดือน
-
-    นับแบบเดือนปฏิทิน (ไม่ใช่หาร 30 วัน) ให้ตรงกับวิธีคิดงวดของระบบ
-    """
-    if not end_date:
-        return None
-    today = today or datetime.date.today()
-    if end_date >= today:
-        return None
-
-    months = (today.year - end_date.year) * 12 + (today.month - end_date.month)
-    # วันที่ในเดือนยังไม่ถึง -> ยังไม่ครบเดือนนั้น
-    if today.day < end_date.day:
-        months -= 1
-    if months <= 0:
-        return 'เดือนนี้'
-
-    years, rem = divmod(months, 12)
-    parts = []
-    if years:
-        parts.append(f'{years} ปี')
-    if rem:
-        parts.append(f'{rem} เดือน')
-    return ' '.join(parts)
-
-
-def _thai_date(value):
-    """
-    วันที่ -> '1 มิถุนายน 2569' (พ.ศ.) ใช้แสดงช่วงอายุสัญญาบนหน้าจอ
-    ตรงกับฟังก์ชัน thaiDate() ใน termination_detail.js คืน None ถ้าไม่ใช่วันที่
-    """
-    if not value:
-        return None
-    try:
-        return f'{value.day} {THAI_MONTHS[value.month - 1]} {value.year + 543}'
-    except (AttributeError, IndexError, TypeError):
-        return None
-
-
-def _thai_datetime(value):
-    """datetime -> '2 พฤศจิกายน 2569 14:35' (พ.ศ.) คืน None ถ้าไม่ใช่วันที่"""
-    if not value:
-        return None
-    try:
-        return f'{value.day} {THAI_MONTHS[value.month - 1]} {value.year + 543} {value:%H:%M}'
-    except (AttributeError, IndexError, TypeError, ValueError):
-        return None
-
-
-def _parse_iso_date(text):
-    """'YYYY-MM-DD' -> date หรือ None ถ้าไม่ใช่วันที่จริง (เช่น 2569-02-31)"""
-    try:
-        return datetime.datetime.strptime((text or '').strip(), '%Y-%m-%d').date()
-    except ValueError:
-        return None
-
-
-def _period_label(period):
-    """
-    แปลงงวดรูปแบบ YYYYMM ให้เป็นข้อความไทย เช่น '202702' -> 'กุมภาพันธ์ 2570'
-
-    ปีใน Installment_period / Last_installment_period เป็น ค.ศ. -- ตรงกับ
-    Contract_Installment_tr.Contract_Installment_month_year ซึ่งเป็น ค.ศ. ทั้ง 3009 แถว
-    (sp_Contract_Installment_CreateAfterTermination เอาค่านี้ไปใส่คอลัมน์นั้นตรงๆ
-     จึงต้องเป็น convention เดียวกัน -- ห้ามเปลี่ยนค่าที่เก็บ)
-
-    แต่ "ตอนแสดงผล" ต้องเป็น พ.ศ. เพราะปีที่ผู้ใช้เห็นที่อื่นในระบบนี้เป็น พ.ศ. ทั้งหมด
-    (Billing_year_be, Contract_year, _current_year_be) ถ้าโชว์ '202702' ดิบๆ
-    ผู้ใช้ไทยมีโอกาสอ่านเป็น พ.ศ. 2702 ซึ่งคลาดไป 175 ปี
-    เทมเพลตยังโชว์ค่าดิบกำกับไว้ด้วย เพื่อให้เทียบกับข้อมูลในฐานข้อมูลได้
-
-    คืน None ถ้ารูปแบบไม่ใช่ YYYYMM -> เทมเพลต fallback ไปโชว์ค่าดิบแทน
-    """
-    text = str(period or '').strip()
-    if len(text) != 6 or not text.isdigit():
-        return None
-    year_ce, month = int(text[:4]), int(text[4:])
-    if not 1 <= month <= 12:
-        return None
-    return f'{THAI_MONTHS[month - 1]} {year_ce + 543}'
-
-
-# สถานะ workflow ที่ถือว่าสัญญาเสร็จสมบูรณ์แล้ว (จาก dbo.Contract_workflow_status_ms)
-#   '40' สัญญาเสร็จสมบูรณ์ / '50' สัญญาเสร็จสมบูรณ์-สิ้นสุด
-WORKFLOW_COMPLETE = frozenset({'40', '50'})
-
-# ขอบเขตข้อมูลที่แสดง (?scope=)
-#
-# ข้อมูลจริงมี 44 จาก 224 สัญญาที่ workflow ยังไม่ถึง '40' (ร่าง / ไม่อนุมัติ /
-# ยกเลิกฉบับร่าง) ซึ่งไม่ควรอยู่ในคิวยกเลิกสัญญาเพราะยังไม่มีสัญญาให้ยกเลิก
-# และมีข้อมูลทดสอบปนอยู่ชัดเจน ('123456', 'กดกดกดกดกดกด', 'ทดสอบ H2/2563')
-#
-# แต่กรองด้วย workflow ล้วนไม่ได้: 24 ฉบับในนั้นตั้งหนี้ไปแล้ว (บางฉบับ 53 งวด)
-# รวมสัญญา 113 ที่สถานะเป็น 'ยกเลิกสัญญา' อยู่แล้ว -- ถ้ากรองออกจะซ่อนสัญญาที่มี
-# ประวัติการเงินจริง จึงถือว่า "เป็นสัญญาจริง" เมื่อ workflow เสร็จสมบูรณ์ "หรือ" มีงวดแล้ว
-#
-# ไม่ซ่อนถาวร -- สลับไปดูฉบับร่างหรือดูทั้งหมดได้ เพราะคนใช้ระบบยังแยกไม่ออกว่า
-# แถวไหนเป็นข้อมูลจริงแถวไหนเป็นข้อมูลทดสอบ
-SCOPE_REAL = 'real'
-SCOPE_DRAFT = 'draft'
-SCOPE_ALL = 'all'
-
-TERMINATION_SCOPES = [
-    (SCOPE_REAL, 'สัญญาจริง (เสร็จสมบูรณ์ หรือตั้งหนี้แล้ว)'),
-    (SCOPE_DRAFT, 'ฉบับร่าง/ไม่อนุมัติ ที่ยังไม่ตั้งหนี้'),
-    (SCOPE_ALL, 'ทั้งหมด'),
-]
-
-
-def _is_real_contract(row):
-    """สัญญาจริง = workflow เสร็จสมบูรณ์ หรือมีงวดตั้งหนี้แล้ว (ดูเหตุผลที่ TERMINATION_SCOPES)"""
-    return (row.get('Status_workflow__id') in WORKFLOW_COMPLETE
-            or bool(row.get('Has_installment')))
-
-
-# แท็บของหน้ารายการสัญญา -- key คือค่าใน query string (?tab=)
-# 'expired' เป็นค่าเริ่มต้นเพราะเป็นเนื้องานจริง: ไล่ปิดสัญญาที่หมดอายุค้างอยู่
-TAB_EXPIRED = 'expired'
-TAB_UPCOMING = 'upcoming'
-TAB_TERMINATED = 'terminated'
-TAB_ALL = 'all'
-
-TERMINATION_TABS = [
-    (TAB_EXPIRED, 'หมดอายุแล้ว รอบันทึกยกเลิก'),
-    (TAB_UPCOMING, 'ยังไม่หมดอายุ'),
-    (TAB_TERMINATED, 'ยกเลิก/ปิดสัญญาแล้ว'),
-    (TAB_ALL, 'ทั้งหมด'),
-]
-
-CONTRACTS_PER_PAGE = 25
-
-
-def _classify_contract(row, today):
-    """
-    ติดธงที่หน้ารายการต้องใช้ให้แถวหนึ่งแถว แล้วคืนชื่อแท็บที่แถวนั้นสังกัด
-
-    is_blocked -- ยกเลิกซ้ำไม่ได้ (สถานะปิด/ยกเลิกแล้ว หรือมีรายการยกเลิกในระบบนี้แล้ว)
-    is_expired -- คำนวณจาก End_contract ไม่ใช่ Status_contract_id
-                  สองอันนี้ไม่ตรงกันใน 199 จาก 222 สัญญา จึงต้องแยกกันให้ชัด
-
-    แท็บจัดตามลำดับนี้:
-      ยกเลิกซ้ำไม่ได้ -> terminated (จบแล้ว ไม่ต้องมารกคิวงาน)
-      หมดอายุแล้ว     -> expired    (คิวงานที่ทำได้จริง)
-      นอกนั้น          -> upcoming
-
-    ใช้ is_blocked ไม่ใช่ Has_termination เป็นตัวแยกแท็บ terminated เพราะข้อมูลจริงมี
-    สัญญาที่สถานะเป็น 'ยกเลิกสัญญา' อยู่แล้วแต่ไม่มีแถวใน Contract_termination_tr
-    (เช่น Contract_id 113 -- ยกเลิกจากช่องทางอื่น) ถ้าแยกด้วย Has_termination
-    สัญญาพวกนี้จะไปโผล่ในคิวงาน แล้วกดเข้าไปเจอฟอร์มที่ถูกปิด = คิวงานมีงานปลอมปน
-
-    สัญญาที่ไม่มี End_contract ไปอยู่ upcoming -- ยังไม่มีหลักฐานว่าหมดอายุ
-    """
-    end = row.get('End_contract')
-    row['is_blocked'] = (
-        row.get('Status_contract_id') in services.BLOCKED_CONTRACT_STATUSES
-        or bool(row.get('Has_termination'))
-    )
-    row['is_expired'] = bool(end and end < today)
-    row['end_contract_label'] = _thai_date(end)
-    row['expired_ago_label'] = _expired_ago_label(end, today)
-    row['notify_date_label'] = _thai_date(row.get('Notify_date'))
-    row['grace_until_label'] = _period_label(row.get('Last_installment_period'))
-
-    if row['is_blocked']:
-        return TAB_TERMINATED
-    return TAB_EXPIRED if row['is_expired'] else TAB_UPCOMING
-
-
-def termination_search(request):
-    """
-    หน้ารายการสัญญาสำหรับงานยกเลิก -- เปิดมาเห็นรายการเลย ไม่ต้องค้นหาก่อน
-
-    เดิมเป็นหน้าค้นหาแบบ POST ที่เปิดมาว่างเปล่า ซึ่งมีปัญหา:
-      - ผลค้นหาไม่ผูกกับ URL -> กด back จากหน้า detail แล้วผลหาย ต้องพิมพ์ใหม่
-        และ refresh แล้วเบราว์เซอร์เตือนส่งข้อมูลซ้ำ แชร์ลิงก์ก็ไม่ได้
-      - ต้องรู้รหัสสัญญามาก่อนจึงหาอะไรได้ ทั้งที่งานจริงคือ "หาสัญญาที่หมดอายุแล้ว
-        แต่ยังไม่ได้บันทึกยกเลิก" ซึ่งมี 199 ฉบับ
-      - เป็นหน้าเดียวในโปรเจกต์ที่ค้นหาด้วย POST (meter_list ใช้ GET + filter อยู่แล้ว)
-
-    ตอนนี้ทุกอย่างเป็น GET: ?tab=&status=&q=&page= -> back/refresh/แชร์ลิงก์ได้ครบ
-
-    จำนวนบนแท็บนับ "หลังกรองด้วย q และ status แล้ว" เพื่อให้ตัวเลขตรงกับสิ่งที่เห็น
-    """
-    search = request.GET.get('q', '').strip()
-    status_filter = request.GET.get('status', 'all')
-    tab = request.GET.get('tab', TAB_EXPIRED)
-    if tab not in dict(TERMINATION_TABS):
-        tab = TAB_EXPIRED
-    scope = request.GET.get('scope', SCOPE_REAL)
-    if scope not in dict(TERMINATION_SCOPES):
-        scope = SCOPE_REAL
-
-    rows = services.fetch_contracts_for_termination(search, status_filter)
-
-    # กรองด้วย scope ก่อน แล้วจึงนับแท็บ -- ตัวเลขบนแท็บต้องสอดคล้องกับขอบเขตที่เลือก
-    for row in rows:
-        row['is_real_contract'] = _is_real_contract(row)
-    scope_counts = {
-        SCOPE_REAL: sum(1 for r in rows if r['is_real_contract']),
-        SCOPE_DRAFT: sum(1 for r in rows if not r['is_real_contract']),
-        SCOPE_ALL: len(rows),
-    }
-    if scope == SCOPE_REAL:
-        rows = [r for r in rows if r['is_real_contract']]
-    elif scope == SCOPE_DRAFT:
-        rows = [r for r in rows if not r['is_real_contract']]
-
-    today = datetime.date.today()
-    counts = {key: 0 for key, _label in TERMINATION_TABS}
-    for row in rows:
-        row['_tab'] = _classify_contract(row, today)
-        counts[row['_tab']] += 1
-    counts[TAB_ALL] = len(rows)
-
-    visible = rows if tab == TAB_ALL else [r for r in rows if r['_tab'] == tab]
-
-    paginator = Paginator(visible, CONTRACTS_PER_PAGE)
-    page_obj = paginator.get_page(request.GET.get('page'))
-
-    # ประกอบแท็บพร้อมจำนวนให้เสร็จที่นี่ -- เทมเพลต Django index dict ด้วยตัวแปรไม่ได้
-    # (counts[key] เขียนในเทมเพลตไม่ได้) ถ้าดันไปทำในเทมเพลตจะได้ hack ที่อ่านไม่รู้เรื่อง
-    tabs = [
-        {'key': key, 'label': label, 'count': counts[key], 'is_active': key == tab}
-        for key, label in TERMINATION_TABS
-    ]
-
-    scopes = [
-        {'key': key, 'label': label, 'count': scope_counts[key], 'is_active': key == scope}
-        for key, label in TERMINATION_SCOPES
-    ]
-
-    context = {
-        'page_obj': page_obj,
-        'contracts': page_obj.object_list,
-        'total_visible': len(visible),
-        'tabs': tabs,
-        'active_tab': tab,
-        'scopes': scopes,
-        'active_scope': scope,
-        'scope_is_default': scope == SCOPE_REAL,
-        'search': search,
-        'status_filter': status_filter,
-        'statuses': services.fetch_contract_statuses(),
-    }
-    # หมายเหตุ: ลิงก์แบ่งหน้า/แท็บ/แถว ประกอบจากตัวแปรเหล่านี้ในเทมเพลตด้วย |urlencode
-    # ไม่ได้ส่ง query string สำเร็จรูปมา เพราะค่าที่ผ่าน urlencode() ของ Python จะถูก
-    # autoescape เป็น &amp; แล้วไปปนกับ & ดิบที่พิมพ์ในเทมเพลต ทำให้พารามิเตอร์หลุด
-    return render(request, 'meters/termination_search.html', context)
-
-
 def termination_detail(request, contract_id):
     """
     โชว์ข้อมูลยกเลิกสัญญา (ถ้ามีอยู่แล้ว) + รายการงวดทั้งหมดของสัญญานี้
@@ -335,8 +81,8 @@ def termination_detail(request, contract_id):
     blocked_status = contract.get('Status_contract_id') in services.BLOCKED_CONTRACT_STATUSES
 
     # ช่วงอายุสัญญาจาก Contract_tr -- ใช้ทั้งแสดงบนหัวหน้า และเติมค่าในฟอร์ม
-    contract['start_contract_label'] = _thai_date(contract.get('Start_contract'))
-    contract['end_contract_label'] = _thai_date(contract.get('End_contract'))
+    contract['start_contract_label'] = thai_date(contract.get('Start_contract'))
+    contract['end_contract_label'] = thai_date(contract.get('End_contract'))
 
     # เทียบชื่อลูกค้าในสัญญากับ master ฝั่ง SAP -- ข้อมูลจริงมี 3 สัญญาที่เป็นคนละคนกัน
     # เทียบแบบยุบช่องว่างซ้ำก่อน เพื่อไม่ให้เตือนเพราะเรื่องช่องว่างเฉยๆ (มี 2 แถวแบบนั้น)
@@ -354,7 +100,7 @@ def termination_detail(request, contract_id):
     end_contract_is_past = bool(end_contract and end_contract < datetime.date.today())
     # "หมดอายุ" เป็นสถานะที่คำนวณจากวันที่ ไม่ใช่ Status_contract_id ที่เก็บในระบบ
     # เทมเพลตต้องแยกป้ายสองอันนี้ให้ชัด ไม่ให้ดูเหมือนระบบขัดแย้งกันเอง
-    contract['expired_ago_label'] = _expired_ago_label(end_contract)
+    contract['expired_ago_label'] = expired_ago_label(end_contract)
 
     # แยก 2 กอง -- สำคัญ ไม่ใช่เรื่องจัดระเบียบเฉยๆ
     #   form_errors  = ผลการ validate ฟอร์มรอบนี้ ใช้ตัดสินว่าจะบันทึกหรือไม่
@@ -404,11 +150,11 @@ def termination_detail(request, contract_id):
             form_errors.append('กรุณาเลือกกรณีการยกเลิกสัญญา')
         if not form['contract_end_date']:
             form_errors.append('กรุณาระบุวันที่สิ้นสุดสัญญา')
-        elif not _parse_iso_date(form['contract_end_date']):
+        elif not parse_iso_date(form['contract_end_date']):
             form_errors.append('วันที่สิ้นสุดสัญญาไม่ถูกต้อง')
         if form['termination_case'] == CASE_CANCEL_BEFORE_END and not form['notify_date']:
             form_errors.append('กรณียกเลิกสัญญาก่อนครบอายุ ต้องระบุวันที่แจ้งยกเลิกด้วย')
-        elif form['notify_date'] and not _parse_iso_date(form['notify_date']):
+        elif form['notify_date'] and not parse_iso_date(form['notify_date']):
             form_errors.append('วันที่แจ้งยกเลิกไม่ถูกต้อง')
 
         if not form_errors:
@@ -440,11 +186,11 @@ def termination_detail(request, contract_id):
 
     # แปลงงวด YYYYMM (ค.ศ.) เป็นข้อความไทย พ.ศ. สำหรับแสดงผล -- ค่าที่เก็บใน DB ไม่เปลี่ยน
     for p in periods:
-        p['period_label'] = _period_label(p.get('Installment_period'))
+        p['period_label'] = period_label(p.get('Installment_period'))
     if header:
-        header['last_period_label'] = _period_label(header.get('Last_installment_period'))
-        header['notify_date_label'] = _thai_date(header.get('Notify_date'))
-        header['date_entry_label'] = _thai_datetime(header.get('DateEntry'))
+        header['last_period_label'] = period_label(header.get('Last_installment_period'))
+        header['notify_date_label'] = thai_date(header.get('Notify_date'))
+        header['date_entry_label'] = thai_datetime(header.get('DateEntry'))
 
     # นับงวดที่เลือกไว้ -- โชว้ "เลือกอยู่ x จาก y งวด" คู่กับปุ่มเลือก/ไม่เลือกทั้งหมด
     selected_count = sum(1 for p in periods if p.get('Is_selected'))
@@ -457,10 +203,10 @@ def termination_detail(request, contract_id):
     # แล้วแต่เดิมไม่มีที่ไหนเอามาแสดง ทำให้มองไม่เห็นว่าเคยมีรายการก่อนหน้าเป็นอะไร
     deleted_history = services.fetch_termination_history(contract_id)
     for row in deleted_history:
-        row['last_period_label'] = _period_label(row.get('Last_installment_period'))
-        row['end_date_label'] = _thai_date(row.get('Contract_end_date'))
-        row['entry_label'] = _thai_datetime(row.get('DateEntry'))
-        row['delete_label'] = _thai_datetime(row.get('DateDelete'))
+        row['last_period_label'] = period_label(row.get('Last_installment_period'))
+        row['end_date_label'] = thai_date(row.get('Contract_end_date'))
+        row['entry_label'] = thai_datetime(row.get('DateEntry'))
+        row['delete_label'] = thai_datetime(row.get('DateDelete'))
 
     # แปลง Buasri ID เป็นชื่อ-สกุลจริงเพื่อแสดงผล (ค่าในฐานข้อมูลยังเป็น ID เดิม)
     # ไม่พบชื่อหรือดึงไม่ได้ -> แสดง ID เดิมแทน ไม่ให้หน้าล่ม

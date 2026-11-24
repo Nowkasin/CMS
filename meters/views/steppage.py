@@ -1,22 +1,28 @@
 # meters/views/steppage.py
 import datetime
+import logging
 
 from django.conf import settings
 from django.shortcuts import render, redirect
 from django.core.paginator import Paginator
 
 from .. import services
+from ..utils import THAI_MONTHS, year_options
 from ..forms import ExcelUploadForm
+
+logger = logging.getLogger(__name__)
+
 STEP_LABELS = ['อัปโหลดไฟล์', 'ตรวจสอบข้อมูล', 'ยืนยันนำเข้า', 'เสร็จสิ้น']
 
-THAI_MONTHS = [
-    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-    'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
+# แท็บสถานะในหน้า Step 2 -- (key, ป้าย, โทนสี) key ตรงกับ row['status'] จาก parse_excel_staged
+REVIEW_STATUS_TABS = [
+    ('all', 'ทั้งหมด', 'gray'),
+    ('error', 'มีปัญหา', 'red'),
+    ('duplicate', 'มีในระบบแล้ว', 'amber'),
+    ('skip', 'ข้าม', 'gray'),
+    ('ok', 'พร้อมนำเข้า', 'brand'),
 ]
-
-
-def _current_year_be():
-    return datetime.date.today().year + 543
+REVIEW_STATUS_KEYS = frozenset(key for key, _label, _tone in REVIEW_STATUS_TABS)
 
 
 def _safe_month(raw, fallback):
@@ -63,7 +69,7 @@ def step1_upload(request):
         'step_labels': STEP_LABELS,
         'thai_months': THAI_MONTHS,
         'current_month_idx': prev_month_idx,
-        'year_options': [_current_year_be() - 1, _current_year_be(), _current_year_be() + 1],
+        'year_options': year_options(),
         'current_year_be': prev_year_be,
     }
 
@@ -134,10 +140,18 @@ def step2_review(request):
         return redirect('step1')
 
     rows = staged['rows']
+    summary = staged.get('summary') or {}
     q = request.GET.get('q', '').strip()
     type_filter = request.GET.get('type', 'all')
+    # แท็บสถานะ -- เดิมกรองได้แค่น้ำ/ไฟ ผู้ใช้ต้องไล่เปิดทีละหน้า (หน้าละ 10 แถว) เพื่อหาแถว error
+    # ถ้าไม่ได้เลือกแท็บและไฟล์มีแถว error ให้เปิดแท็บ "มีปัญหา" ก่อน เพราะต้องแก้ก่อนไปต่อได้
+    status_filter = request.GET.get('status')
+    if status_filter not in REVIEW_STATUS_KEYS:
+        status_filter = 'error' if summary.get('error') else 'all'
 
     filtered = rows
+    if status_filter != 'all':
+        filtered = [r for r in filtered if r.get('status') == status_filter]
     if type_filter in ('8', '9'):
         # ใช้ .get() ให้ตรงกับบรรทัดถัดไป -- เดิมเป็น r['type_cd'] ซึ่งถ้าคีย์หาย
         # (เช่น session ค้างจากโครงข้อมูลเวอร์ชันก่อน) จะเป็น KeyError -> หน้า 500
@@ -155,10 +169,20 @@ def step2_review(request):
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
 
+    status_tabs = [
+        {
+            'key': key, 'label': label, 'tone': tone,
+            'count': len(rows) if key == 'all' else summary.get(key, 0),
+            'is_active': key == status_filter,
+        }
+        for key, label, tone in REVIEW_STATUS_TABS
+    ]
+
     context = {
         'current_step': 2, 'step_labels': STEP_LABELS,
         'staged': staged, 'page_obj': page_obj,
         'search': q, 'active_filter': type_filter,
+        'status_filter': status_filter, 'status_tabs': status_tabs,
         'total_filtered': len(filtered),
     }
     return render(request, 'meters/review.html', context)
@@ -190,7 +214,12 @@ def step3_confirm(request):
                     billing_month=staged.get('billing_month'),
                     billing_year_be=staged.get('billing_year_be'),
                 )
+            except services.ImportRowError as exc:
+                # ทั้งไฟล์ถูก rollback แล้ว -- บอกแถวที่ล้ม ส่วนข้อความดิบเก็บใน logger เท่านั้น
+                logger.error('commit_staged_rows failed: %s', exc, exc_info=exc.__cause__)
+                error = exc.user_message()
             except Exception:
+                logger.exception('commit_staged_rows failed')
                 # ไม่โชว์ข้อความดิบจาก pyodbc/SQL Server (มีชื่อตาราง/driver ติดมา)
                 # คง staged ไว้ให้กดยืนยันซ้ำได้ ไม่ต้องอัปโหลดไฟล์ใหม่
                 error = (
@@ -227,6 +256,10 @@ def step4_done(request):
 
 
 def restart(request):
+    # ล้างข้อมูลที่ค้างอยู่เฉพาะ POST (ปุ่มในหน้า wizard ส่ง form="restartForm" พร้อม CSRF)
+    # GET เฉยๆ ไม่ล้าง -- กันลิงก์/การ prefetch ของเบราว์เซอร์ทิ้งงานที่ผู้ใช้ทำค้างไว้
+    if request.method != 'POST':
+        return redirect('step1')
     request.session.pop('staged', None)
     request.session.pop('committed', None)
     return redirect('step1')

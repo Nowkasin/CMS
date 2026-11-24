@@ -14,21 +14,10 @@ from django.http import JsonResponse
 from django.shortcuts import render
 
 from .. import services
+from ..utils import thai_datetime
 from ..services import activity_log as activity
-from .dashboard import THAI_MONTHS
 
 LOG_PER_PAGE = 30
-
-
-def _thai_datetime(value):
-    """วันเวลา -> '6 ตุลาคม 2569 16:23:05' (พ.ศ. เหมือนที่อื่นในระบบ)"""
-    if not value:
-        return None
-    try:
-        return (f'{value.day} {THAI_MONTHS[value.month - 1]} {value.year + 543} '
-                f'{value.hour:02d}:{value.minute:02d}:{value.second:02d}')
-    except (AttributeError, IndexError, TypeError):
-        return None
 
 
 def _parse_date(text):
@@ -39,9 +28,26 @@ def _parse_date(text):
         return None
 
 
-def _row_date(row):
-    value = row.get('DateEntry')
-    return value.date() if hasattr(value, 'date') else None
+class _LogPage:
+    """
+    ลำดับแบบ lazy ให้ Paginator -- นับด้วย COUNT(*) และดึงเฉพาะหน้าที่แสดงด้วย OFFSET/FETCH
+    (เดิมดึง log ทั้งตารางมาแบ่งหน้าใน Python ซึ่งช้าลงตามจำนวน log ที่เพิ่มขึ้นทุกวัน)
+    """
+
+    def __init__(self, filters):
+        self.filters = filters
+
+    def count(self):
+        return activity.count_activity_log(**self.filters)
+
+    def __getitem__(self, key):
+        if not isinstance(key, slice):
+            raise TypeError('_LogPage รองรับเฉพาะ slice')
+        start = key.start or 0
+        stop = key.stop if key.stop is not None else start
+        return activity.fetch_activity_log(
+            offset=start, limit=max(stop - start, 0), **self.filters
+        )
 
 
 def activity_log(request):
@@ -78,27 +84,27 @@ def activity_log(request):
     # จะนับให้ (ซ้ำได้ แต่ไม่ตกหล่น)
     latest_id, _ = activity.fetch_log_head(0)
 
-    rows = services.fetch_activity_log(search, action or 'all')
-    if contract_id is not None:
-        rows = [r for r in rows if r.get('Contract_id') == contract_id]
-
+    filters = {
+        'search': search,
+        'action': action or 'all',
+        'contract_id': contract_id,
+        'user': user_filter or None,
+        'date_from': date_from,
+        'date_to': date_to,
+    }
     # รายชื่อใน dropdown มาจากผลก่อนกรองผู้ใช้/วันที่ เพื่อเปลี่ยนตัวเลือกต่อเนื่องได้
-    user_options = sorted({r['UserEntry'] for r in rows if r.get('UserEntry')})
+    user_options = activity.fetch_activity_users(
+        search=search, action=action or 'all', contract_id=contract_id,
+    )
 
-    if user_filter:
-        rows = [r for r in rows if r.get('UserEntry') == user_filter]
-    if date_from:
-        rows = [r for r in rows if (d := _row_date(r)) and d >= date_from]
-    if date_to:
-        rows = [r for r in rows if (d := _row_date(r)) and d <= date_to]
+    paginator = Paginator(_LogPage(filters), LOG_PER_PAGE)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    rows = list(page_obj.object_list)
 
     for r in rows:
-        r['at_label'] = _thai_datetime(r.get('DateEntry'))
+        r['at_label'] = thai_datetime(r.get('DateEntry'), seconds=True)
         # Action_type ที่ไม่รู้จักแสดงค่าดิบ ดีกว่าซ่อนแถวนั้นไป
         r['action_label'] = services.ACTION_LABELS.get(r['Action_type'], r['Action_type'])
-
-    paginator = Paginator(rows, LOG_PER_PAGE)
-    page_obj = paginator.get_page(request.GET.get('page'))
 
     # query string ที่คงตัวกรองไว้ทั้งหมด (ไม่รวม page/poll) -- ใช้กับลิงก์ก่อนหน้า/ถัดไปและปุ่มโหลดใหม่
     params = request.GET.copy()
@@ -107,8 +113,8 @@ def activity_log(request):
 
     context = {
         'page_obj': page_obj,
-        'rows': page_obj.object_list,
-        'total_visible': len(rows),
+        'rows': rows,
+        'total_visible': paginator.count,
         'search': search,
         'contract_filter': contract_id or '',
         'user_filter': user_filter,

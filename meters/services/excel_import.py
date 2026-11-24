@@ -3,10 +3,11 @@
 ทุกอย่างที่เกี่ยวกับการอ่าน/แปลงไฟล์ Excel ตอน step1_upload (parse_excel_staged)
 รวมถึง lookup ที่ใช้ตรวจสอบข้อมูลระหว่าง parse (find_subarea, find_contract_by_code)
 """
+from django.conf import settings
 from openpyxl import load_workbook
 
 from .db import get_db_connection
-from .meters import find_existing_meter
+from .meter_import import find_existing_meter
 
 STATUS_MAP = {
     'สัญญา': '1', 'ต่อสัญญา': '3', 'ไม่ต่อสัญญา': '4',
@@ -81,6 +82,46 @@ def _parse_reading(raw):
         except ValueError:
             return None, False
     return (int(val) if val.is_integer() else val), True
+
+
+def _json_safe(raw):
+    """
+    แปลงค่าจากเซลล์ให้เก็บลง session (JSONSerializer) ได้เสมอ
+
+    ค่าที่เก็บดิบจาก Excel (ปีสัญญา ชื่อลูกหนี้ เลข 13 หลัก ฯลฯ) อาจเป็น datetime/time ถ้าเซลล์
+    ถูกจัดรูปแบบเป็นวันที่ -- เดิมเก็บลง session ตรงๆ แล้วพังเป็นหน้า 500 ตอน Django บันทึก session
+    ท้าย request (หลัง view ทำงานเสร็จแล้ว จึงไม่มี try/except ไหนรับได้)
+    """
+    if raw is None or isinstance(raw, (str, bool, int)):
+        return raw
+    if isinstance(raw, float):
+        return int(raw) if raw.is_integer() else raw
+    if hasattr(raw, 'year') and hasattr(raw, 'month'):
+        return _parse_read_date(raw)
+    return str(raw)
+
+
+def _clean_text(raw):
+    """
+    ค่าข้อความจากเซลล์ -> str ที่ตัดช่องว่างแล้ว หรือ None
+    ตัวเลขจำนวนเต็มที่ Excel เก็บเป็น float (12345.0) แปลงเป็น '12345' -- เดิมได้ '12345.0'
+    ซึ่งไม่ตรงกับเลขมิเตอร์ในทะเบียน ทำให้นำเข้าแล้วได้มิเตอร์ซ้ำ
+    """
+    if raw is None:
+        return None
+    if isinstance(raw, float) and raw.is_integer():
+        raw = int(raw)
+    text = str(raw).strip()
+    return text or None
+
+
+def _is_confirmed(raw):
+    """ช่อง 'ยืนยันพื้นที่ที่คิดค่า' = 1 -- รับทั้งตัวเลข 1/1.0 และข้อความ '1' (เซลล์ที่จัดรูปแบบเป็น Text)"""
+    if isinstance(raw, bool):
+        return False
+    if isinstance(raw, (int, float)):
+        return raw == 1
+    return _clean_text(raw) == '1'
 
 
 def _parse_read_date(raw):
@@ -206,6 +247,31 @@ def parse_excel_staged(uploaded_file):
 def _parse_workbook(wb):
     water_sheet = find_contract_sheet(wb.sheetnames, 'น้ำ')
     elec_sheet = find_contract_sheet(wb.sheetnames, 'ไฟ')
+    if not water_sheet and not elec_sheet:
+        # เดิมคืน 0 แถวเงียบๆ ผู้ใช้ไปถึงหน้ายืนยันแล้วไม่มีอะไรถูกนำเข้าโดยไม่รู้สาเหตุ
+        raise ValueError(
+            "ไม่พบชีทสัญญาในไฟล์ -- ต้องมีชีทที่ขึ้นต้นด้วย 'สัญญาปี' และมีคำว่า 'น้ำ' หรือ 'ไฟ' "
+            "อย่างน้อย 1 ชีท กรุณาตรวจสอบชื่อชีท"
+        )
+
+    # ตรวจจำนวนแถวระหว่าง parse (ก่อน query ฐานข้อมูลของแถวนั้น) -- เดิมตรวจหลัง parse เสร็จ
+    # ไฟล์ใหญ่จึงยิง query ทุกแถวก่อนถูกปฏิเสธ (3 connection ต่อแถว)
+    max_rows = getattr(settings, 'EXCEL_UPLOAD_MAX_ROWS', 5000)
+
+    # cache ผล lookup ภายในไฟล์เดียว -- พื้นที่/สัญญาเดียวกันมักซ้ำหลายแถว (น้ำ+ไฟ)
+    subarea_cache = {}
+    contract_cache = {}
+
+    def cached_subarea(area_id, subarea_id, loc_id):
+        key = (area_id, subarea_id, loc_id)
+        if key not in subarea_cache:
+            subarea_cache[key] = find_subarea(area_id, subarea_id, loc_id)
+        return subarea_cache[key]
+
+    def cached_contract(code):
+        if code not in contract_cache:
+            contract_cache[code] = find_contract_by_code(code)
+        return contract_cache[code]
 
     rows_out = []
     counter = {'idx': 0}
@@ -243,16 +309,21 @@ def _parse_workbook(wb):
             subarea_id = _cell(row, col['SUBAREA'])
             area_id = _cell(row, col['AREA'])
             loc_id = _cell(row, col['LOCATION']) if has_location else None
+            area_id, subarea_id = _clean_text(area_id), _clean_text(subarea_id)
+            loc_id = _clean_text(loc_id)
             if not subarea_id or not area_id:
                 continue
-            area_id, subarea_id = str(area_id).strip(), str(subarea_id).strip()
-            loc_id = str(loc_id).strip() if loc_id else None
 
-            contract_id = _cell(row, col['CONTRACT_NO'])
-            contract_code = _cell(row, col['CONTRACT_CODE'])
-            contract_code = str(contract_code).strip() if contract_code else contract_code
+            if counter['idx'] >= max_rows:
+                raise ValueError(
+                    f'ไฟล์นี้มีเกิน {max_rows:,} แถว เกินที่ระบบรับได้ '
+                    f'กรุณาแบ่งไฟล์ออกเป็นหลายไฟล์แล้วอัปโหลดทีละไฟล์'
+                )
+
+            contract_id = _json_safe(_cell(row, col['CONTRACT_NO']))
+            contract_code = _clean_text(_cell(row, col['CONTRACT_CODE']))
             confirm_flag = _cell(row, col['CONFIRM'])
-            meter_no_raw = _cell(row, col['METER_NO'])
+            meter_no_raw = _clean_text(_cell(row, col['METER_NO']))
 
             # เลขอ่านมิเตอร์ -- อ่านทุกแถวตั้งแต่ต้น แถว error ก็ยังเห็นค่าจริงในตาราง review
             reading_after, after_ok = _parse_reading(_cell(row, col['READING_AFTER']))
@@ -262,12 +333,12 @@ def _parse_workbook(wb):
             entry = {
                 'idx': counter['idx'],
                 'type_cd': type_cd, 'type_label': type_label,
-                'contract_year': _cell(row, col['YEAR']) if 'YEAR' in col else None,
-                'customer_name': _cell(row, col['CUSTOMER_NAME']) if 'CUSTOMER_NAME' in col else None,
-                'tax_id': _cell(row, col['TAX_ID']) if 'TAX_ID' in col else None,
+                'contract_year': _json_safe(_cell(row, col['YEAR'])) if 'YEAR' in col else None,
+                'customer_name': _json_safe(_cell(row, col['CUSTOMER_NAME'])) if 'CUSTOMER_NAME' in col else None,
+                'tax_id': _json_safe(_cell(row, col['TAX_ID'])) if 'TAX_ID' in col else None,
                 'location_id': loc_id, 'area_id': area_id,
                 'subarea_id': subarea_id,
-                'subarea_name': _cell(row, col['SUBAREA_NAME']) if 'SUBAREA_NAME' in col else None,
+                'subarea_name': _json_safe(_cell(row, col['SUBAREA_NAME'])) if 'SUBAREA_NAME' in col else None,
                 'contract_id': contract_id, 'contract_code': contract_code,
                 'meter_no': None, 'meter_no_status': None, 'phase_type': None,
                 'reading_before': reading_before,
@@ -277,7 +348,7 @@ def _parse_workbook(wb):
                 'status': 'ok', 'message': '',
             }
 
-            if confirm_flag != 1 or meter_no_raw == 'ไม่มีมิเตอร์':
+            if not _is_confirmed(confirm_flag) or meter_no_raw == 'ไม่มีมิเตอร์':
                 entry['status'] = 'skip'
                 entry['message'] = f'ไม่มีการคิดค่า{type_label}ในพื้นที่นี้'
                 rows_out.append(entry)
@@ -307,7 +378,7 @@ def _parse_workbook(wb):
             entry['reading_warning'] = reading_warning
 
             # --- เช็คพื้นที่ + แก้บั๊ก Location_id เป็น None ---
-            subarea_match = find_subarea(area_id, subarea_id, loc_id)
+            subarea_match = cached_subarea(area_id, subarea_id, loc_id)
             if not subarea_match:
                 where = f'{loc_id}/{area_id}/{subarea_id}' if loc_id else f'{area_id}/{subarea_id}'
                 entry['status'] = 'error'
@@ -321,7 +392,7 @@ def _parse_workbook(wb):
 
             # อ่านเลขมิเตอร์/เฟสจากไฟล์ก่อนเสมอ ไม่ว่าจะเช็ครหัสสัญญาผ่านหรือไม่
             # (แถวไหน error ก็ยังเห็นข้อมูลจริงจากไฟล์ในตาราง review ได้ ไม่ใช่ว่างเปล่า)
-            meter_no = None if meter_no_raw in (None, 'มิเตอร์ไม่มีเลข (GEN เลข)') else str(meter_no_raw)
+            meter_no = None if meter_no_raw in (None, 'มิเตอร์ไม่มีเลข (GEN เลข)') else meter_no_raw
             entry['meter_no'] = meter_no
             entry['meter_no_status'] = 'รอ Gen เลข' if meter_no is None else 'ปกติ'
             if type_cd == 8 and 'PHASE' in col and _cell(row, col['PHASE']):
@@ -340,7 +411,7 @@ def _parse_workbook(wb):
                 rows_out.append(entry)
                 continue
 
-            contract_match = find_contract_by_code(contract_code)
+            contract_match = cached_contract(contract_code)
             if not contract_match:
                 entry['status'] = 'error'
                 entry['message'] = f"ไม่พบรหัสสัญญา '{contract_code}' ในระบบ"

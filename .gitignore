@@ -14,3 +14,8 @@ db.sqlite3
 
 # สคริปต์แก้ schema ที่รันกับฐานข้อมูลจริงแล้ว -- จัดการผ่านกระบวนการของ DBA
 sql/
+
+# log/cache ที่ระบบสร้างตอนรัน (DJANGO_LOG_DIR / DJANGO_CACHE_DIR)
+/var/
+db.sqlite3-wal
+db.sqlite3-shm

@@ -5,9 +5,9 @@
 
 {% comment %}
   หน้า log เหตุการณ์รวมของระบบ -- อ่านจาก Contract_activity_log
-  ทำเป็นหน้าเดียวรวมทุกเหตุการณ์ เรียงเวลาล่าสุดก่อน ไม่มีแท็บแยกตามประเภทเหตุการณ์
-  (เหตุการณ์ครอบคลุมทุกเมนูแล้ว ประเภทดูได้จากป้ายสีในแต่ละรายการ)
-  กรองได้ด้วย ?q= (คำค้น) และ ?contract= (เฉพาะสัญญา -- ลิงก์ "ดูประวัติสัญญา" จากหน้ายกเลิกสัญญา)
+  ทำเป็นหน้าเดียวรวมทุกเหตุการณ์ เรียงเวลาล่าสุดก่อน
+  กรองได้ด้วย ?action= (แท็บประเภท) ?user= ?date_from= ?date_to= ?q= (คำค้น)
+  และ ?contract= (เฉพาะสัญญา -- ลิงก์ "ดูประวัติสัญญา" จากหน้ายกเลิกสัญญา)
 {% endcomment %}
 
 {% block content %}
@@ -24,30 +24,78 @@
     <a href="?{{ qs }}" class="shrink-0 font-semibold text-amber-900 underline hover:no-underline">โหลดรายการใหม่</a>
   </div>
 
-  <form method="get" class="mb-2 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(280px,1fr)_minmax(210px,250px)_minmax(210px,250px)_auto] xl:items-center">
+  {% comment %}
+    ตัวกรอง -- ประเภทเหตุการณ์เป็นแท็บ (ลิงก์ GET), ผู้ทำรายการเป็น dropdown, ช่วงวันที่มีปุ่มลัด
+    เดิม server รองรับ ?action= และ ?user= อยู่แล้วแต่หน้าจอไม่มีที่ให้เลือก
+    ช่องวันที่ยังเป็น date picker ของเบราว์เซอร์ (ส่งค่า YYYY-MM-DD) แต่มีป้าย พ.ศ. กำกับข้างล่าง
+    (static/meters/js/ui.js -- data-thai-date-for) เพราะเบราว์เซอร์แสดงรูปแบบตามภาษาเครื่อง (มักเป็น ค.ศ.)
+  {% endcomment %}
+  <div class="mb-3 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="ประเภทเหตุการณ์" data-tour="tabs">
+    <a href="?{% if search %}q={{ search|urlencode }}&{% endif %}{% if user_filter %}user={{ user_filter|urlencode }}&{% endif %}{% if date_from %}date_from={{ date_from }}&{% endif %}{% if date_to %}date_to={{ date_to }}&{% endif %}{% if contract_filter %}contract={{ contract_filter }}{% endif %}"
+       role="tab" aria-selected="{% if not action_filter %}true{% else %}false{% endif %}"
+       class="shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors {% if not action_filter %}bg-brand-500 text-white shadow-sm{% else %}border border-gray-200 bg-white text-gray-600 hover:bg-gray-50{% endif %}">
+      ทั้งหมด
+    </a>
+    {% for key, label in action_options %}
+      <a href="?action={{ key|urlencode }}{% if search %}&q={{ search|urlencode }}{% endif %}{% if user_filter %}&user={{ user_filter|urlencode }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if contract_filter %}&contract={{ contract_filter }}{% endif %}"
+         role="tab" aria-selected="{% if action_filter == key %}true{% else %}false{% endif %}"
+         class="shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors {% if action_filter == key %}bg-brand-500 text-white shadow-sm{% else %}border border-gray-200 bg-white text-gray-600 hover:bg-gray-50{% endif %}">
+        {{ label }}
+      </a>
+    {% endfor %}
+  </div>
+
+  <form method="get" data-tour="filters" class="mb-2 rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:p-4">
     {% if contract_filter %}<input type="hidden" name="contract" value="{{ contract_filter }}">{% endif %}
-    <input type="text" name="q" value="{{ search }}"
-           placeholder="ค้นหา รหัสสัญญา / ชื่อลูกค้า / ผู้ทำรายการ / ชื่อไฟล์"
-           class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:col-span-2 sm:py-2 sm:text-sm xl:col-span-1">
-    <label class="flex items-center gap-2 text-sm text-gray-500">
-      <span class="shrink-0">ตั้งแต่</span>
-      <input type="date" name="date_from" value="{{ date_from }}"
-             class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:py-2 sm:text-sm">
-    </label>
-    <label class="flex items-center gap-2 text-sm text-gray-500">
-      <span class="shrink-0">ถึง</span>
-      <input type="date" name="date_to" value="{{ date_to }}"
-             class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:py-2 sm:text-sm">
-    </label>
-    <div class="flex gap-3 sm:col-span-2 xl:col-span-1 xl:whitespace-nowrap">
-      <button type="submit"
-              class="flex-1 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 sm:py-2">
-        ค้นหา
-      </button>
-      {% if has_filters %}
-      <a href="?"
-         class="flex-1 rounded-lg border border-transparent px-4 py-2.5 text-center text-sm font-medium text-gray-500 hover:bg-gray-50 sm:py-2">ล้างตัวกรอง</a>
-      {% endif %}
+    {% if action_filter %}<input type="hidden" name="action" value="{{ action_filter }}">{% endif %}
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_200px_190px_190px]">
+      <div class="sm:col-span-2 xl:col-span-1">
+        <label for="log-q" class="mb-1 block text-xs font-medium text-gray-500">ค้นหา</label>
+        <input id="log-q" type="search" name="q" value="{{ search }}"
+               placeholder="รหัสสัญญา / ชื่อลูกค้า / ผู้ทำรายการ / ชื่อไฟล์"
+               class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:py-2 sm:text-sm">
+      </div>
+      <div class="sm:col-span-2 xl:col-span-1">
+        <label for="log-user" class="mb-1 block text-xs font-medium text-gray-500">ผู้ทำรายการ</label>
+        <select id="log-user" name="user" onchange="this.form.submit()"
+                data-custom-select data-custom-select-label="ผู้ทำรายการ"
+                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-base text-gray-700 sm:py-2 sm:text-sm">
+          <option value="">ทุกคน</option>
+          {% for u in user_options %}
+            <option value="{{ u }}" {% if u == user_filter %}selected{% endif %}>{{ u }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="log-from" class="mb-1 block text-xs font-medium text-gray-500">ตั้งแต่วันที่</label>
+        <input id="log-from" type="date" name="date_from" value="{{ date_from }}"
+               class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:py-2 sm:text-sm">
+        <p class="mt-1 min-h-[1rem] text-xs text-brand-700" data-thai-date-for="log-from" aria-live="polite"></p>
+      </div>
+      <div>
+        <label for="log-to" class="mb-1 block text-xs font-medium text-gray-500">ถึงวันที่</label>
+        <input id="log-to" type="date" name="date_to" value="{{ date_to }}"
+               class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:py-2 sm:text-sm">
+        <p class="mt-1 min-h-[1rem] text-xs text-brand-700" data-thai-date-for="log-to" aria-live="polite"></p>
+      </div>
+    </div>
+    <div class="mt-3 flex flex-col gap-3 border-t border-gray-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex flex-wrap items-center gap-1.5 text-xs" aria-label="ช่วงวันที่ลัด">
+        <span class="mr-1 text-gray-400">ช่วงลัด:</span>
+        <button type="button" data-date-range="0" class="rounded-full border border-gray-200 px-2.5 py-1 text-gray-600 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700">วันนี้</button>
+        <button type="button" data-date-range="6" class="rounded-full border border-gray-200 px-2.5 py-1 text-gray-600 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700">7 วัน</button>
+        <button type="button" data-date-range="29" class="rounded-full border border-gray-200 px-2.5 py-1 text-gray-600 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700">30 วัน</button>
+        <button type="button" data-date-range="month" class="rounded-full border border-gray-200 px-2.5 py-1 text-gray-600 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700">เดือนนี้</button>
+      </div>
+      <div class="flex gap-2">
+        {% if has_filters %}
+          <a href="?" class="flex-1 rounded-lg px-4 py-2 text-center text-sm font-medium text-gray-500 hover:bg-gray-50 sm:flex-none">ล้างตัวกรอง</a>
+        {% endif %}
+        <button type="submit"
+                class="flex-1 rounded-lg bg-brand-500 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-600 sm:flex-none">
+          ค้นหา
+        </button>
+      </div>
     </div>
   </form>
 
@@ -61,7 +109,7 @@
   {% endif %}
 
   {# --- มือถือ: การ์ดต่อเหตุการณ์ (ปุ่มดูสัญญาอยู่มุมขวาบนของการ์ด) --- #}
-  <div class="space-y-3 md:hidden">
+  <div class="space-y-3 md:hidden" data-tour="table-mobile">
     {% for r in rows %}
     <article class="space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
       <div class="flex items-start justify-between gap-3">
@@ -87,22 +135,20 @@
       </div>
 
       <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
-        <span>{{ r.at_label|default:"—" }}</span>
+        <time datetime="{{ r.DateEntry|date:'c' }}" data-relative-time title="{{ r.at_label }}">{{ r.at_label|default:"—" }}</time>
         <span class="text-gray-300" aria-hidden="true">|</span>
         <span>โดย {{ r.UserEntry|default:"—" }}</span>
       </div>
 
+      {% if r.Contract_id %}
       <div class="border-t border-gray-100 pt-3 text-sm">
         <div class="text-xs text-gray-400">สัญญา</div>
-        {% if r.Contract_id %}
-          <div class="mt-0.5 font-medium text-gray-800 break-words">{{ r.Contract_code|default:"—" }}</div>
-          <div class="text-xs text-gray-400 break-words">
-            #{{ r.Contract_id }}{% if r.CompanyName %} · {{ r.CompanyName }}{% endif %}
-          </div>
-        {% else %}
-          <div class="mt-0.5 text-xs text-gray-400">หลายสัญญา / ไม่ผูกสัญญา</div>
-        {% endif %}
+        <div class="mt-0.5 font-medium text-gray-800 break-words">{{ r.Contract_code|default:"—" }}</div>
+        <div class="text-xs text-gray-400 break-words">
+          #{{ r.Contract_id }}{% if r.CompanyName %} · {{ r.CompanyName }}{% endif %}
+        </div>
       </div>
+      {% endif %}
 
       {% if r.Detail %}
       <div class="text-sm">
@@ -122,62 +168,67 @@
     {% endfor %}
   </div>
 
-  {# --- แท็บเล็ต/เดสก์ท็อป: ตาราง คอลัมน์ดำเนินการติดขอบขวา --- #}
-  <div class="hidden bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto md:block">
-    <table class="min-w-[920px] w-full text-sm text-left">
+  {% comment %}
+    แท็บเล็ต/เดสก์ท็อป -- เดิม 6 คอลัมน์ คอลัมน์รายละเอียด (สำคัญที่สุด) ถูกบีบจนอ่านไม่ได้
+    รวมเวลา+ผู้ทำรายการไว้คอลัมน์เดียว และย้ายสัญญาไปอยู่หัวรายละเอียด (แสดงเฉพาะเมื่อมี)
+    เวลาแสดงแบบสัมพัทธ์ ("5 นาทีที่แล้ว") ด้วย ui.js -- เวลาเต็มอยู่ใน title และบรรทัดรอง
+  {% endcomment %}
+  <div class="hidden bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto md:block" data-tour="table">
+    <table class="min-w-[620px] w-full text-sm text-left">
       <thead>
         <tr class="border-b border-gray-100 bg-gray-50">
-          <th class="px-4 py-2.5 font-semibold text-gray-500 whitespace-nowrap">เมื่อ</th>
-          <th class="px-4 py-2.5 font-semibold text-gray-500 whitespace-nowrap">เหตุการณ์</th>
-          <th class="px-4 py-2.5 font-semibold text-gray-500">สัญญา</th>
-          <th class="px-4 py-2.5 font-semibold text-gray-500">รายละเอียด</th>
-          <th class="px-4 py-2.5 font-semibold text-gray-500 whitespace-nowrap">ผู้ทำรายการ</th>
-          <th class="sticky right-0 z-10 whitespace-nowrap border-l border-gray-200 bg-gray-50 px-4 py-2.5 text-right font-semibold text-gray-500 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.12)]">ดำเนินการ</th>
+          <th class="w-[170px] px-4 py-3 font-semibold text-gray-500 whitespace-nowrap">เมื่อ / โดย</th>
+          <th class="w-[170px] px-4 py-3 font-semibold text-gray-500 whitespace-nowrap">เหตุการณ์</th>
+          <th class="px-4 py-3 font-semibold text-gray-500">รายละเอียด</th>
+          <th class="sticky right-0 z-10 whitespace-nowrap border-l border-gray-200 bg-gray-50 px-4 py-3 text-right font-semibold text-gray-500 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.12)]">ดำเนินการ</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-gray-50">
+      <tbody class="divide-y divide-gray-100">
         {% for r in rows %}
-        <tr class="group hover:bg-gray-50 align-top">
-          <td class="px-4 py-2.5 text-gray-700 whitespace-nowrap">
-            {{ r.at_label|default:"—" }}
+        <tr class="group align-top transition-colors hover:bg-brand-50/40">
+          <td class="px-4 py-3 whitespace-nowrap">
+            <time datetime="{{ r.DateEntry|date:'c' }}" data-relative-time title="{{ r.at_label }}"
+                  class="font-medium text-gray-800">{{ r.at_label|default:"—" }}</time>
+            <div class="mt-0.5 hidden text-xs text-gray-400" data-relative-full>{{ r.at_label|default:"" }}</div>
+            <div class="mt-1 inline-flex items-center gap-1.5 text-xs text-gray-600">
+              <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-[10px] font-semibold uppercase text-gray-500" aria-hidden="true">{{ r.UserEntry|default:"?"|slice:":1" }}</span>
+              {{ r.UserEntry|default:"—" }}
+            </div>
           </td>
-          <td class="px-4 py-2.5 whitespace-nowrap">
-            {% comment %} สีแยกตามความรุนแรง: ลบ = แดง, ปิดการตั้งหนี้ = เหลือง, อื่นๆ = น้ำเงิน {% endcomment %}
+          <td class="px-4 py-3">
+            {% comment %} สีแยกตามความรุนแรง: ลบ/ล็อกอินไม่สำเร็จ = แดง, ปิดการตั้งหนี้ = เหลือง, เข้า/ออก = เทา {% endcomment %}
             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
                          {% if r.Action_type == 'termination_delete' or r.Action_type == 'login_failed' %}bg-red-50 text-red-600
                          {% elif r.Action_type == 'termination_close_meters' %}bg-amber-50 text-amber-700
                          {% elif r.Action_type == 'login' or r.Action_type == 'logout' %}bg-gray-100 text-gray-600
-                       {% else %}bg-brand-50 text-brand-600{% endif %}">
+                         {% else %}bg-brand-50 text-brand-600{% endif %}">
               {{ r.action_label }}
             </span>
             {% if r.Ref_text %}
-              <div class="text-xs text-gray-400 mt-0.5 max-w-[180px] truncate" title="{{ r.Ref_text }}">
-                {{ r.Ref_text }}
-              </div>
+              <div class="mt-1 max-w-[190px] truncate text-xs text-gray-500" title="{{ r.Ref_text }}">{{ r.Ref_text }}</div>
             {% endif %}
           </td>
-          <td class="px-4 py-2.5 max-w-[200px]">
+          <td class="px-4 py-3">
             {% if r.Contract_id %}
-              <div class="font-medium text-gray-800">{{ r.Contract_code|default:"—" }}</div>
-              <div class="text-xs text-gray-400 truncate" title="{{ r.CompanyName|default:'' }}">
-                #{{ r.Contract_id }}{% if r.CompanyName %} · {{ r.CompanyName }}{% endif %}
+              <div class="mb-1 text-xs">
+                <span class="font-semibold text-gray-800">{{ r.Contract_code|default:"—" }}</span>
+                <span class="text-gray-400">#{{ r.Contract_id }}{% if r.CompanyName %} · {{ r.CompanyName }}{% endif %}</span>
               </div>
-            {% else %}
-              <span class="text-xs text-gray-400">หลายสัญญา / ไม่ผูกสัญญา</span>
             {% endif %}
+            <div class="whitespace-pre-line text-sm leading-6 text-gray-600">{{ r.Detail|default:"—" }}</div>
           </td>
-          <td class="px-4 py-2.5 text-gray-600 text-xs whitespace-pre-line">{{ r.Detail|default:"—" }}</td>
-          <td class="px-4 py-2.5 text-gray-700 text-xs whitespace-nowrap">{{ r.UserEntry|default:"—" }}</td>
-          <td class="sticky right-0 z-10 whitespace-nowrap border-l border-gray-100 bg-white px-4 py-2.5 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.12)] group-hover:bg-gray-50">
+          <td class="sticky right-0 z-10 whitespace-nowrap border-l border-gray-100 bg-white px-4 py-3 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.12)] group-hover:bg-gray-50">
             {% if r.action_url %}
             <a href="{{ r.action_url }}"
                class="text-sm font-medium text-brand-600 hover:text-brand-700">{{ r.action_text }}</a>
+            {% else %}
+            <span class="text-xs text-gray-300" aria-hidden="true">—</span>
             {% endif %}
           </td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="6" class="px-4 py-10 text-center text-gray-400 text-sm">
+          <td colspan="4" class="px-4 py-10 text-center text-gray-400 text-sm">
             {% if has_filters %}
               ไม่พบประวัติที่ตรงกับตัวกรอง
             {% else %}

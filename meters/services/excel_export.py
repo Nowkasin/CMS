@@ -56,6 +56,11 @@ def build_subareas_workbook(rows):
             r.get('electric_meter_no') or '',
             status,
         ])
+        # ข้อความที่ขึ้นต้นด้วย '=' (เช่นชื่อลูกหนี้) openpyxl จะตีเป็นสูตร แล้ว Excel คำนวณตอนเปิดไฟล์
+        # บังคับเป็นข้อความธรรมดา -- แบบเดียวกับ _append_row ในหน้าดาวน์โหลด (views/download.py)
+        for cell in ws[ws.max_row]:
+            if cell.data_type == 'f':
+                cell.data_type = 's'
 
     last_row = ws.max_row
     for row in ws.iter_rows(min_row=2, max_row=last_row, max_col=len(headers)):

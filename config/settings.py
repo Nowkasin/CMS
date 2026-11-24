@@ -36,6 +36,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # โหมดปรับปรุงระบบ (หน้า 503) -- ต้องอยู่ก่อน Session/Auth เพื่อไม่แตะฐานข้อมูลระหว่างปิดปรับปรุง
+    'meters.maintenance.MaintenanceModeMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',  # จำเป็นสำหรับ request.session
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     # ทุกหน้าต้องล็อกอิน ยกเว้น view ที่ติด @login_not_required
@@ -74,6 +76,28 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+        # session ของ wizard นำเข้า Excel ใหญ่ได้หลาย MB และ SQLite ล็อกทั้งไฟล์ตอนเขียน
+        # ถ้ามีหลาย worker/ผู้ใช้พร้อมกันจะเจอ "database is locked" ได้ จึง:
+        #   WAL           -- ผู้อ่านไม่ถูกบล็อกระหว่างมีคนเขียน
+        #   IMMEDIATE     -- ขอล็อกเขียนตั้งแต่ต้นทรานแซกชัน (กัน deadlock แบบ upgrade lock)
+        #   timeout 20 วิ -- รอคิวแทนการ error ทันที
+        'OPTIONS': {
+            'timeout': 20,
+            'transaction_mode': 'IMMEDIATE',
+            'init_command': 'PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;',
+        },
+    }
+}
+
+# -----------------------------------------------------------------------
+# Cache -- ใช้นับจำนวนครั้งล็อกอินผิด (meters/views/auth.py)
+# ต้องเป็น cache ที่ทุก worker เห็นร่วมกัน ค่าเริ่มต้นของ Django (LocMemCache) แยกต่อ process
+# จึงใช้ FileBasedCache (ไม่ต้องสร้างตารางเพิ่ม) -- ถ้ารันหลายเครื่องให้เปลี่ยนเป็น redis
+# -----------------------------------------------------------------------
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
+        'LOCATION': config('DJANGO_CACHE_DIR', default=str(BASE_DIR / 'var' / 'cache')),
     }
 }
 
@@ -111,6 +135,78 @@ SESSION_COOKIE_PATH = f'{SCRIPT_NAME_PREFIX}/' if SCRIPT_NAME_PREFIX else '/'
 CSRF_COOKIE_PATH = SESSION_COOKIE_PATH
 
 # -----------------------------------------------------------------------
+# ความปลอดภัยเมื่อเปิดใช้ผ่าน HTTPS (Production)
+#
+# DJANGO_HTTPS=True       -- ส่ง cookie session/CSRF เฉพาะ HTTPS และเปิด HSTS
+#   ค่าเริ่มต้นเป็น False เพราะถ้าเปิดบนเครื่องที่ยังเป็น HTTP จะล็อกอินไม่ได้เลย
+#   (เบราว์เซอร์ไม่ส่ง secure cookie กลับมา)
+# DJANGO_BEHIND_PROXY=True -- IIS/Nginx รับ HTTPS แล้วส่งต่อเป็น HTTP ให้ Django
+#   ต้องเปิดเพื่อให้ request.is_secure() ถูก -- เปิดเฉพาะเมื่อ proxy ตั้ง
+#   X-Forwarded-Proto เองเสมอ ไม่งั้น client ปลอม header ได้
+# -----------------------------------------------------------------------
+USE_HTTPS = config('DJANGO_HTTPS', default=False, cast=bool)
+SESSION_COOKIE_SECURE = USE_HTTPS
+CSRF_COOKIE_SECURE = USE_HTTPS
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+SECURE_REFERRER_POLICY = 'same-origin'
+if USE_HTTPS:
+    SECURE_HSTS_SECONDS = config('DJANGO_HSTS_SECONDS', default=3600, cast=int)
+if config('DJANGO_BEHIND_PROXY', default=False, cast=bool):
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    USE_X_FORWARDED_HOST = True
+
+# -----------------------------------------------------------------------
+# Logging -- โค้ดหลายจุดพึ่ง logger.exception() แทนการโชว์ error ดิบบนหน้าเว็บ
+# (นำเข้า Excel ล้ม, เขียน activity log ไม่สำเร็จ, ตรวจสิทธิ์ล้ม) จึงต้องลงไฟล์ให้ย้อนดูได้
+# ไฟล์หมุนเวียนวันละไฟล์ เก็บ 30 วัน -- ห้าม log รหัสผ่าน/ข้อมูลใน .env (ดู AGENTS.md)
+# -----------------------------------------------------------------------
+LOG_DIR = Path(config('DJANGO_LOG_DIR', default=str(BASE_DIR / 'var' / 'logs')))
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+LOG_LEVEL = config('DJANGO_LOG_LEVEL', default='INFO')
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format': '%(asctime)s %(levelname)s %(name)s: %(message)s',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'standard',
+        },
+        'file': {
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': str(LOG_DIR / 'cms.log'),
+            'when': 'midnight',
+            'backupCount': 30,
+            'encoding': 'utf-8',
+            # หลาย worker เขียนไฟล์เดียวกันได้ แต่การหมุนไฟล์ตอนเที่ยงคืนอาจชนกัน
+            # delay=True เปิดไฟล์ตอนเขียนครั้งแรก ลดการถือ handle ค้าง
+            'delay': True,
+            'formatter': 'standard',
+        },
+    },
+    'loggers': {
+        'meters': {
+            'handlers': ['console', 'file'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['console', 'file'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+    },
+}
+
+# -----------------------------------------------------------------------
 # Authentication
 #
 # LDAP ตรวจรหัสผ่าน ส่วนตาราง SysUserGroupAssiciate/SysGroup ใน SQL Server เดิม
@@ -120,6 +216,29 @@ AUTHENTICATION_BACKENDS = ['meters.auth_backend.BuasriLDAPBackend']
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'meter_list'
 LOGOUT_REDIRECT_URL = 'login'
+
+# -----------------------------------------------------------------------
+# โหมดปรับปรุงระบบ (หน้า 503) -- ดูรายละเอียดที่ meters/maintenance.py
+# ปกติเปิด/ปิดด้วย `python manage.py maintenance on|off` (ไม่ต้อง restart)
+# CMS_MAINTENANCE_MODE=True ใช้เมื่อต้องการบังคับเปิดจาก .env
+# -----------------------------------------------------------------------
+CMS_MAINTENANCE_MODE = config('CMS_MAINTENANCE_MODE', default=False, cast=bool)
+CMS_MAINTENANCE_FLAG_FILE = config(
+    'CMS_MAINTENANCE_FLAG_FILE', default=str(BASE_DIR / 'var' / 'maintenance.json'),
+)
+CMS_MAINTENANCE_MESSAGE = config('CMS_MAINTENANCE_MESSAGE', default='')
+CMS_MAINTENANCE_UNTIL = config('CMS_MAINTENANCE_UNTIL', default='')
+CMS_MAINTENANCE_RETRY_AFTER = config('CMS_MAINTENANCE_RETRY_AFTER', default=3600, cast=int)
+# รหัสลิงก์ผ่านสำหรับโหมดที่เปิดจาก .env (โหมดที่เปิดด้วยคำสั่ง maintenance on สุ่มรหัสให้เอง)
+CMS_MAINTENANCE_BYPASS_TOKEN = config('CMS_MAINTENANCE_BYPASS_TOKEN', default='')
+# IP ที่ยังเข้าระบบได้ระหว่างปรับปรุง (คั่นด้วย ,) -- เทียบกับ REMOTE_ADDR
+# localhost (127.0.0.1 / ::1) ผ่านได้เสมอ ไม่ต้องใส่
+CMS_MAINTENANCE_ALLOW_IPS = [
+    ip.strip() for ip in config('CMS_MAINTENANCE_ALLOW_IPS', default='').split(',') if ip.strip()
+]
+
+# ดึงสิทธิ์เมนูจาก K2 ใหม่ทุกกี่วินาทีระหว่างที่ผู้ใช้ยังล็อกอินอยู่ (0 = ไม่ดึงใหม่ ใช้ค่าตอนล็อกอิน)
+CMS_ACCESS_REFRESH_SECONDS = config('CMS_ACCESS_REFRESH_SECONDS', default=600, cast=int)
 
 LDAP_SERVER_URI = config('LDAP_SERVER_URI', default='')
 LDAP_USER_DN_TEMPLATE = config('LDAP_USER_DN_TEMPLATE', default='')

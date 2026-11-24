@@ -41,6 +41,11 @@
 - หลีกเลี่ยงการสร้างไฟล์ขนาดใหญ่รวมหลายหน้าที่รับผิดชอบ ให้แยกตาม Feature ตามโครงสร้างปัจจุบัน
 - รักษาชื่อ URL, Form field, Session key และ DOM ID ที่ JavaScript ใช้อยู่ เว้นแต่แก้ทุกจุดที่อ้างอิงพร้อมกัน
 - เพิ่ม Comment เมื่ออธิบายข้อจำกัดของข้อมูลเดิมหรือเหตุผลที่มองจากโค้ดไม่ออก หลีกเลี่ยง Comment ที่เพียงทวนคำสั่งในโค้ด
+- ตัวช่วยที่หลาย View ใช้ร่วมกัน (วันที่ไทย/พ.ศ., แปลงค่าจากฟอร์ม) อยู่ที่ `meters/utils.py` ห้าม import ฟังก์ชันที่ขึ้นต้นด้วย `_` ข้ามไฟล์ View
+- `meters/models.py` ตั้งใจว่าง ระบบไม่ใช้ ORM กับตารางธุรกิจ
+- Activity log มี 3 ช่องทางเท่านั้น: `meters/log_middleware.py` (ทุกการกระทำผ่านหน้าเว็บ — เมนูใหม่ให้ลงทะเบียนที่ `REGISTRY`), ในทรานแซกชันเดียวกับงาน (นำเข้า Excel และ SP ยกเลิกสัญญา) และ `meters/signals.py` (เข้า/ออกระบบ) View ส่ง id ที่เพิ่งบันทึกให้ middleware ผ่าน `request.activity_result` ไม่ต้องเรียก log เอง
+- สิทธิ์เมนูถูกเก็บใน Session ด้วย `store_access_in_session()` ใน `meters/permissions.py` และถูกดึงใหม่จาก K2 ทุก `CMS_ACCESS_REFRESH_SECONDS`
+- การกระทำที่เปลี่ยนข้อมูล (รวมถึงล้าง Session อย่าง `restart`) ต้องเป็น POST พร้อม CSRF ห้ามใช้ลิงก์ GET
 
 ## Template และรูปแบบหน้าจอ
 
@@ -63,7 +68,10 @@
 - รายการยาวที่ต้องค้นหา เช่น SubArea ให้ใช้ Searchable Combobox เฉพาะงาน ไม่ใช้ Custom Dropdown รายการสั้น
 - URL ที่ไม่มีอยู่และ URL ของเมนูที่ผู้ใช้ไม่มีสิทธิ์ต้องแสดงหน้า `templates/meters/404.html` แบบกลาง เพื่อไม่เปิดเผยว่าหน้านั้นมีอยู่จริง
 - บัญชีที่ล็อกอินสำเร็จแต่ไม่ได้รับสิทธิ์เมนูใดเลยให้ใช้ `templates/meters/no_permission.html` แยกจากหน้า 404
+- ปิดปรับปรุงระบบใช้หน้า `templates/meters/503.html` (แสดงจาก `meters/maintenance.py`) เป็นหน้า Standalone ห้าม extends `base.html` หรือใช้ session/user/`{% url %}` เพราะต้องแสดงได้ขณะฐานข้อมูลใช้งานไม่ได้ เปิด/ปิดด้วย `manage.py maintenance on|off` ผู้ดูแลดูหน้าเว็บจริงระหว่างปรับปรุงได้ผ่านลิงก์ผ่าน/localhost และหน้าภายในต้องแสดงแถบเตือน `partials/maintenance_banner.html` (รวมอยู่ใน `base.html` แล้ว)
 - Stepper ใช้ `templates/meters/stepper.html` และต้องแสดงครบโดยไม่มี Scrollbar
+- คู่มือการใช้งานอยู่ที่ `/help/` (`meters/views/help.py` + `templates/meters/help.html`) เนื้อหาแสดงตามสิทธิ์เมนู ภาพสาธิตเป็น CSS animation ใน `partials/help_demo.html` เมื่อเพิ่มหรือเปลี่ยน Flow ของเมนูใด ให้แก้ขั้นตอนใน `HELP_SECTIONS` ด้วย
+- ทัวร์พาคลิกอยู่ที่ `static/meters/js/tour.js` อ้าง element ด้วย `data-tour="..."` ใน Template และ ID เดิมของหน้า ห้ามลบหรือเปลี่ยนชื่อ `data-tour` โดยไม่แก้ `tour.js` (มี Test `test_help.py` ตรวจว่าทุก `data-tour` ที่ทัวร์อ้างมีอยู่จริง)
 - ออกแบบ Responsive เสมอ บนจอเล็ก Form และปุ่มต้องเรียงลงมาโดยไม่ล้นหน้าจอ
 - อย่าเปลี่ยนข้อความทางธุรกิจหรือความหมายของสถานะเพื่อความสวยงามเพียงอย่างเดียว
 
@@ -137,6 +145,14 @@
 ```powershell
 .\venv\Scripts\python.exe manage.py check
 ```
+
+รัน Test อัตโนมัติ (mock SQL Server ทั้งหมด ไม่เขียนข้อมูลจริง):
+
+```powershell
+.\venv\Scripts\python.exe manage.py test meters
+```
+
+เมื่อแก้ Logic ให้เพิ่มหรือแก้ Test ใน `meters/tests/` ด้วย และห้ามเขียน Test ที่ต่อ SQL Server หรือ LDAP จริง
 
 ตรวจปัญหา Whitespace:
 
