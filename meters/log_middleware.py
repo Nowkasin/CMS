@@ -290,14 +290,17 @@ def _invoice_print_build(request, kwargs, before, response):
     """เปิดหน้าพิมพ์ใบแจ้งหนี้สำเร็จ -- view ฝากเลขตั้งหนี้ SAP ที่แสดงไว้ใน activity_result"""
     if response.status_code != 200:
         return None
-    docs = _result(request).get('invoice_docs') or []
+    result = _result(request)
+    docs = result.get('invoice_docs') or []
     if not docs:
         return None
-    shown = ', '.join(docs[:20]) + (f' และอีก {len(docs) - 20} ใบ' if len(docs) > 20 else '')
+    # ใบแจ้งหนี้หนึ่งใบรวมได้หลายเลขเอกสาร SAP (สัญญา + วันที่ตั้งหนี้)
+    count = result.get('invoice_count') or len(docs)
+    shown = ', '.join(docs[:20]) + (f' และอีก {len(docs) - 20} เลข' if len(docs) > 20 else '')
     return {
         'action': activity.ACTION_INVOICE_PRINT,
-        'ref_text': docs[0] if len(docs) == 1 else f'{len(docs)} ใบ',
-        'detail': f'พิมพ์ใบแจ้งหนี้ {len(docs)} ใบ\nเลขที่ใบแจ้งหนี้ {shown}',
+        'ref_text': docs[0] if len(docs) == 1 else f'{count} ใบ',
+        'detail': f'พิมพ์ใบแจ้งหนี้ {count} ใบ\nเลขเอกสาร SAP {shown}',
     }
 
 

@@ -4,8 +4,10 @@
 {% block title %}พิมพ์ใบแจ้งหนี้{% endblock %}
 
 {% comment %}
-  หน้าใบแจ้งหนี้ขนาด A4 หนึ่งหน้าต่อหนึ่งใบ (Contract_id + เลขตั้งหนี้ SAP) -- รูปแบบตามใบแจ้งหนี้ของ K2
-  ข้อมูลมาจาก sp_6000_Contact_Doc_invoice (meters/services/invoice.py)
+  หน้าใบแจ้งหนี้ขนาด A4 หนึ่งหน้าต่อหนึ่งใบ (สัญญา + วันที่ตั้งหนี้ รวมหลายเลขเอกสาร SAP)
+  รูปแบบตามแบบร่าง "ใบแจ้งหนี้ V1.3": แต่ละบรรทัดมีเลขเอกสาร (Document) ของตัวเอง
+  ค่าน้ำ/ค่าไฟจาก Contract_meter_reading_tr แสดงเลขมิเตอร์ก่อน/หลัง (หนึ่งบรรทัดต่อมิเตอร์)
+  ข้อมูลมาจาก meters/services/invoice.py fetch_invoice_documents
   ตอนพิมพ์ ซ่อนแถบบน เมนู และแถบเครื่องมือ (.no-print) เหลือเฉพาะใบแจ้งหนี้
   ยังไม่มี QR Code รับชำระเงิน (รอกำหนดลิงก์) -- ตำแหน่งเดิมอยู่มุมซ้ายล่างของใบ
   ข้อความช่องทางชำระเงินและเบอร์ติดต่อคัดลอกจากใบแจ้งหนี้ K2 ถ้าเปลี่ยนให้แก้ที่ไฟล์นี้
@@ -62,7 +64,7 @@
 
 {% for doc in documents %}
 {% with h=doc.header %}
-<article class="invoice-sheet" aria-label="ใบแจ้งหนี้ {{ doc.invoice_no }}">
+<article class="invoice-sheet" aria-label="ใบแจ้งหนี้ {{ h.Contract_code }} วันที่ {{ doc.date_label }}">
   <div style="text-align:center">
     <img src="{% static 'meters/images/swu-logo.png' %}" alt="ตรามหาวิทยาลัยศรีนครินทรวิโรฒ" style="height:30mm;width:auto;display:inline-block">
   </div>
@@ -70,13 +72,10 @@
 
   <table class="inv-grid" style="margin-top:2mm">
     <tr>
-      <td style="width:50%">มหาวิทยาลัยศรีนครินทรวิโรฒ {{ h.Contract_swu_location_name|default:"" }}</td>
-      <td>เลขที่ใบแจ้งหนี้ {{ doc.invoice_no }}</td>
-    </tr>
-    <tr>
-      <td>{{ h.Contract_swu_address|default:"" }}</td>
+      <td style="width:52%">{{ doc.university_line }}</td>
       <td>วันที่ {{ doc.date_label|default:"" }}</td>
     </tr>
+    <tr><td colspan="2">{{ h.Contract_swu_address|default:"" }}</td></tr>
     <tr><td colspan="2">รหัสผู้เช่า/Customer : {{ h.SAPVendor_Id|default:"" }}</td></tr>
     <tr><td colspan="2">รหัสสัญญา : {{ h.Contract_code|default:"" }}</td></tr>
     <tr><td colspan="2">ชื่อผู้เช่า / Name : {{ h.CompanyName|default:"" }}</td></tr>
@@ -86,24 +85,31 @@
   <table class="inv-grid inv-items" style="margin-top:-1px">
     <thead>
       <tr>
-        <th style="width:8%;text-align:center">ที่</th>
-        <th style="width:42%">รายการ(Description)</th>
-        <th style="width:27%">ประจำเดือน(งวด)</th>
-        <th style="width:23%" class="num">จำนวนเงิน(บาท)</th>
+        <th style="width:5%;text-align:center">ที่</th>
+        <th style="width:13%">Document</th>
+        <th style="width:23%">รายการ(Description)</th>
+        <th style="width:11%;white-space:nowrap">มิเตอร์ก่อน</th>
+        <th style="width:11%;white-space:nowrap">มิเตอร์หลัง</th>
+        <th style="width:21%;white-space:nowrap">ประจำเดือน(งวด)</th>
+        <th style="width:16%" class="num">จำนวนเงิน(บาท)</th>
       </tr>
     </thead>
     <tbody>
       {% for line in doc.lines %}
       <tr>
         <td style="text-align:center">{{ forloop.counter }}</td>
+        <td>{{ line.Contract_fi_doc }}</td>
         <td>{{ line.description }}</td>
+        <td>{% if line.Reading_before is not None %}{{ line.Reading_before }}{% endif %}</td>
+        <td>{% if line.Reading_after is not None %}{{ line.Reading_after }}{% endif %}</td>
         <td>{{ line.period_label|default:"" }}</td>
-        <td class="num">{{ line.Contract_Installment_amt|floatformat:"2g" }}</td>
+        <td class="num">{{ line.Amount|floatformat:"2g" }}</td>
       </tr>
       {% endfor %}
       <tr>
         <td></td>
-        <td colspan="2" style="font-weight:700;height:24mm">รวมเป็นจำนวนเงิน {{ doc.total_text }}</td>
+        <td></td>
+        <td colspan="4" style="font-weight:700">รวมเป็นจำนวนเงิน {{ doc.total_text }}</td>
         <td class="num" style="font-weight:700">{{ doc.total|floatformat:"2g" }}</td>
       </tr>
     </tbody>
