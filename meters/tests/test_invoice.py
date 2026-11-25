@@ -275,6 +275,7 @@ class InvoiceViewTests(NoDbTestCase):
                      'สองพันหกร้อยสามสิบสองบาทถ้วน', '2,632.00', '492.00', 'นายทดสอบ ระบบ'):
             self.assertIn(text, body)
         self.assertNotIn('เลขที่ใบแจ้งหนี้', body)
+        self.assertIn('meters/images/invoice-qr-payment.png', body)
         self.assertIn('มหาวิทยาลัยศรีนครินทรวิโรฒ ประสานมิตร', body)
         self.assertEqual(req.activity_result,
                          {'invoice_docs': ['2100004064', '2100004067'], 'invoice_count': 1})
@@ -287,6 +288,17 @@ class InvoiceViewTests(NoDbTestCase):
             body = invoice_view.invoice_print(make_request('/invoice/print/?doc=1234:20260604')).content.decode()
         self.assertNotIn('มหาวิทยาลัยศรีนครินทรวิโรฒ มหาวิทยาลัยศรีนครินทรวิโรฒ', body)
         self.assertIn('มหาวิทยาลัยศรีนครินทรวิโรฒ ประสานมิตร', body)
+
+    def test_print_marks_test_copy_during_maintenance(self):
+        doc = {'contract_id': '1234', 'fi_date': FI_DATE, 'docs': ['2100004064'], 'header': dict(HEADER),
+               'total': Decimal('2140.00'), 'lines': [line()]}
+        req = make_request('/invoice/print/?doc=1234:20260604')
+        with mock.patch.object(invoice_service, 'fetch_invoice_documents', return_value=[doc]):
+            normal = invoice_view.invoice_print(req).content.decode()
+            req.cms_maintenance_bypass = True
+            bypass = invoice_view.invoice_print(req).content.decode()
+        self.assertNotIn('>ทดสอบ<', normal)
+        self.assertIn('>ทดสอบ<', bypass)
 
     def test_print_without_docs_redirects(self):
         resp = invoice_view.invoice_print(make_request('/invoice/print/'))

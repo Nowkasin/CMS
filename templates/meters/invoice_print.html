@@ -9,14 +9,15 @@
   ค่าน้ำ/ค่าไฟจาก Contract_meter_reading_tr แสดงเลขมิเตอร์ก่อน/หลัง (หนึ่งบรรทัดต่อมิเตอร์)
   ข้อมูลมาจาก meters/services/invoice.py fetch_invoice_documents
   ตอนพิมพ์ ซ่อนแถบบน เมนู และแถบเครื่องมือ (.no-print) เหลือเฉพาะใบแจ้งหนี้
-  ยังไม่มี QR Code รับชำระเงิน (รอกำหนดลิงก์) -- ตำแหน่งเดิมอยู่มุมซ้ายล่างของใบ
+  QR มุมซ้ายล่าง = รูปนิ่ง static/meters/images/invoice-qr-payment.png ตัดมาจากใบแจ้งหนี้ K2
+  ชี้ไปหน้าเข้าระบบรับชำระเงิน K2 (FRM__1004__SWU__QR__Code__login) -- ถ้าลิงก์เปลี่ยนต้องทำรูปใหม่
   ข้อความช่องทางชำระเงินและเบอร์ติดต่อคัดลอกจากใบแจ้งหนี้ K2 ถ้าเปลี่ยนให้แก้ที่ไฟล์นี้
 {% endcomment %}
 
 {% block extra_css %}
 <style>
   .invoice-sheet { width: 210mm; min-height: 297mm; margin: 0 auto 24px; background: #fff; color: #111827;
-                   padding: 14mm 16mm 12mm; box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 8px 24px rgba(0,0,0,.06);
+                   padding: 10mm 16mm 10mm; box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 8px 24px rgba(0,0,0,.06);
                    font-size: 13.5px; line-height: 1.55; position: relative; }
   .invoice-sheet .inv-grid { width: 100%; border-collapse: collapse; }
   .invoice-sheet .inv-grid td, .invoice-sheet .inv-grid th { border: 1px solid #D1D5DB; padding: 5px 8px; vertical-align: top; }
@@ -65,10 +66,14 @@
 {% for doc in documents %}
 {% with h=doc.header %}
 <article class="invoice-sheet" aria-label="ใบแจ้งหนี้ {{ h.Contract_code }} วันที่ {{ doc.date_label }}">
+  {% if request.cms_maintenance_bypass %}
+    {# ช่วงปิดปรับปรุง (ผู้ดูแลเข้าผ่านลิงก์ผ่าน) -- ใบที่พิมพ์ออกไปคือใบทดสอบ #}
+    <div style="position:absolute;top:8mm;left:10mm;font-weight:700;font-size:16px;color:#B91C1C">ทดสอบ</div>
+  {% endif %}
   <div style="text-align:center">
-    <img src="{% static 'meters/images/swu-logo.png' %}" alt="ตรามหาวิทยาลัยศรีนครินทรวิโรฒ" style="height:30mm;width:auto;display:inline-block">
+    <img src="{% static 'meters/images/swu-logo.png' %}" alt="ตรามหาวิทยาลัยศรีนครินทรวิโรฒ" style="height:25mm;width:auto;display:inline-block">
   </div>
-  <div style="margin-top:6mm;font-size:16px">ใบแจ้งหนี้ / Invoice</div>
+  <div style="margin-top:4mm;font-size:16px">ใบแจ้งหนี้ / Invoice</div>
 
   <table class="inv-grid" style="margin-top:2mm">
     <tr>
@@ -128,13 +133,21 @@
     <p>** ขออภัยหากท่านชำระเงินเรียบร้อยแล้ว **</p>
   </div>
 
-  <div style="margin-top:12mm;text-align:center">
+  <div style="margin-top:8mm;text-align:center">
     <div>ลงชื่อ/ signature ........................................................................................</div>
     <div style="margin-top:3mm;font-weight:700">หัวหน้าฝ่ายจัดการทรัพย์สิน</div>
   </div>
 
-  <div style="margin-top:14mm;font-size:12px">
-    ติดต่อได้ที่ : 02-6495000 ต่อ 15994 , 02-2600139 &nbsp;&nbsp; ผู้บันทึก : {{ recorder }}
+  {# ตำแหน่งเดียวกับใบ K2: ใต้บรรทัดติดต่อ มุมซ้าย -- QR 18mm เพื่อให้ทั้งใบยังอยู่ใน A4 หน้าเดียว #}
+  <div style="margin-top:8mm;break-inside:avoid;page-break-inside:avoid">
+    <div style="font-size:12px">
+      ติดต่อได้ที่ : 02-6495000 ต่อ 15994 , 02-2600139 &nbsp;&nbsp; ผู้บันทึก : {{ recorder }}
+    </div>
+    <div style="margin-top:2mm;width:36mm;text-align:center;font-size:8px;line-height:1.3">
+      <img src="{% static 'meters/images/invoice-qr-payment.png' %}" alt="QR Code เข้าสู่ระบบรับชำระเงินรูปแบบอิเล็กทรอนิกส์"
+           style="width:18mm;height:18mm;display:inline-block">
+      <div>QR CODE สำหรับเข้าสู่ระบบ<br>รับชำระเงินรูปแบบอิเล็กทรอนิกส์</div>
+    </div>
   </div>
 </article>
 {% endwith %}
