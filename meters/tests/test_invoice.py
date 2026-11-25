@@ -276,6 +276,8 @@ class InvoiceViewTests(NoDbTestCase):
             self.assertIn(text, body)
         self.assertNotIn('เลขที่ใบแจ้งหนี้', body)
         self.assertIn('meters/images/invoice-qr-payment.png', body)
+        self.assertIn('meters/webfonts/THSarabunPSK-Regular.ttf', body)
+        self.assertIn('meters/webfonts/THSarabunPSK-Bold.ttf', body)
         self.assertIn('มหาวิทยาลัยศรีนครินทรวิโรฒ ประสานมิตร', body)
         self.assertEqual(req.activity_result,
                          {'invoice_docs': ['2100004064', '2100004067'], 'invoice_count': 1})
