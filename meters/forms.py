@@ -66,3 +66,45 @@ class ExcelUploadForm(forms.Form):
             f.seek(0)
 
         return f
+
+
+class SpacePeriodForm(forms.Form):
+    month = forms.IntegerField(min_value=1, max_value=12)
+    year = forms.IntegerField(min_value=2443, max_value=2643)
+
+
+class SpaceFilterForm(forms.Form):
+    business = forms.ChoiceField(label='ประเภทธุรกิจ', required=False)
+    location = forms.ChoiceField(label='สถานที่ตั้ง', required=False)
+    area_status = forms.ChoiceField(label='สถานะพื้นที่ย่อย', required=False)
+
+    def __init__(self, *args, options, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name, choices in options.items():
+            self.fields[name].choices = choices
+
+
+class SpacePeriodActionForm(forms.Form):
+    period = forms.DateField(input_formats=['%Y-%m-%d'])
+    action = forms.ChoiceField(choices=[('close', 'ปิดรอบ'), ('reopen', 'เปิดรอบ')])
+    reason = forms.CharField(max_length=500, required=False)
+
+    def clean(self):
+        values = super().clean()
+        if values.get('action') == 'reopen' and not values.get('reason'):
+            self.add_error('reason', 'กรุณาระบุเหตุผลเปิดรอบ')
+        return values
+
+
+class SpaceDetailsForm(forms.Form):
+    floor = forms.CharField(label='ชั้น', max_length=10)
+    products = forms.CharField(label='ขายอะไร', max_length=255)
+    business_type = forms.CharField(label='ประเภทธุรกิจ', max_length=255)
+    shop_name = forms.CharField(label='ชื่อร้านค้า', max_length=255)
+    purpose = forms.CharField(label='วัตถุประสงค์', max_length=255)
+
+    def as_details(self):
+        return dict(zip(
+            ('Floor_BI', 'Shop_Sell_BI', 'Business_Types_BI', 'Shop_name_BI', 'Objective_Desc_BI'),
+            (self.cleaned_data[name] for name in ('floor', 'products', 'business_type', 'shop_name', 'purpose')),
+        ))

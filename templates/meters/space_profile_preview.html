@@ -1,0 +1,98 @@
+{% extends "meters/base.html" %}
+
+{% block title %}ข้อมูลพื้นที่และร้านค้า{% endblock %}
+
+{% block content %}
+<div class="mx-auto w-full max-w-[1600px] space-y-6">
+  <header>
+    <h1 class="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">ข้อมูลพื้นที่และร้านค้า</h1>
+    <p class="mt-1 text-sm text-gray-500">ตรวจสอบข้อมูลพื้นที่ และระบุรายละเอียดการใช้พื้นที่ของร้านค้า</p>
+  </header>
+
+  <nav class="flex gap-2" aria-label="ประเภทข้อมูลพื้นที่">
+    <a href="{% url 'space_profile_preview' %}" class="rounded-lg border px-4 py-2 text-sm font-semibold {% if tab == 'work' %}border-brand-500 bg-brand-500 text-white{% else %}border-gray-200 bg-white text-gray-600 hover:bg-brand-50{% endif %}">จัดทำข้อมูล</a>
+    <a href="{% url 'space_profile_preview' %}?tab=history" class="rounded-lg border px-4 py-2 text-sm font-semibold {% if tab == 'history' %}border-brand-500 bg-brand-500 text-white{% else %}border-gray-200 bg-white text-gray-600 hover:bg-brand-50{% endif %}">ประวัติรายเดือน</a>
+  </nav>
+
+  <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="period-title">
+    {% if tab == 'work' %}
+      <h2 id="period-title" class="font-semibold text-gray-900">กำลังจัดทำรอบ {{ active_period_label }}</h2>
+      {% if reopened %}<p class="mt-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">ผู้ดูแลเปิดรอบนี้ให้แก้ไขย้อนหลัง การบันทึกจะปรับรายละเอียดของรายงานเดือนนี้ ผู้มีสิทธิ์แก้ไขสามารถดำเนินการได้ เมื่อเสร็จให้ผู้ดูแลปิดรอบอีกครั้งจากเมนูตั้งค่าระบบ</p>
+      {% else %}<p class="mt-2 text-sm text-gray-600">กรอกหรือตรวจสอบรายละเอียดพื้นที่ ผู้มีสิทธิ์จัดการรอบสามารถปิดรอบได้แม้กรอกไม่ครบ แล้วระบบจะเริ่มเดือนถัดไปพร้อมรายละเอียดเดิม</p>{% endif %}
+      <p class="mt-3 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700">ทำงานทีละเดือน · ประวัติเดือนที่ปิดแล้วดูได้ในแท็บประวัติรายเดือน</p>
+      {% if period_error %}<a href="{% url 'space_profile_preview' %}" class="mt-3 inline-block text-sm font-semibold text-brand-600 hover:underline">กลับไปรอบที่กำลังจัดทำ</a>{% endif %}
+    {% else %}
+      <h2 id="period-title" class="font-semibold text-gray-900">ประวัติรายเดือน</h2>
+      <p class="mt-1 text-sm text-gray-500">แสดงเฉพาะเดือนที่ปิดรอบแล้ว ข้อมูลของแต่ละเดือนคงค่าเดิมและแก้ไขไม่ได้</p>
+      {% if has_history %}
+      <form method="get" class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <input type="hidden" name="tab" value="history">
+        <div class="w-full sm:max-w-sm">
+          <label for="history-period" class="mb-1.5 block text-sm font-medium text-gray-700">เดือนที่ปิดรอบแล้ว</label>
+          <select id="history-period" name="period" data-custom-select data-custom-select-label="เดือนที่ปิดรอบแล้ว" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm">
+          {% for p in closed_periods %}<option value="{{ p.value }}" {% if p.value == selected_period %}selected{% endif %}>{{ p.label }}</option>{% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-600">แสดงประวัติ</button>
+      </form>
+      <p class="mt-3 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700">ข้อมูลที่ปิดรอบ ณ {{ snapshot_date_label }} · อ่านได้อย่างเดียว</p>
+      {% else %}<p class="mt-4 rounded-lg bg-gray-50 p-4 text-sm text-gray-500">ยังไม่มีประวัติรายเดือน เมื่อปิดรอบครั้งแรกข้อมูลจะแสดงที่นี่</p>{% endif %}
+    {% endif %}
+  </section>
+  {% if period_error %}<p role="alert" class="rounded-lg bg-red-50 p-4 text-sm text-red-700">{{ period_error }}</p>{% endif %}
+
+  {% if data_error %}<p role="alert" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{{ data_error }}</p>{% endif %}
+  {% if action_error %}<p role="alert" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{{ action_error }}</p>{% endif %}
+  {% if saved and not action_error %}<p role="status" class="rounded-lg bg-brand-50 p-4 text-sm text-brand-700">บันทึกรายละเอียดพื้นที่เรียบร้อยแล้ว</p>{% endif %}
+  {% if selection_error %}<p role="alert" class="text-sm text-red-600">ไม่พบพื้นที่ที่เลือกในรอบข้อมูลนี้ กรุณาเลือกจากรายการอีกครั้ง</p>{% endif %}
+  {% if not data_error and not period_error %}
+  {% if tab == 'work' or has_history %}
+  <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm" aria-label="ตัวกรองพื้นที่">
+    <form method="get" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_auto] xl:items-end">
+      <input type="hidden" name="tab" value="{{ tab }}"><input type="hidden" name="period" value="{{ selected_period }}"><input type="hidden" name="month" value="{{ selected_month }}"><input type="hidden" name="year" value="{{ selected_year }}">
+      {% for field in filter_form %}
+      <div class="min-w-0">
+        <label for="filter-{{ field.name }}" class="mb-1.5 block text-sm font-medium text-gray-700">{{ field.label }}</label>
+        <select id="filter-{{ field.name }}" name="{{ field.name }}" data-custom-select data-custom-select-label="{{ field.label }}" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700">
+          {% for value, label in field.field.choices %}<option value="{{ value }}" {% if field.value == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      {% endfor %}
+      <div class="flex items-center gap-3">
+        <button type="submit" class="rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-600">กรองข้อมูล</button>
+        {% if has_filters %}<a href="{{ clear_filter_url }}" class="whitespace-nowrap rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-600 hover:bg-gray-50">ล้างตัวกรอง</a>{% endif %}
+      </div>
+    </form>
+    {% if filter_error %}<p role="alert" class="mt-3 text-sm text-red-600">ค่าตัวกรองไม่อยู่ในรอบข้อมูลนี้ กรุณาเลือกใหม่หรือล้างตัวกรอง</p>{% endif %}
+  </section>
+  <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+    <div class="border-b border-gray-100 px-5 py-4"><h2 class="font-semibold text-gray-900">รายการพื้นที่</h2><p class="mt-1 text-sm text-gray-500">พบ {{ page_obj.paginator.count }} จาก {{ total_count }} รายการ · กรอกครบ {{ complete_count }} · ยังไม่ครบ {{ incomplete_count }}</p></div>
+    <div class="overflow-x-auto">
+      <table class="w-full min-w-[2000px] text-left text-sm">
+        <thead class="bg-gray-50 text-gray-500"><tr><th class="px-4 py-3">รหัสพื้นที่</th><th class="px-4 py-3">พื้นที่ย่อย</th><th class="px-4 py-3">ขนาด (ตร.ม.)</th><th class="px-4 py-3">สถานที่ตั้ง</th><th class="px-4 py-3">สถานะพื้นที่ย่อย</th><th class="px-4 py-3">ผู้เช่า</th><th class="px-4 py-3">สัญญา</th><th class="px-4 py-3">ชั้น</th><th class="px-4 py-3">ขายอะไร</th><th class="px-4 py-3">ประเภทธุรกิจ</th><th class="px-4 py-3">ชื่อร้านค้า</th><th class="px-4 py-3">วัตถุประสงค์</th><th class="px-4 py-3">การกรอกข้อมูล</th><th class="sticky right-0 border-l border-gray-200 bg-gray-50 px-4 py-3">จัดการ</th></tr></thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for space in page_obj %}<tr class="hover:bg-brand-50">
+            <td class="px-4 py-3 font-semibold text-gray-900">{{ space.SubArea_id }}</td><td class="px-4 py-3 text-gray-700">{{ space.SubArea_name|default:'—' }}</td><td class="px-4 py-3">{{ space.SubArea_size_meters|default_if_none:'—' }}</td><td class="px-4 py-3">{{ space.Memo_Location|default:'—' }}</td><td class="px-4 py-3">{{ space.Status_Area|default:'—' }}</td><td class="px-4 py-3">{{ space.CompanyName|default:'—' }}</td><td class="px-4 py-3">{{ space.Contract_code|default:'—' }}</td>
+<td class="min-w-[120px] max-w-xs break-words px-4 py-3">{{ space.Floor_BI|default:'—' }}</td>
+<td class="min-w-[120px] max-w-xs break-words px-4 py-3">{{ space.Shop_Sell_BI|default:'—' }}</td>
+<td class="min-w-[120px] max-w-xs break-words px-4 py-3">{{ space.Business_Types_BI|default:'—' }}</td>
+<td class="min-w-[120px] max-w-xs break-words px-4 py-3">{{ space.Shop_name_BI|default:'—' }}</td>
+<td class="min-w-[120px] max-w-xs break-words px-4 py-3">{{ space.Objective_Desc_BI|default:'—' }}</td><td class="whitespace-nowrap px-4 py-3">{% if space.details_complete %}<span class="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700">กรอกครบ</span>{% else %}<span class="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">ยังไม่ครบ</span>{% endif %}</td>
+<td class="sticky right-0 border-l border-gray-100 bg-white px-4 py-3">
+<a class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-brand-50 hover:text-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100" title="{% if editable %}แก้ไข{% else %}ดูรายละเอียด{% endif %}" aria-label="{% if editable %}แก้ไขพื้นที่{% else %}ดูรายละเอียดพื้นที่{% endif %} {{ space.SubArea_id }}" href="{% url 'space_profile_detail' space.SubArea_id %}?{{ list_query }}&amp;page={{ page_obj.number }}">
+{% if editable %}<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 13.5V18a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V8.25A2.25 2.25 0 016 6h4.5"/></svg>{% else %}<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2.25 12s3.75-6 9.75-6 9.75 6 9.75 6-3.75 6-9.75 6S2.25 12 2.25 12Z"/><circle cx="12" cy="12" r="2.25"/></svg>{% endif %}
+</a></td>
+          </tr>{% empty %}<tr><td colspan="14" class="px-4 py-10 text-center text-gray-500">ไม่พบข้อมูลพื้นที่ในรอบนี้</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-5 py-4 text-sm text-gray-600">
+      <span>หน้า {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} · หน้าละ 20 รายการ</span>
+      <div class="flex gap-3">{% if page_obj.has_previous %}<a class="rounded-lg border border-gray-200 px-3 py-2 hover:bg-gray-50" href="?{{ list_query }}&amp;page={{ page_obj.previous_page_number }}">ก่อนหน้า</a>{% endif %}{% if page_obj.has_next %}<a class="rounded-lg border border-gray-200 px-3 py-2 hover:bg-gray-50" href="?{{ list_query }}&amp;page={{ page_obj.next_page_number }}">ถัดไป</a>{% endif %}</div>
+    </div>
+  </section>
+  {% endif %}
+  {% endif %}
+  {% if cms_is_admin %}<div class="text-right"><a href="{% url 'system_settings' %}#space-periods" class="inline-flex rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">จัดการรอบในตั้งค่าระบบ</a></div>{% endif %}
+</div>
+{% endblock %}

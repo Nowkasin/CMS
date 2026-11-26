@@ -1,0 +1,49 @@
+{% extends "meters/base.html" %}
+{% block title %}ตั้งค่าระบบ{% endblock %}
+{% block content %}
+<div class="mx-auto w-full max-w-[1600px] space-y-6">
+  <header><h1 class="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">ตั้งค่าระบบ</h1><p class="mt-1 text-sm text-gray-500">จัดการรอบข้อมูลและการเปิดให้แก้ไขของแต่ละงาน</p></header>
+  {% if error %}<p role="alert" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{{ error }}</p>{% endif %}
+  {% if updated and not error %}<p role="status" class="rounded-lg bg-brand-50 p-4 text-sm text-brand-700">เปลี่ยนสถานะรอบข้อมูลเรียบร้อยแล้ว</p>{% endif %}
+  <section id="space-periods" class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+    <div class="flex flex-col gap-4 border-b border-gray-100 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
+      <div class="flex items-start gap-3">
+        <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-500">
+          <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2Z"/><path stroke-linecap="round" d="m9 16 2 2 4-4"/></svg>
+        </span>
+        <div><h2 class="text-lg font-semibold text-gray-900">รอบข้อมูลพื้นที่และร้านค้า</h2><p class="mt-1 max-w-2xl text-sm leading-relaxed text-gray-500">เปิดรอบให้ผู้ใช้งานแก้ไข หรือปิดรอบเพื่อเก็บรายงาน</p></div>
+      </div>
+      <a href="{% url 'space_profile_preview' %}" class="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-brand-50 hover:text-brand-700">ดูข้อมูลพื้นที่และร้านค้า <span aria-hidden="true">›</span></a>
+    </div>
+    <div class="mx-5 my-4 flex items-start gap-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2.5 text-sm leading-relaxed text-amber-800 sm:mx-6">
+      <svg class="mt-0.5 h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 11v5m0-9v.01"/></svg>
+      <p>เมื่อเปิดรอบย้อนหลัง ต้องดำเนินการและปิดรอบเดือนเก่าให้เสร็จก่อนกลับไปจัดทำเดือนใหม่</p>
+    </div>
+    <div class="overflow-x-auto"><table class="w-full min-w-[1100px] text-left text-sm">
+      <thead class="bg-gray-50 text-gray-500"><tr><th class="px-4 py-3">รอบข้อมูล</th><th class="px-4 py-3">สถานะ</th><th class="px-4 py-3">ผู้เปิด / วันที่</th><th class="px-4 py-3">ผู้ปิด / วันที่</th><th class="px-4 py-3">เหตุผลเปิดย้อนหลัง</th><th class="px-4 py-3">ดำเนินการ</th></tr></thead>
+      <tbody class="divide-y divide-gray-100">{% for p in periods %}<tr class="align-top transition-colors hover:bg-slate-50">
+        <td class="whitespace-nowrap px-4 py-4 font-semibold text-gray-900">{{ p.label }}</td>
+        <td class="px-4 py-4">{% if p.Period_status == 'OPEN' %}<span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold {% if p.working %}bg-brand-50 text-brand-700{% else %}bg-amber-50 text-amber-800{% endif %}"><span class="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true"></span>{% if p.working %}เปิดให้แก้ไข{% else %}รอรอบก่อนหน้า{% endif %}</span>{% else %}<span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600"><svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>ปิดรอบแล้ว</span>{% endif %}</td>
+        <td class="px-4 py-4">{{ p.Opened_by|default:'—' }}<div class="mt-1 text-xs text-gray-500">{{ p.Opened_at|date:'d/m/Y H:i'|default:'—' }}</div></td>
+        <td class="px-4 py-4">{{ p.Closed_by|default:'—' }}<div class="mt-1 text-xs text-gray-500">{{ p.Closed_at|date:'d/m/Y H:i'|default:'—' }}</div></td>
+        <td class="max-w-xs break-words px-4 py-4 text-gray-600">{{ p.Reopen_reason|default:'—' }}<div class="mt-1 text-xs text-gray-500">เปิดย้อนหลัง {{ p.Revision_no }} ครั้ง</div></td>
+        <td class="w-80 min-w-[280px] border-l border-gray-100 px-4 py-4">
+          {% if p.Period_status == 'CLOSED' %}
+          <form method="post" class="space-y-3" data-confirm-submit data-confirm-title="เปิดรอบ {{ p.label }} ให้แก้ไข" data-confirm-message="ผู้มีสิทธิ์เข้าเมนูข้อมูลพื้นที่และร้านค้าจะกลับมาแก้เดือนนี้ได้ การบันทึกจะเปลี่ยนรายละเอียดรายงานเดือนนี้ และรอบใหม่จะรอจนปิดรอบเก่าอีกครั้ง ต้องการเปิดรอบหรือไม่?" data-confirm-yes="ยืนยันเปิดรอบ">
+            {% csrf_token %}<input type="hidden" name="action" value="reopen"><input type="hidden" name="period" value="{{ p.date_value }}">
+            <div><label for="reason-{{ forloop.counter }}" class="mb-1.5 block text-xs font-medium text-gray-600">เหตุผลเปิดรอบ <span class="text-red-600">*</span></label><textarea id="reason-{{ forloop.counter }}" name="reason" rows="2" required maxlength="500" placeholder="ระบุเหตุผลที่ต้องแก้ไขย้อนหลัง" data-confirm-field="เหตุผล" class="block w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"></textarea></div>
+            <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100 focus:ring-offset-2"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10a9 9 0 111 8M3 4v6h6m3-3v5l3 2"/></svg><span>เปิดรอบให้แก้ไข</span></button>
+          </form>
+          {% else %}
+          <form method="post" data-confirm-submit data-confirm-title="ปิดรอบ {{ p.label }}" data-confirm-message="ข้อมูลของรอบ {{ p.label }} จะถูกเก็บและล็อกไม่ให้ผู้ใช้แก้ไข ช่องที่ยังไม่ได้กรอกจะคงเป็นค่าว่าง สามารถปิดได้แม้ข้อมูลยังไม่ครบ ผู้ดูแลเปิดกลับมาแก้ได้จากหน้าตั้งค่าระบบ ต้องการปิดรอบหรือไม่?" data-confirm-yes="ยืนยันปิดรอบ">
+            {% csrf_token %}<input type="hidden" name="action" value="close"><input type="hidden" name="period" value="{{ p.date_value }}">
+            <button type="submit" {% if not p.can_close %}disabled{% endif %} class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border disabled:border-gray-200 disabled:bg-gray-100 disabled:text-gray-500"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path stroke-linecap="round" d="M8 10V7a4 4 0 018 0v3"/></svg><span>ปิดรอบข้อมูล</span></button>
+            {% if not p.can_close %}<p class="mt-2 text-xs text-gray-500">ต้องถึงวันสิ้นเดือน และปิดรอบที่เก่ากว่าก่อน</p>{% endif %}
+          </form>
+          {% endif %}
+        </td>
+      </tr>{% empty %}<tr><td colspan="6" class="p-8 text-center text-gray-500">ยังไม่มีรอบข้อมูล</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+</div>
+{% endblock %}

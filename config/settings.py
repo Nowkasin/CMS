@@ -58,6 +58,7 @@ TEMPLATES = [
             'context_processors': [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
+                'meters.context_processors.cms_ui',
             ],
         },
     },
@@ -132,3 +133,9 @@ LDAP_USERNAME_PATTERN = config(
 )
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# รอบแรกของข้อมูลพื้นที่ ก่อนมี Snapshot; หลังปิดรอบจะเลื่อนไปเดือนถัดไปอัตโนมัติ
+SPACE_PROFILE_START_PERIOD = '202610'
+
+# GroupId ของกลุ่มผู้ดูแลระบบ K2 ที่ตรวจสอบใน DEV; ตรวจรหัสของแต่ละ environment ก่อน deploy
+CMS_ADMIN_GROUP_IDS = ('9B148353-6383-40D7-B3B8-F04FC8C5A4C5',)

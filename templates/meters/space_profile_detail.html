@@ -1,0 +1,70 @@
+{% extends "meters/base.html" %}
+{% block title %}รายละเอียดพื้นที่และร้านค้า{% endblock %}
+{% block content %}
+<div class="mx-auto w-full max-w-5xl space-y-6">
+<header class="flex flex-wrap items-center justify-between gap-3">
+<div><h1 class="text-2xl font-bold text-gray-900 sm:text-3xl">{% if editable %}แก้ไขข้อมูลพื้นที่{% else %}รายละเอียดพื้นที่{% endif %} {{ selected_space.SubArea_id }}</h1><p class="mt-1 text-sm text-gray-500">รอบ {{ period_label }} · ข้อมูล ณ {{ snapshot_date_label }}</p></div>
+<a href="{{ return_url }}" class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">กลับไปรายการ</a>
+</header>
+{% if data_error or period_error or selection_error %}<p role="alert" class="rounded-lg bg-red-50 p-4 text-sm text-red-700">{% if data_error %}{{ data_error }}{% elif period_error %}{{ period_error }}{% else %}ไม่พบพื้นที่ที่เลือกในรอบนี้{% endif %}</p>{% endif %}
+{% if action_error %}<p role="alert" class="rounded-lg bg-red-50 p-4 text-sm text-red-700">{{ action_error }}</p>{% endif %}
+{% if closed %}<p class="rounded-lg bg-brand-50 p-4 text-sm text-brand-700">ปิดรอบแล้ว · แสดงข้อมูลประวัติ อ่านได้อย่างเดียว</p>{% endif %}
+{% if reopened %}<p class="rounded-lg bg-amber-50 p-4 text-sm text-amber-800">รอบนี้เปิดให้แก้ไขย้อนหลัง การบันทึกจะเปลี่ยนรายละเอียดของรายงานเดือนนี้เท่านั้น</p>{% endif %}
+  {% if selected_space %}
+  <section class="rounded-xl border border-gray-200 bg-white shadow-sm" aria-labelledby="space-info-title">
+    <div class="border-b border-gray-100 px-5 py-4 sm:px-6">
+      <h2 id="space-info-title" class="font-semibold text-gray-900">ข้อมูลพื้นที่</h2>
+      <p class="mt-1 text-xs text-gray-500">ข้อมูล ณ {{ snapshot_date_label }}</p>
+    </div>
+    <dl class="grid grid-cols-1 gap-x-8 gap-y-5 p-5 sm:grid-cols-2 sm:p-6 lg:grid-cols-3">
+      <div><dt class="text-xs text-gray-500">รหัสพื้นที่ย่อย</dt><dd class="mt-1 font-semibold text-gray-900">{{ selected_space.SubArea_id }}</dd></div>
+      <div class="sm:col-span-2"><dt class="text-xs text-gray-500">พื้นที่ย่อย</dt><dd class="mt-1 text-sm text-gray-700">{{ selected_space.SubArea_name|default:'—' }}</dd></div>
+      <div><dt class="text-xs text-gray-500">รหัสสถานที่ตั้ง</dt><dd class="mt-1 text-sm text-gray-700">{{ selected_space.Location_id|default:'—' }}</dd></div>
+      <div><dt class="text-xs text-gray-500">ขนาดพื้นที่ย่อย</dt><dd class="mt-1 text-sm text-gray-700">{{ selected_space.SubArea_size_meters|default_if_none:'—' }} ตารางเมตร</dd></div>
+      <div><dt class="text-xs text-gray-500">สถานะพื้นที่ย่อย</dt><dd class="mt-1 text-sm text-gray-700">{{ selected_space.Status_Area|default:'—' }}</dd></div>
+      <div><dt class="text-xs text-gray-500">ผู้เช่า</dt><dd class="mt-1 text-sm text-gray-700">{{ selected_space.CompanyName|default:'—' }}</dd></div>
+      <div><dt class="text-xs text-gray-500">สถานะสัญญา</dt><dd class="mt-1 text-sm text-gray-700">{{ selected_space.Status_contract_Desc|default:'—' }}</dd></div>
+    </dl>
+  </section>
+
+  <form method="post" class="rounded-xl border border-gray-200 bg-white shadow-sm" aria-label="ฟอร์มรายละเอียดการใช้พื้นที่" data-confirm-submit data-confirm-title="ยืนยันบันทึกรายละเอียดพื้นที่" data-confirm-message="{% if reopened %}ข้อมูลรายงานเดือน {{ period_label }} ของพื้นที่นี้จะถูกแก้ไขตามที่กรอก ค่าตั้งต้นของเดือนปัจจุบันจะไม่เปลี่ยน{% else %}รายละเอียดทั้ง 5 ช่องจะเป็นค่าล่าสุดของพื้นที่นี้และใช้ต่อในรอบถัดไป ประวัติเดือนที่ปิดแล้วจะคงค่าเดิม{% endif %}">
+    {% csrf_token %}
+    {% for name, value in filter_params.items %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+    <input type="hidden" name="action" value="save"><input type="hidden" name="tab" value="{{ tab }}"><input type="hidden" name="period" value="{{ selected_period }}"><input type="hidden" name="month" value="{{ selected_month }}"><input type="hidden" name="year" value="{{ selected_year }}"><input type="hidden" name="subarea" value="{{ selected_space.SubArea_id }}"><input type="hidden" name="page" value="{{ page_obj.number }}">
+    <div class="border-b border-gray-100 px-5 py-4 sm:px-6">
+      <h2 class="font-semibold text-gray-900">รายละเอียดการใช้พื้นที่</h2>
+      <p class="mt-1 text-xs text-gray-500">กรอกข้อมูลชั้นและรายละเอียดร้านค้า</p>
+    </div>
+    {% if details_form.errors %}<div role="alert" class="mx-5 mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{{ details_form.errors }}</div>{% endif %}
+    <fieldset {% if not editable %}disabled{% endif %} class="grid grid-cols-1 gap-5 p-5 sm:grid-cols-2 sm:p-6">
+      <div>
+        <label for="space-floor" class="mb-1.5 block text-sm font-medium text-gray-700">ชั้น</label>
+        <input id="space-floor" name="floor" value="{{ details_form.floor.value|default_if_none:'' }}" maxlength="10" required type="text" placeholder="เช่น 1, ชั้นลอย, ใต้ดิน" class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
+      </div>
+      <div>
+        <label for="shop-name" class="mb-1.5 block text-sm font-medium text-gray-700">ชื่อร้านค้า</label>
+        <input id="shop-name" name="shop_name" value="{{ details_form.shop_name.value|default_if_none:'' }}" maxlength="255" required type="text" placeholder="ระบุชื่อร้านค้า" class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
+      </div>
+      <div>
+        <label for="products" class="mb-1.5 block text-sm font-medium text-gray-700">ขายอะไร</label>
+        <input id="products" name="products" value="{{ details_form.products.value|default_if_none:'' }}" maxlength="255" required type="text" placeholder="ระบุสินค้าหรือบริการ" class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
+      </div>
+      <div>
+        <label for="business-type" class="mb-1.5 block text-sm font-medium text-gray-700">ประเภทธุรกิจ</label>
+        <input id="business-type" name="business_type" value="{{ details_form.business_type.value|default_if_none:'' }}" maxlength="255" required type="text" placeholder="ระบุประเภทธุรกิจ" class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
+      </div>
+      <div class="sm:col-span-2">
+        <label for="space-purpose" class="mb-1.5 block text-sm font-medium text-gray-700">วัตถุประสงค์</label>
+        <textarea id="space-purpose" name="purpose" rows="3" maxlength="255" required placeholder="ระบุวัตถุประสงค์การใช้พื้นที่" class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">{{ details_form.purpose.value|default_if_none:'' }}</textarea>
+      </div>
+    </fieldset>
+    <div class="flex flex-col items-stretch justify-between gap-3 border-t border-gray-100 px-5 py-4 sm:flex-row sm:items-center sm:px-6">
+      <p class="text-xs text-gray-500">{% if editable %}กรอกให้ครบทั้ง 5 ช่อง · รายละเอียดผูกกับพื้นที่ {{ selected_space.SubArea_id }}{% else %}รอบนี้เปิดดูได้อย่างเดียว{% endif %}</p>
+      <a href="{{ return_url }}" class="rounded-lg border border-gray-200 px-5 py-2.5 text-center text-sm text-gray-600 hover:bg-gray-50">{% if editable %}ยกเลิก{% else %}กลับไปรายการ{% endif %}</a>
+      {% if editable %}<button type="submit" class="rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-600">บันทึกข้อมูล</button>{% endif %}
+    </div>
+  </form>
+  {% endif %}
+
+</div>
+{% endblock %}

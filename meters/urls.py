@@ -1,8 +1,16 @@
 from django.urls import path
+from django.views.generic import RedirectView
 
 from . import views
+from .views.space_profile import space_profile_preview
+from .views.system_settings import system_settings
+from .views.space_dashboard import space_dashboard
 
 urlpatterns = [
+    path('dashboard/spaces/', space_dashboard, name='space_dashboard'),
+    path('settings/', system_settings, name='system_settings'),
+    path('spaces/form-preview/', space_profile_preview, name='space_profile_preview'),
+    path('spaces/details/<str:subarea_id>/', space_profile_preview, name='space_profile_detail'),
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
     path('no-permission/', views.no_permission_view, name='no_permission'),
@@ -12,7 +20,8 @@ urlpatterns = [
     path('confirm/', views.step3_confirm, name='step3'),
     path('done/', views.step4_done, name='step4'),
     path('restart/', views.restart, name='restart'),
-    path('dashboard/', views.dashboard, name='dashboard'),
+    path('dashboard/', RedirectView.as_view(pattern_name='dashboard', query_string=True), name='dashboard_legacy'),
+    path('dashboard/meters/', views.dashboard, name='dashboard'),
     path('dashboard/edit/<str:subarea_id>/', views.edit_meter, name='edit_meter'),
     path('dashboard/export/', views.export_meters_excel, name='export_meters'),
 

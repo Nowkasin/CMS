@@ -8,9 +8,12 @@ PERMISSION_HOME_ROUTES = (
     ('dashboard_view', 'dashboard'),
     ('contract_termination', 'termination_search'),
     ('activity_log_view', 'activity_log'),
+    ('space_profile_view', 'space_profile_preview'),
+    ('space_dashboard_view', 'space_dashboard'),
 )
 
 PERMISSION_LABELS = {
+    'space_dashboard_view': 'ภาพรวมพื้นที่เช่า',
     'meter_management': 'จัดการมิเตอร์',
     'excel_upload': 'อัปโหลดไฟล์',
     'excel_download': 'ดาวน์โหลด Excel',
@@ -18,9 +21,14 @@ PERMISSION_LABELS = {
     'dashboard_view': 'แดชบอร์ด',
     'contract_termination': 'ยกเลิกสัญญา',
     'activity_log_view': 'ประวัติการใช้งาน',
+    'space_profile_view': 'ข้อมูลพื้นที่และร้านค้า',
+    'system_settings': 'ตั้งค่าระบบ',
 }
 
 URL_PERMISSION_MAP = {
+    'space_dashboard': 'space_dashboard_view',
+    'space_profile_preview': 'space_profile_view',
+    'space_profile_detail': 'space_profile_view',
     # นำเข้า Excel ทุกขั้นใช้สิทธิ์เดียวกัน เพื่อไม่ให้ข้ามขั้นด้วย URL โดยตรง
     'step1': 'excel_upload',
     'step2': 'excel_upload',
@@ -29,6 +37,7 @@ URL_PERMISSION_MAP = {
     'restart': 'excel_upload',
 
     'dashboard': 'dashboard_view',
+    'dashboard_legacy': 'dashboard_view',
     'edit_meter': 'dashboard_view',
     'export_meters': 'dashboard_view',
 
@@ -54,6 +63,7 @@ URL_PERMISSION_MAP = {
 }
 
 PUBLIC_URL_NAMES = frozenset({'login', 'logout', 'no_permission'})
+ADMIN_URL_NAMES = frozenset({'system_settings'})
 HOME_URL_NAMES = frozenset({'home'})
 
 

@@ -3,11 +3,13 @@
 import logging
 
 from django.shortcuts import redirect, render
+from .access_control import is_cms_admin
 
 from .permissions import (
     HOME_URL_NAMES,
     PUBLIC_URL_NAMES,
     URL_PERMISSION_MAP,
+    ADMIN_URL_NAMES,
 )
 
 
@@ -29,6 +31,10 @@ class CMSMenuPermissionMiddleware:
             return None
 
         permissions = request.session.get('cms_permissions', {})
+        if url_name in ADMIN_URL_NAMES:
+            if is_cms_admin(request):
+                return None
+            return render(request, 'meters/404.html', status=404)
         if url_name in HOME_URL_NAMES:
             if permissions:
                 return None

@@ -1,0 +1,53 @@
+{% extends "meters/base.html" %}
+{% block title %}ภาพรวมพื้นที่เช่า{% endblock %}
+{% block content %}
+<div class="mx-auto w-full max-w-[1600px] space-y-6">
+  <header><h1 class="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">ภาพรวมพื้นที่เช่า</h1><p class="mt-1 text-sm text-gray-500">สรุปการใช้พื้นที่และอัตราการเช่าตามรอบข้อมูล</p></header>
+  {% if error %}<p role="alert" class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{{ error }}</p>
+  {% else %}
+  <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+    <form method="get" class="flex flex-col gap-3 sm:flex-row sm:items-end">
+      <div class="w-full sm:max-w-sm"><label for="dashboard-period" class="mb-1.5 block text-sm font-medium text-gray-700">รอบข้อมูล</label>
+        <select id="dashboard-period" name="period" data-custom-select data-custom-select-label="รอบข้อมูล" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm">{% for p in periods %}<option value="{{ p.value }}" {% if p.value == selected_period %}selected{% endif %}>{{ p.label }}</option>{% endfor %}</select>
+      </div>
+      <button class="rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-600" type="submit">แสดงข้อมูล</button>
+    </form>
+    {% if selected_period %}<p class="mt-4 rounded-lg px-3 py-2 text-sm {% if closed %}bg-brand-50 text-brand-700{% else %}bg-amber-50 text-amber-800{% endif %}">{{ period_label }} · {% if closed %}ปิดรอบแล้ว{% else %}อยู่ระหว่างจัดทำ ข้อมูลอาจเปลี่ยนแปลงได้{% endif %}</p>{% endif %}
+  </section>
+  {% if summary %}
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    {% for label, value in cards %}<section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"><h2 class="text-sm font-medium text-gray-500">{{ label }}</h2><p class="mt-3 text-3xl font-bold {% if forloop.counter == 2 %}text-brand-500{% else %}text-gray-900{% endif %}">{{ value }} <span class="text-sm font-normal text-gray-500">พื้นที่</span></p></section>{% endfor %}
+  </div>
+  <div class="grid gap-6 xl:grid-cols-[1fr_2fr]">
+    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+      <h2 class="font-semibold text-gray-900">อัตราการเช่า</h2><p class="mt-1 text-xs text-gray-500">พื้นที่เช่าอยู่ ÷ พื้นที่ทั้งหมด × 100</p>
+      <div class="relative mx-auto my-6 h-52 w-52">
+        <svg class="h-full w-full -rotate-90" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="48" fill="none" stroke="currentColor" stroke-width="12" class="text-gray-100"/><circle cx="60" cy="60" r="48" fill="none" stroke="currentColor" stroke-width="12" pathLength="100" stroke-dasharray="100" stroke-dashoffset="{{ ring_offset }}" class="text-brand-500"/></svg>
+        <div class="absolute inset-0 flex flex-col items-center justify-center"><strong class="text-3xl text-gray-900">{% if summary.rate != None %}{{ summary.rate|floatformat:2 }}%{% else %}—{% endif %}</strong><span class="mt-1 text-sm text-gray-500">เช่าอยู่</span></div>
+      </div>
+      <p class="text-center text-sm text-gray-600">เช่าอยู่ {{ summary.occupied }} จาก {{ summary.total }} พื้นที่</p>
+      {% if summary.other %}<p class="mt-3 text-center text-xs text-amber-800">มีสถานะอื่น / ไม่ระบุ {{ summary.other }} พื้นที่ รวมอยู่ในพื้นที่ทั้งหมด</p>{% endif %}
+    </section>
+    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+      <h2 class="font-semibold text-gray-900">อัตราการเช่ารายเดือน · {{ year_be }}</h2><p class="mt-1 text-xs text-gray-500">ข้อมูลเดือนที่ปิดแล้ว และรอบที่กำลังจัดทำ</p>
+      <div class="mt-5 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+        {% for point in trend %}<div><div class="mb-1 flex items-center justify-between gap-3 text-xs"><span class="{% if point.selected %}font-semibold text-brand-700{% else %}text-gray-600{% endif %}">{{ point.label }}</span><span class="text-gray-500">{% if point.summary.rate != None and point.summary %}{{ point.summary.rate|floatformat:2 }}%{% else %}ยังไม่มีข้อมูล{% endif %}</span></div>
+          <svg class="h-2 w-full overflow-hidden rounded-full bg-gray-100" viewBox="0 0 100 4" preserveAspectRatio="none" aria-hidden="true">{% if point.summary.rate != None and point.summary %}<rect width="{{ point.summary.rate }}" height="4" fill="currentColor" class="text-brand-500"/>{% endif %}</svg>
+        </div>{% endfor %}
+      </div>
+    </section>
+  </div>
+  {% for group in groups %}
+  <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+    <div class="border-b border-gray-100 px-5 py-4"><h2 class="font-semibold text-gray-900">{{ group.title }}</h2></div>
+    <div class="overflow-x-auto"><table class="w-full min-w-[700px] text-left text-sm"><thead class="bg-gray-50 text-gray-500"><tr><th class="px-5 py-3">รายการ</th><th class="px-4 py-3 text-right">พื้นที่ทั้งหมด</th><th class="px-4 py-3 text-right">เช่าอยู่</th><th class="px-4 py-3 text-right">ว่าง</th><th class="px-4 py-3 text-right">อื่น / ไม่ระบุ</th><th class="px-5 py-3 text-right">อัตราการเช่า</th></tr></thead>
+      <tbody class="divide-y divide-gray-100">{% for row in group.rows %}<tr class="hover:bg-brand-50"><td class="px-5 py-3 text-gray-700">{{ row.label }}</td><td class="px-4 py-3 text-right">{{ row.total }}</td><td class="px-4 py-3 text-right font-medium text-brand-700">{{ row.occupied }}</td><td class="px-4 py-3 text-right">{{ row.vacant }}</td><td class="px-4 py-3 text-right">{{ row.other }}</td><td class="px-5 py-3 text-right">{{ row.rate|floatformat:2 }}%</td></tr>{% empty %}<tr><td colspan="6" class="px-5 py-8 text-center text-gray-500">ไม่พบข้อมูลพื้นที่ในรอบนี้</td></tr>{% endfor %}</tbody>
+      <tfoot class="border-t border-gray-200 bg-brand-50 font-semibold text-brand-700"><tr><td class="px-5 py-3">รวมทั้งหมด</td><td class="px-4 py-3 text-right">{{ summary.total }}</td><td class="px-4 py-3 text-right">{{ summary.occupied }}</td><td class="px-4 py-3 text-right">{{ summary.vacant }}</td><td class="px-4 py-3 text-right">{{ summary.other }}</td><td class="px-5 py-3 text-right">{% if summary.rate != None %}{{ summary.rate|floatformat:2 }}%{% else %}—{% endif %}</td></tr></tfoot>
+    </table></div>
+  </section>
+  {% endfor %}
+  <p class="text-xs leading-relaxed text-gray-500">นับพื้นที่จากรหัสพื้นที่ย่อย สถานะเช่าอยู่และว่างอ้างอิงข้อมูลของรอบที่เลือก ชื่อสถานที่ตั้งและอาคารใช้ชื่อจากทะเบียนปัจจุบัน หากไม่พบชื่อจะแสดงรหัสแทน</p>
+  {% else %}<p class="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-500">ยังไม่มีข้อมูลรอบสำหรับแสดงภาพรวม</p>{% endif %}
+  {% endif %}
+</div>
+{% endblock %}
