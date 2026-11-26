@@ -3,7 +3,8 @@ from django.conf import settings
 
 def is_cms_admin(request):
     """ตรวจ GroupId ที่ LDAP/K2 ส่งเข้า Session ไม่ใช้ชื่อกลุ่มหรือสิทธิ์เมนูงาน"""
-    if not request.user.is_authenticated:
+    user = getattr(request, 'user', None)
+    if user is None or not user.is_authenticated:
         return False
     if not request.session.get('cms_permissions', {}).get('system_settings'):
         return False

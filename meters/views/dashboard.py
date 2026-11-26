@@ -1,48 +1,14 @@
 # meters/views/dashboard.py
 import datetime
+import logging
 
 from django.shortcuts import render, redirect
 from django.urls import reverse
 
 from .. import services
+from ..utils import THAI_MONTHS, current_year_be, safe_int, year_options
 
-THAI_MONTHS = [
-    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-    'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
-]
-
-
-def _current_year_be():
-    return datetime.date.today().year + 543
-
-
-def _safe_int(raw, field_label, errors, min_value=None, max_value=None):
-    """
-    แปลงค่าเป็น int อย่างปลอดภัย -- ถ้าแปลงไม่ได้ (เช่น พิมพ์ตัวอักษรปนมา) จะไม่ throw
-    แต่เก็บข้อความ error ไว้ใน errors list แทน แล้วคืน None ให้ผู้เรียกข้ามการบันทึกค่านั้นไป
-
-    min_value/max_value ใช้ตรวจช่วงที่ยอมรับได้ด้วย เพราะ "แปลงเป็น int ได้" ยังไม่พอ:
-      - เดือนต้องอยู่ 1-12 เท่านั้น ส่ง ?month=99 มาจะทำให้ sp_Contract_Meter_Reading_Save
-        ไปชน CHECK constraint CK_Contract_meter_reading_tr_Month แล้วเด้งเป็น error
-        จากฐานข้อมูลดิบๆ แทนที่จะบอกผู้ใช้ตรงๆ ว่าเดือนไม่ถูกต้อง
-      - เลขอ่านมิเตอร์ติดลบไม่ได้
-    """
-    if raw is None or raw == '':
-        return None
-    try:
-        value = int(raw)
-    except (TypeError, ValueError):
-        errors.append(f"{field_label} ต้องเป็นตัวเลขเท่านั้น (พิมพ์มาว่า '{raw}')")
-        return None
-
-    if min_value is not None and value < min_value:
-        errors.append(f"{field_label} ต้องไม่น้อยกว่า {min_value} (พิมพ์มาว่า '{raw}')")
-        return None
-    if max_value is not None and value > max_value:
-        errors.append(f"{field_label} ต้องไม่เกิน {max_value} (พิมพ์มาว่า '{raw}')")
-        return None
-    return value
-
+logger = logging.getLogger(__name__)
 
 def _safe_save_reading(meter_id, year_be, month, before_val, after_val, label, errors,
                        user_id, contract_id=None, contract_code=None):
@@ -93,7 +59,7 @@ def _edit_meter_context(data, year_be, month, errors):
         'thai_months': THAI_MONTHS,
         'billing_month': month,
         'billing_year': year_be,
-        'year_options': [_current_year_be() - 1, _current_year_be(), _current_year_be() + 1],
+        'year_options': year_options(),
         'reading_errors': errors,
         # ตัวเลือกระบบไฟฟ้าดึงจาก Master (Contract_meter_phase_ms) ไม่ hardcode ในเทมเพลตแล้ว
         # ส่งค่าปัจจุบันของมิเตอร์ไฟไปด้วย เผื่อค่านั้นถูกปิดใช้งานใน master ภายหลัง
@@ -112,7 +78,7 @@ def edit_meter(request, subarea_id):
     ส่วนเลขอ่านก่อน-หลังอ่าน/เขียนที่ Contract_meter_reading_tr โดยจับคู่ด้วย
     Meter_id + Billing_year_be (พ.ศ.) + Billing_month และเป็น upsert -- ถ้ายังไม่มีแถวของรอบบิลนั้น
     ระบบจะสร้างให้ใหม่เอง จึงบันทึกได้เสมอ ป้องกัน error 2 ชั้น:
-      1) _safe_int() ที่ view นี้ ดักค่าที่ไม่ใช่ตัวเลขก่อนแปลง
+      1) safe_int() ที่ view นี้ ดักค่าที่ไม่ใช่ตัวเลขก่อนแปลง
       2) _safe_save_reading() ครอบ try/except รอบการเรียก service อีกที กันทุก error หลุดเป็น 500
     """
     data = services.fetch_subarea_meters(subarea_id)
@@ -129,10 +95,10 @@ def edit_meter(request, subarea_id):
     year_raw = request.GET.get('year') or request.POST.get('billing_year')
     month_raw = request.GET.get('month') or request.POST.get('billing_month')
     # ช่วงปีกว้างๆ พอให้กันค่าเพี้ยน (ปีเป็น พ.ศ.) ไม่ล็อกแคบ เพราะอาจต้องย้อนดูรอบบิลเก่า
-    year_be = _safe_int(year_raw, 'ปี', period_errors, min_value=2400, max_value=2700)
+    year_be = safe_int(year_raw, 'ปี', period_errors, min_value=2400, max_value=2700)
     if year_be is None:
-        year_be = _current_year_be()
-    month = _safe_int(month_raw, 'เดือน', period_errors, min_value=1, max_value=12)
+        year_be = current_year_be()
+    month = safe_int(month_raw, 'เดือน', period_errors, min_value=1, max_value=12)
     if month is None:
         month = datetime.date.today().month
     reading_errors = []
@@ -171,7 +137,7 @@ def edit_meter(request, subarea_id):
                 reading_errors.append(
                     f"เลขประจำตัวเครื่องวัด{label}ถูกเว้นว่างไว้ ทั้งที่มิเตอร์ตัวนี้มีเลข "
                     f"'{existing['Meter_no']}' อยู่แล้ว -- ถ้าต้องการเปลี่ยนเลข ให้กรอกเลขใหม่ลงไป "
-                    f"ถ้าต้องการเลิกใช้มิเตอร์ตัวนี้ ให้เอาเครื่องหมายถูกหน้าหัวข้อออกแทน "
+                    f"ถ้าต้องการเลิกใช้มิเตอร์ตัวนี้ ให้ปิดใช้งานที่เมนูจัดการมิเตอร์แทน "
                     f"(ระบบไม่ได้ Gen เลขใหม่ให้อัตโนมัติ เว้นว่างแล้วเลขเดิมจะหายถาวร)"
                 )
 
@@ -185,8 +151,8 @@ def edit_meter(request, subarea_id):
             if not (before_raw or after_raw):
                 continue
             errors_before_this = len(reading_errors)
-            before_val = _safe_int(before_raw, f'เลขอ่านก่อน ({label})', reading_errors, min_value=0)
-            after_val = _safe_int(after_raw, f'เลขอ่านหลัง ({label})', reading_errors, min_value=0)
+            before_val = safe_int(before_raw, f'เลขอ่านก่อน ({label})', reading_errors, min_value=0)
+            after_val = safe_int(after_raw, f'เลขอ่านหลัง ({label})', reading_errors, min_value=0)
 
             # เลขอ่านหลังต้องไม่น้อยกว่าเลขอ่านก่อน -- มิเตอร์เดินไปข้างหน้าเท่านั้น
             # ถ้าหลังน้อยกว่าก่อน หน่วยที่ใช้จะติดลบ ซึ่งจะกลายเป็นยอดเงินติดลบที่ปลายทาง
@@ -212,17 +178,28 @@ def edit_meter(request, subarea_id):
                           _edit_meter_context(data, year_be, month, period_errors + reading_errors))
 
         # ---------- 2) ผ่านการตรวจหมดแล้ว จึงเขียน ----------
-        _logs, result_meter_ids = services.save_subarea_meters(
-            location_id=data['Location_id'], area_id=data['Area_id'], subarea_id=data['SubArea_id'],
-            user_id=request.user.get_username(),
-            water_enabled=water_enabled,
-            water_meter_id=data['water']['Meter_id'] if data['water'] else None,
-            water_meter_no=water_meter_no,
-            electric_enabled=electric_enabled,
-            electric_meter_id=data['electric']['Meter_id'] if data['electric'] else None,
-            electric_meter_no=electric_meter_no,
-            electric_phase=request.POST.get('electric_phase') or None,
-        )
+        # ครอบ try/except -- เดิม error จากฐานข้อมูลตรงนี้หลุดเป็นหน้า 500
+        # (save_subarea_meters ไม่ commit ถ้าล้ม จึงยังไม่มีอะไรถูกบันทึก)
+        try:
+            _logs, result_meter_ids = services.save_subarea_meters(
+                location_id=data['Location_id'], area_id=data['Area_id'], subarea_id=data['SubArea_id'],
+                user_id=request.user.get_username(),
+                water_enabled=water_enabled,
+                water_meter_id=data['water']['Meter_id'] if data['water'] else None,
+                water_meter_no=water_meter_no,
+                electric_enabled=electric_enabled,
+                electric_meter_id=data['electric']['Meter_id'] if data['electric'] else None,
+                electric_meter_no=electric_meter_no,
+                electric_phase=request.POST.get('electric_phase') or None,
+            )
+        except Exception:
+            logger.exception('save_subarea_meters failed subarea_id=%s', subarea_id)
+            reading_errors.append(
+                'บันทึกทะเบียนมิเตอร์ไม่สำเร็จ -- เกิดข้อผิดพลาดจากระบบฐานข้อมูล '
+                'ยังไม่มีข้อมูลใดถูกบันทึก กรุณาลองใหม่อีกครั้ง'
+            )
+            return render(request, 'meters/edit_meter.html',
+                          _edit_meter_context(data, year_be, month, period_errors + reading_errors))
 
         for prefix, label, before_val, after_val in pending_readings:
             meter_id = result_meter_ids[prefix]

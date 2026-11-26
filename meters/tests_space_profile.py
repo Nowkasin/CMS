@@ -220,7 +220,7 @@ class SpaceProfileTests(SimpleTestCase):
         middleware = CMSMenuPermissionMiddleware(lambda r: None)
         request = RequestFactory().get('/settings/')
         request.user = MagicMock(is_authenticated=True, username='tester')
-        request.session = {'cms_permissions': {'system_settings': True}, 'cms_groups': []}
+        request.session = {'cms_permissions': {'system_settings': True}, 'cms_groups': [], 'cms_access_checked_at': 9999999999}
         request.resolver_match = SimpleNamespace(url_name='system_settings')
         self.assertEqual(middleware.process_view(request, None, (), {}).status_code, 404)
         request.session['cms_groups'] = [{'id': ADMIN_ID}]

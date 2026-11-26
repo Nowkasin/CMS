@@ -59,7 +59,13 @@
           <h1 class="text-3xl font-bold tracking-tight text-slate-900">เข้าสู่ระบบ</h1>
         </div>
 
-        {% if form.errors %}
+        {% include "meters/partials/maintenance_banner.html" %}
+
+        {% if throttle_error %}
+          <div class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700" role="alert">
+            {{ throttle_error }}
+          </div>
+        {% elif form.errors %}
           <div class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700" role="alert">
             Buasri ID หรือรหัสผ่านไม่ถูกต้อง หรือบัญชีนี้ยังไม่มีสิทธิ์เข้าใช้งาน
           </div>

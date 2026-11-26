@@ -137,3 +137,78 @@ def fetch_user_access(buasri_id):
         }
     finally:
         conn.close()
+
+
+# --------------------------------------------------------------------------
+# "ดูในมุมมองกลุ่ม" ของผู้ดูแลระบบ -- อ่านอย่างเดียว ใช้ความสัมพันธ์เดิมของ K2
+# SysGroup -> SysMenuGroupAssociate -> Sysmenu (เงื่อนไข IsActive เดียวกับ fetch_user_access)
+# --------------------------------------------------------------------------
+_GROUP_MENU_SQL = """
+    WITH cms_root AS (
+        SELECT menuId
+        FROM dbo.Sysmenu
+        WHERE menu_name_eng = ?
+          AND IsActive = 1
+    )
+    SELECT DISTINCT
+        CONVERT(nvarchar(36), g.GroupId) AS GroupId,
+        g.GroupName,
+        menu.menu_name_eng
+    FROM dbo.SysGroup AS g
+    INNER JOIN dbo.SysMenuGroupAssociate AS menu_group
+        ON menu_group.GroupId = g.GroupId
+    INNER JOIN dbo.Sysmenu AS menu
+        ON menu.menuId = menu_group.MenuId
+    CROSS JOIN cms_root
+    WHERE g.IsActive = 1
+      AND menu_group.IsActive = 1
+      AND menu.IsActive = 1
+      AND menu.ParentMenu = cms_root.menuId
+      {group_filter}
+    ORDER BY g.GroupName
+"""
+
+
+def fetch_cms_groups():
+    """
+    กลุ่ม K2 ที่เปิดใช้งานและได้รับเมนูย่อยของ CMS อย่างน้อยหนึ่งเมนู
+    คืน [{'id', 'name', 'permissions': {menu_key: True}}] เรียงตามชื่อกลุ่ม
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(_GROUP_MENU_SQL.format(group_filter=''), CMS_PARENT_MENU_KEY)
+        groups = {}
+        for group_id, name, key in cursor.fetchall():
+            key = str(key or '').strip()
+            if not key:
+                continue
+            group = groups.setdefault(str(group_id).upper(), {
+                'id': str(group_id).upper(), 'name': str(name or '').strip(), 'permissions': {},
+            })
+            group['permissions'][key] = True
+        return sorted(groups.values(), key=lambda g: g['name'])
+    finally:
+        conn.close()
+
+
+def fetch_group_access(group_id):
+    """
+    สิทธิ์เมนู CMS ของกลุ่มเดียว -- คืน {'id', 'name', 'permissions'} หรือ None ถ้าไม่พบ/ไม่มีเมนู CMS
+    group_id ต้องผ่านการตรวจรูปแบบ GUID จาก view มาก่อน (ส่งเป็นพารามิเตอร์เสมอ)
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            _GROUP_MENU_SQL.format(group_filter='AND g.GroupId = CONVERT(uniqueidentifier, ?)'),
+            CMS_PARENT_MENU_KEY, group_id,
+        )
+        rows = cursor.fetchall()
+        permissions = {str(key).strip(): True for _, _, key in rows if str(key or '').strip()}
+        if not permissions:
+            return None
+        return {'id': str(rows[0][0]).upper(), 'name': str(rows[0][1] or '').strip(),
+                'permissions': permissions}
+    finally:
+        conn.close()

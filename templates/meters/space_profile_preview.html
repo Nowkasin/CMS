@@ -93,6 +93,6 @@
   </section>
   {% endif %}
   {% endif %}
-  {% if cms_is_admin %}<div class="text-right"><a href="{% url 'system_settings' %}#space-periods" class="inline-flex rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">จัดการรอบในตั้งค่าระบบ</a></div>{% endif %}
+  {% if cms_can_manage_settings %}<div class="text-right"><a href="{% url 'system_settings' %}#space-periods" class="inline-flex rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">จัดการรอบในตั้งค่าระบบ</a></div>{% endif %}
 </div>
 {% endblock %}

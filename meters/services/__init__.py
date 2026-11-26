@@ -8,9 +8,10 @@ Re-export ทุกฟังก์ชัน/ค่าคงที่จากโ
   excel_import.py  -> STATUS_MAP, COL_KEYS, parse_excel_staged, build_column_map,
                        find_contract_sheet, find_subarea, find_contract_by_code,
                        find_registered_meter
-  meters.py        -> fetch_*, save_*, commit_staged_rows, sp_meter_save,
-                       sp_bind_to_contract, find_existing_meter,
-                       fetch_meter_by_id, save_standalone_meter
+  meter_import.py  -> commit_staged_rows, ImportRowError, sp_meter_save,
+                       sp_bind_to_contract, sp_meter_reading_save, find_existing_meter
+  meters.py        -> fetch_*, save_*, fetch_meter_by_id, save_standalone_meter
+  sql_utils.py     -> to_sql_like_pattern (ใช้ร่วมกันหลาย service)
   excel_export.py  -> build_subareas_workbook
   termination.py   -> fetch_contracts_for_termination, fetch_contract_statuses,
                        save_termination, delete_termination, fetch_termination_detail,
@@ -36,11 +37,15 @@ from .excel_import import (
     parse_excel_staged,
 )
 
-from .meters import (
+from .meter_import import (
     sp_meter_save,
     sp_bind_to_contract,
     find_existing_meter,
     commit_staged_rows,
+    ImportRowError,
+)
+
+from .meters import (
     fetch_subareas,
     fetch_subarea_options,
     fetch_contract_meter_detail,
@@ -99,7 +104,7 @@ __all__ = [
     'find_contract_by_code', 'find_contract_sheet', 'find_registered_meter',
     'parse_excel_staged',
     'sp_meter_save', 'sp_bind_to_contract',
-    'find_existing_meter', 'commit_staged_rows',
+    'find_existing_meter', 'commit_staged_rows', 'ImportRowError',
     'fetch_subareas', 'fetch_subarea_options',
     'fetch_contract_meter_detail', 'fetch_subarea_meters',
     'save_subarea_meters', 'fetch_readings_for_meters', 'fetch_meters',

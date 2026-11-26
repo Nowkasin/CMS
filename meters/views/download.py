@@ -9,8 +9,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font
 
 from .. import services
-from .dashboard import THAI_MONTHS, _current_year_be, _safe_int
-from .termination import _period_label, _thai_date
+from ..utils import THAI_MONTHS, current_year_be, period_label, safe_int, thai_date, year_options
 
 
 WATER_HEADERS = [
@@ -75,8 +74,8 @@ def _merge_water_electric(water_rows, electric_rows):
                 # สัญญาที่ยกเลิกแล้วแต่ยังอยู่ในช่วงผ่อนผัน -- เทมเพลตใช้แสดงป้ายบอกเหตุผลที่ยังอยู่ในรายการ
                 'in_grace': r.get('Last_installment_period') is not None,
                 'grace_case': r.get('Termination_case'),
-                'grace_notify_label': _thai_date(r.get('Notify_date')),
-                'grace_until_label': _period_label(r.get('Last_installment_period')),
+                'grace_notify_label': thai_date(r.get('Notify_date')),
+                'grace_until_label': period_label(r.get('Last_installment_period')),
             })
             entry[kind] = r
 
@@ -183,10 +182,6 @@ def _write_electric_sheet(ws, rows):
         ])
 
 
-def _year_options():
-    return [_current_year_be() - 1, _current_year_be(), _current_year_be() + 1]
-
-
 def download_form(request):
     """
     หน้าเลือกเดือน-ปี + ค้นหา -- GET ธรรมดา (ไม่มี month/year) โชว์แค่ฟอร์มเปล่า
@@ -197,8 +192,8 @@ def download_form(request):
     context = {
         'thai_months': THAI_MONTHS,
         'billing_month': datetime.date.today().month,
-        'billing_year': _current_year_be(),
-        'year_options': _year_options(),
+        'billing_year': current_year_be(),
+        'year_options': year_options(),
         'searched': False,
     }
 
@@ -208,11 +203,11 @@ def download_form(request):
         # ที่ไม่ได้ขอโดยไม่รู้ตัว -- ตอนนี้ตรวจช่วงด้วยและส่งข้อความไปแสดงบนหน้าจอ
         # (เทียบ `is None` ไม่ใช้ `or` เพราะ 0 เป็น falsy จะถูกกลืนเป็น fallback เงียบๆ)
         period_errors = []
-        year_be = _safe_int(request.GET.get('year'), 'ปี', period_errors,
+        year_be = safe_int(request.GET.get('year'), 'ปี', period_errors,
                             min_value=2400, max_value=2700)
         if year_be is None:
-            year_be = _current_year_be()
-        month = _safe_int(request.GET.get('month'), 'เดือน', period_errors,
+            year_be = current_year_be()
+        month = safe_int(request.GET.get('month'), 'เดือน', period_errors,
                           min_value=1, max_value=12)
         if month is None:
             month = datetime.date.today().month
@@ -242,8 +237,8 @@ def _form_with_errors(request, month, year_be, errors):
     return render(request, 'meters/download_form.html', {
         'thai_months': THAI_MONTHS,
         'billing_month': month if month is not None else datetime.date.today().month,
-        'billing_year': year_be if year_be is not None else _current_year_be(),
-        'year_options': _year_options(),
+        'billing_year': year_be if year_be is not None else current_year_be(),
+        'year_options': year_options(),
         'searched': False,
         'period_errors': errors,
     })
@@ -265,9 +260,9 @@ def download_excel(request):
         return redirect('download_form')
 
     period_errors = []
-    year_be = _safe_int(request.POST.get('year'), 'ปี', period_errors,
+    year_be = safe_int(request.POST.get('year'), 'ปี', period_errors,
                         min_value=2400, max_value=2700)
-    month = _safe_int(request.POST.get('month'), 'เดือน', period_errors,
+    month = safe_int(request.POST.get('month'), 'เดือน', period_errors,
                       min_value=1, max_value=12)
 
     selected_keys = set(request.POST.getlist('selected_rows'))

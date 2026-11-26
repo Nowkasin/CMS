@@ -11,20 +11,23 @@ log เหตุการณ์รวมของระบบ (dbo.Contract_acti
 ใครเขียน log ที่ไหน
   - เหตุการณ์ยกเลิกสัญญา 3 อย่าง เขียนใน SP เอง (ทรานแซกชันเดียวกับข้อมูลหลัก)
     ดู sql/Contract_activity_log_Hook_Termination.sql
-  - เหตุการณ์อื่นทั้งหมด เขียนจากฝั่ง Python (view) หลังงานหลัก commit สำเร็จแล้ว
-    ผ่าน log_activity_safe() -- ถ้าเขียน log พลาดจะไม่ทำให้งานหลักที่สำเร็จไปแล้วดูเหมือนล้ม
+  - นำเข้าไฟล์ Excel เขียนบน cursor เดียวกับการนำเข้า (services/meter_import.py)
+  - เหตุการณ์จากหน้าเว็บอื่นทั้งหมด เขียนที่ meters/log_middleware.py หลังงานหลักสำเร็จแล้ว
+    และเข้า/ออกระบบเขียนที่ meters/signals.py -- ทั้งสองทางใช้ log_activity_safe()
+    ถ้าเขียน log พลาดจะไม่ทำให้งานหลักที่สำเร็จไปแล้วดูเหมือนล้ม
 
 ไม่บันทึก (ตั้งใจ):
   - การติ๊กงวดทีละงวดในหน้ายกเลิกสัญญา -- เกิดบ่อย เป็นแค่ข้อมูลอ้างอิง
     ถ้าลงทุกครั้ง หน้า log จะถูกกลบด้วยรายการเล็กๆ จนหาเหตุการณ์สำคัญไม่เจอ
   - การเปิดดูหน้าต่างๆ (GET) -- log นี้เก็บเฉพาะการเปลี่ยนแปลงข้อมูลและการนำข้อมูลออก
 """
+import datetime
 import logging
 
 from django.urls import NoReverseMatch, reverse
 
 from .db import get_db_connection
-from .meters import _to_sql_like_pattern
+from .sql_utils import _to_sql_like_pattern
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +55,12 @@ ACTION_PHASE_TOGGLE = 'phase_toggle'          # เปิด/ปิดใช้�
 # --- ใหม่: นำข้อมูลออก ---
 ACTION_DOWNLOAD_EXCEL = 'download_excel'      # ดาวน์โหลด Excel (เดือน-ปี + จำนวนรายการ)
 ACTION_EXPORT_METERS = 'export_meters'        # ส่งออก Excel จากแดชบอร์ด
+ACTION_INVOICE_PRINT = 'invoice_print'        # เปิดหน้าพิมพ์ใบแจ้งหนี้ (เลขตั้งหนี้ SAP ที่พิมพ์)
+ACTION_DISHWASH_SAVE = 'dishwash_save'        # บันทึกค่าล้างจานรายเดือน (เพิ่ม/แก้/ลบยอด)
+
+# --- ใหม่: ผู้ดูแลระบบดูในมุมมองกลุ่ม (จำลองสิทธิ์เมนู อ่านอย่างเดียว) ---
+ACTION_VIEW_AS_START = 'view_as_start'
+ACTION_VIEW_AS_STOP = 'view_as_stop'
 
 # --- ใหม่: POST ที่ยังไม่ได้ลงทะเบียนใน middleware ---
 ACTION_OTHER = 'other_action'
@@ -66,6 +75,8 @@ ACTIVITY_ACTIONS = [
     (ACTION_UPLOAD_COMMIT, 'นำเข้าไฟล์ Excel'),
     (ACTION_DOWNLOAD_EXCEL, 'ดาวน์โหลด Excel'),
     (ACTION_EXPORT_METERS, 'ส่งออกมิเตอร์'),
+    (ACTION_INVOICE_PRINT, 'พิมพ์ใบแจ้งหนี้'),
+    (ACTION_DISHWASH_SAVE, 'บันทึกค่าล้างจาน'),
     (ACTION_METER_CREATE, 'เพิ่มมิเตอร์'),
     (ACTION_METER_UPDATE, 'แก้ไขมิเตอร์'),
     (ACTION_METER_TOGGLE, 'เปิด/ปิดมิเตอร์'),
@@ -76,11 +87,41 @@ ACTIVITY_ACTIONS = [
     (ACTION_TERMINATION_SAVE, 'บันทึกยกเลิกสัญญา'),
     (ACTION_TERMINATION_DELETE, 'ลบรายการยกเลิก'),
     (ACTION_TERMINATION_CLOSE_METERS, 'ปิดการตั้งหนี้มิเตอร์'),
+    (ACTION_VIEW_AS_START, 'เริ่มดูในมุมมองกลุ่ม'),
+    (ACTION_VIEW_AS_STOP, 'เลิกดูในมุมมองกลุ่ม'),
     (ACTION_LOGIN, 'เข้าสู่ระบบ'),
     (ACTION_LOGOUT, 'ออกจากระบบ'),
     (ACTION_LOGIN_FAILED, 'เข้าสู่ระบบไม่สำเร็จ'),
     (ACTION_OTHER, 'การดำเนินการอื่น'),
 ]
+
+# เหตุการณ์แต่ละชนิดเป็นของเมนูไหน (key สิทธิ์เมนู K2) -- คนที่ไม่ใช่ผู้ดูแลระบบเห็น log
+# เฉพาะเหตุการณ์ของเมนูที่กลุ่มตัวเองมีสิทธิ์ ส่วนที่ไม่อยู่ในนี้ (เข้า/ออกระบบ ดูในมุมมองกลุ่ม
+# การดำเนินการอื่น และ Action_type ที่ไม่รู้จัก) ผู้ดูแลระบบเห็นคนเดียว
+ACTION_PERMISSIONS = {
+    ACTION_UPLOAD_COMMIT: 'excel_upload',
+    ACTION_DOWNLOAD_EXCEL: 'excel_download',
+    ACTION_EXPORT_METERS: 'dashboard_view',
+    ACTION_READING_SAVE: 'dashboard_view',
+    ACTION_INVOICE_PRINT: 'invoice_print',
+    ACTION_DISHWASH_SAVE: 'dishwash_fee',
+    ACTION_METER_CREATE: 'meter_management',
+    ACTION_METER_UPDATE: 'meter_management',
+    ACTION_METER_TOGGLE: 'meter_management',
+    ACTION_PHASE_CREATE: 'phase_management',
+    ACTION_PHASE_UPDATE: 'phase_management',
+    ACTION_PHASE_TOGGLE: 'phase_management',
+    ACTION_TERMINATION_SAVE: 'contract_termination',
+    ACTION_TERMINATION_DELETE: 'contract_termination',
+    ACTION_TERMINATION_CLOSE_METERS: 'contract_termination',
+}
+
+
+def allowed_actions_for(permissions):
+    """รายการ Action_type ที่ผู้ใช้ที่มีสิทธิ์เมนู permissions เห็นได้ (ตามลำดับแท็บ)"""
+    permissions = permissions or {}
+    return [key for key, _ in ACTIVITY_ACTIONS if permissions.get(ACTION_PERMISSIONS.get(key))]
+
 
 # ชื่อเหตุการณ์ที่ไม่รู้จัก (เผื่อมี Action_type ในฐานข้อมูลที่ยังไม่ได้ลงทะเบียนที่นี่
 # เช่นถูกเขียนจาก SP ที่เพิ่มภายหลัง) -- แสดงค่าดิบดีกว่าซ่อนแถวนั้นไป
@@ -184,50 +225,104 @@ def _row_link(row):
     return None, None
 
 
-def fetch_activity_log(search='', action='all'):
-    """
-    ดึง log เหตุการณ์ เรียงเวลาล่าสุดก่อน
+_LOG_FROM = """
+    FROM dbo.Contract_activity_log g
+    LEFT JOIN dbo.Contract_hrd_tr c ON c.Contract_id = g.Contract_id
+    OUTER APPLY (
+        SELECT TOP 1 x.CompanyName
+        FROM dbo.Contract_customer_tr x
+        WHERE TRY_CONVERT(int, x.Contract_id) = g.Contract_id
+    ) cu
+"""
 
-    search -- รหัสสัญญา / ชื่อลูกค้า / ชื่อผู้ทำรายการ / ข้อความอ้างอิง
-    action -- Action_type ที่ต้องการ หรือ 'all'
+
+def _actions_in(allowed_actions, column='g.Action_type'):
+    """
+    เงื่อนไขจำกัดชนิดเหตุการณ์ -- None = ไม่จำกัด (ผู้ดูแลระบบ), [] = ไม่เห็นอะไรเลย
+    ค่าใน allowed_actions มาจาก ACTION_PERMISSIONS เท่านั้น แต่ก็ยังส่งเป็นพารามิเตอร์
+    """
+    if allowed_actions is None:
+        return '', []
+    allowed_actions = list(allowed_actions)
+    if not allowed_actions:
+        return ' AND 1 = 0', []
+    return f" AND {column} IN ({', '.join('?' * len(allowed_actions))})", allowed_actions
+
+
+def _log_where(search='', action='all', contract_id=None, user=None,
+               date_from=None, date_to=None, allowed_actions=None):
+    """
+    ประกอบ WHERE ของหน้า log -- ทุกตัวกรองทำใน SQL
+
+    เดิมดึง log ทั้งตารางมากรอง/แบ่งหน้าใน Python ซึ่งช้าลงเรื่อยๆ เพราะทุกการเข้า/ออกระบบ
+    ก็ถูกบันทึกด้วย (ตารางโตไม่หยุด)
+
+    date_to รวมทั้งวัน -- เทียบ DateEntry < วันถัดไป แทน <= date_to (ไม่งั้นตัดเวลาหลังเที่ยงคืนทิ้ง)
+    """
+    sql, params = _actions_in(allowed_actions)
+    sql = ' WHERE 1 = 1' + sql
+    if action and action != 'all':
+        sql += ' AND g.Action_type = ?'
+        params.append(action)
+    search = (search or '').strip()
+    if search:
+        like = _to_sql_like_pattern(search)
+        sql += """ AND (LTRIM(RTRIM(c.Contract_code)) LIKE ?
+                        OR cu.CompanyName LIKE ?
+                        OR g.UserEntry LIKE ?
+                        OR g.Ref_text LIKE ?)"""
+        params += [like, like, like, like]
+    if contract_id is not None:
+        sql += ' AND g.Contract_id = ?'
+        params.append(int(contract_id))
+    if user:
+        sql += ' AND g.UserEntry = ?'
+        params.append(user)
+    if date_from:
+        sql += ' AND g.DateEntry >= ?'
+        params.append(date_from)
+    if date_to:
+        sql += ' AND g.DateEntry < ?'
+        params.append(date_to + datetime.timedelta(days=1))
+    return sql, params
+
+
+def count_activity_log(**filters):
+    """จำนวนรายการ log ที่ตรงตัวกรอง (ใช้กับตัวแบ่งหน้า)"""
+    where, params = _log_where(**filters)
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*)' + _LOG_FROM + where, params)
+        return int(cursor.fetchone()[0])
+    finally:
+        conn.close()
+
+
+def fetch_activity_log(offset=0, limit=None, **filters):
+    """
+    ดึง log เหตุการณ์ เรียงเวลาล่าสุดก่อน เฉพาะช่วง offset/limit (แบ่งหน้าใน SQL)
+
+    ตัวกรอง (ดู _log_where): search, action, contract_id, user, date_from, date_to, allowed_actions
+      search -- รหัสสัญญา / ชื่อลูกค้า / ชื่อผู้ทำรายการ / ข้อความอ้างอิง
 
     join Contract_hrd_tr เพื่อเอารหัสสัญญามาแสดง (log เก็บแค่ Contract_id)
     และ OUTER APPLY หาชื่อลูกค้า -- Contract_customer_tr.Contract_id เป็น nvarchar
     ส่วน Contract_hrd_tr.Contract_id เป็น int จึงต้องใช้ TRY_CONVERT ไม่ใช่ join ตรงๆ
     """
+    where, params = _log_where(**filters)
+    sql = """
+        SELECT g.Log_id, g.Action_type, g.Contract_id, g.Meter_id, g.SubArea_id,
+               g.Ref_text, g.Detail, g.UserEntry, g.DateEntry,
+               c.Contract_code, cu.CompanyName
+    """ + _LOG_FROM + where + ' ORDER BY g.DateEntry DESC, g.Log_id DESC'
+    if limit is not None:
+        sql += ' OFFSET ? ROWS FETCH NEXT ? ROWS ONLY'
+        params = params + [int(offset), int(limit)]
+
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        sql = """
-            SELECT g.Log_id, g.Action_type, g.Contract_id, g.Meter_id, g.SubArea_id,
-                   g.Ref_text, g.Detail, g.UserEntry, g.DateEntry,
-                   c.Contract_code, cu.CompanyName
-            FROM dbo.Contract_activity_log g
-            LEFT JOIN dbo.Contract_hrd_tr c ON c.Contract_id = g.Contract_id
-            OUTER APPLY (
-                SELECT TOP 1 x.CompanyName
-                FROM dbo.Contract_customer_tr x
-                WHERE TRY_CONVERT(int, x.Contract_id) = g.Contract_id
-            ) cu
-            WHERE 1 = 1
-        """
-        params = []
-
-        if action and action != 'all':
-            sql += ' AND g.Action_type = ?'
-            params.append(action)
-
-        search = (search or '').strip()
-        if search:
-            like = _to_sql_like_pattern(search)
-            sql += """ AND (LTRIM(RTRIM(c.Contract_code)) LIKE ?
-                            OR cu.CompanyName LIKE ?
-                            OR g.UserEntry LIKE ?
-                            OR g.Ref_text LIKE ?)"""
-            params += [like, like, like, like]
-
-        sql += ' ORDER BY g.DateEntry DESC, g.Log_id DESC'
-
         cursor.execute(sql, params)
         columns = [c[0] for c in cursor.description]
         rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
@@ -238,11 +333,33 @@ def fetch_activity_log(search='', action='all'):
         conn.close()
 
 
-def fetch_log_head(after_id=0):
+def fetch_activity_users(search='', action='all', contract_id=None, allowed_actions=None):
+    """
+    รายชื่อผู้ทำรายการสำหรับ dropdown -- กรองด้วยตัวกรองอื่นยกเว้นผู้ใช้/วันที่
+    (เหมือนพฤติกรรมเดิม: เปลี่ยนผู้ใช้ได้ต่อเนื่องโดยรายชื่อไม่หดตามตัวที่เลือกอยู่)
+    """
+    where, params = _log_where(search=search, action=action, contract_id=contract_id,
+                               allowed_actions=allowed_actions)
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT DISTINCT g.UserEntry' + _LOG_FROM + where
+            + ' AND g.UserEntry IS NOT NULL ORDER BY g.UserEntry',
+            params,
+        )
+        return [row[0] for row in cursor.fetchall() if row[0]]
+    finally:
+        conn.close()
+
+
+def fetch_log_head(after_id=0, allowed_actions=None):
     """
     ใช้กับการเช็ครายการใหม่ของหน้า log (polling) -- query เบา ไม่ join ไม่ดึงแถว
     คืน (Log_id ล่าสุด, จำนวนรายการที่ Log_id > after_id)
+    allowed_actions จำกัดชนิดเหตุการณ์เหมือนหน้ารายการ (ไม่งั้นแถบ "รายการใหม่" นับของเมนูอื่นด้วย)
     """
+    limit_sql, limit_params = _actions_in(allowed_actions, column='Action_type')
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -251,8 +368,8 @@ def fetch_log_head(after_id=0):
             SELECT ISNULL(MAX(Log_id), 0),
                    ISNULL(SUM(CASE WHEN Log_id > ? THEN 1 ELSE 0 END), 0)
             FROM dbo.Contract_activity_log
-            """,
-            int(after_id or 0),
+            WHERE 1 = 1""" + limit_sql,
+            int(after_id or 0), *limit_params,
         )
         latest, new = cursor.fetchone()
         return int(latest), int(new)
