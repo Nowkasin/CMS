@@ -56,6 +56,7 @@ ACTION_PHASE_TOGGLE = 'phase_toggle'          # เปิด/ปิดใช้�
 ACTION_DOWNLOAD_EXCEL = 'download_excel'      # ดาวน์โหลด Excel (เดือน-ปี + จำนวนรายการ)
 ACTION_EXPORT_METERS = 'export_meters'        # ส่งออก Excel จากแดชบอร์ด
 ACTION_INVOICE_PRINT = 'invoice_print'        # เปิดหน้าพิมพ์ใบแจ้งหนี้ (เลขตั้งหนี้ SAP ที่พิมพ์)
+ACTION_DISHWASH_SAVE = 'dishwash_save'        # บันทึกค่าล้างจานรายเดือน (เพิ่ม/แก้/ลบยอด)
 
 # --- ใหม่: ผู้ดูแลระบบดูในมุมมองกลุ่ม (จำลองสิทธิ์เมนู อ่านอย่างเดียว) ---
 ACTION_VIEW_AS_START = 'view_as_start'
@@ -75,6 +76,7 @@ ACTIVITY_ACTIONS = [
     (ACTION_DOWNLOAD_EXCEL, 'ดาวน์โหลด Excel'),
     (ACTION_EXPORT_METERS, 'ส่งออกมิเตอร์'),
     (ACTION_INVOICE_PRINT, 'พิมพ์ใบแจ้งหนี้'),
+    (ACTION_DISHWASH_SAVE, 'บันทึกค่าล้างจาน'),
     (ACTION_METER_CREATE, 'เพิ่มมิเตอร์'),
     (ACTION_METER_UPDATE, 'แก้ไขมิเตอร์'),
     (ACTION_METER_TOGGLE, 'เปิด/ปิดมิเตอร์'),
@@ -102,6 +104,7 @@ ACTION_PERMISSIONS = {
     ACTION_EXPORT_METERS: 'dashboard_view',
     ACTION_READING_SAVE: 'dashboard_view',
     ACTION_INVOICE_PRINT: 'invoice_print',
+    ACTION_DISHWASH_SAVE: 'dishwash_fee',
     ACTION_METER_CREATE: 'meter_management',
     ACTION_METER_UPDATE: 'meter_management',
     ACTION_METER_TOGGLE: 'meter_management',

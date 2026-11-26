@@ -9,6 +9,7 @@ PERMISSION_HOME_ROUTES = (
     ('contract_termination', 'termination_search'),
     ('activity_log_view', 'activity_log'),
     ('invoice_print', 'invoice_search'),
+    ('dishwash_fee', 'dishwash'),
 )
 
 PERMISSION_LABELS = {
@@ -20,6 +21,7 @@ PERMISSION_LABELS = {
     'contract_termination': 'ยกเลิกสัญญา',
     'activity_log_view': 'ประวัติการใช้งาน',
     'invoice_print': 'ใบแจ้งหนี้',
+    'dishwash_fee': 'ค่าล้างจาน',
 }
 
 URL_PERMISSION_MAP = {
@@ -56,6 +58,8 @@ URL_PERMISSION_MAP = {
 
     'invoice_search': 'invoice_print',
     'invoice_print': 'invoice_print',
+
+    'dishwash': 'dishwash_fee',
 }
 
 PUBLIC_URL_NAMES = frozenset({'login', 'logout', 'no_permission'})

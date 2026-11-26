@@ -61,6 +61,9 @@ urlpatterns = [
     path('invoice/', views.invoice_search, name='invoice_search'),
     path('invoice/print/', views.invoice_print, name='invoice_print'),
 
+    # --- ค่าล้างจานรายเดือน (Contract_dishwash_tr) ---
+    path('dishwash/', views.dishwash, name='dishwash'),
+
     # --- ผู้ดูแลระบบ: ดูในมุมมองกลุ่ม (จำลองสิทธิ์เมนู อ่านอย่างเดียว) ---
     path('admin/view-as/', views.view_as, name='view_as'),
     path('admin/view-as/start/', views.view_as_start, name='view_as_start'),

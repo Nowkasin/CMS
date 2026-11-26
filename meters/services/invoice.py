@@ -13,12 +13,16 @@
     ยกเว้นค่าน้ำ/ค่าไฟ (8/9) ที่คิดตามมิเตอร์และไม่มีราคาตั้งไว้ในสัญญา
   - Contract_meter_reading_tr ที่มีเลข SAP แล้ว -- ค่าน้ำ/ค่าไฟรายมิเตอร์ พร้อมเลขมิเตอร์ก่อน/หลัง
     (หนึ่งบรรทัดต่อมิเตอร์ งวด = เดือนที่จดมิเตอร์)
+  - Contract_dishwash_tr ที่มีเลข SAP แล้ว -- ค่าล้างจานรายเดือน (ประเภท 11) หนึ่งบรรทัดต่อรอบบิล
+  ผู้ใช้ยืนยัน (2026-11-26) ให้ใช้ค่าน้ำ/ค่าไฟจากทั้งสองตาราง ไม่เลือกตารางใดตารางหนึ่ง
+  ถ้ารอบบิลเดียวกันของสัญญาเดียวกันมีทั้งสองที่ จะขึ้นสองบรรทัด (DEV ณ วันนั้นยังไม่มีกรณีซ้ำ)
 ข้อความรายการของงวดใน Contract_Installment_tr ใช้ 'Doc Header Text' จาก sp_6000_Contact_Doc_invoice
 (SP เดิมของ K2) เพื่อให้ข้อความพิเศษอย่างค่าใช้พื้นที่รายปีพร้อมช่วงวันที่ตรงกับ K2
 """
 import datetime
 
 from .db import get_db_connection
+from .dishwash import DISHWASH_PRICE_TYPE
 from .sql_utils import _to_sql_like_pattern
 
 # ใบแจ้งหนี้ที่เลือกพิมพ์พร้อมกันได้สูงสุดต่อครั้ง -- กัน URL ยาวเกินและการเรียก SP จำนวนมาก
@@ -63,6 +67,15 @@ WITH lines AS (
     INNER JOIN dbo.Contract_type_price_ms tp ON tp.Contract_type_price_id = ut.Price_type
     WHERE rd.Contract_fi_doc IS NOT NULL
       AND rd.Contract_id IS NOT NULL
+    UNION ALL
+    SELECT dw.Contract_id, dw.Contract_fi_doc, dw.Contract_fi_date,
+           tp.Contract_type_price_id, tp.Contract_type_price_desc, NULL, NULL,
+           CONCAT(dw.Billing_year_be - 543, RIGHT('0' + CAST(dw.Billing_month AS varchar(2)), 2)),
+           dw.Amount, NULL, NULL, NULL,
+           dw.Contract_debt_to_SAP, NULL, dw.Dishwash_id, 'D'
+    FROM dbo.Contract_dishwash_tr dw
+    INNER JOIN dbo.Contract_type_price_ms tp ON tp.Contract_type_price_id = N'{DISHWASH_PRICE_TYPE}'
+    WHERE dw.Contract_fi_doc IS NOT NULL
 )
 """
 
@@ -130,6 +143,10 @@ def fetch_invoice_periods(limit=36):
                 UNION
                 SELECT CONVERT(char(6), Contract_fi_date, 112)
                 FROM dbo.Contract_meter_reading_tr
+                WHERE Contract_fi_doc IS NOT NULL AND Contract_fi_date IS NOT NULL
+                UNION
+                SELECT CONVERT(char(6), Contract_fi_date, 112)
+                FROM dbo.Contract_dishwash_tr
                 WHERE Contract_fi_doc IS NOT NULL AND Contract_fi_date IS NOT NULL
             ) x
             ORDER BY ym DESC

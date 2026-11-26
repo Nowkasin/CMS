@@ -54,6 +54,7 @@ from .help import help_page
 from .invoice import invoice_search, invoice_print
 
 from .view_as import view_as, view_as_start, view_as_stop
+from .dishwash import dishwash
 
 __all__ = [
     'step1_upload', 'step2_review', 'step3_confirm',
@@ -70,4 +71,5 @@ __all__ = [
     'invoice_search', 'invoice_print',
     'login_view', 'logout_view', 'no_permission_view',
     'view_as', 'view_as_start', 'view_as_stop',
+    'dishwash',
 ]

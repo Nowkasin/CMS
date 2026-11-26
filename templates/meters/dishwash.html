@@ -1,0 +1,157 @@
+{% extends "meters/base.html" %}
+
+{% block title %}ค่าล้างจาน{% endblock %}
+
+{% comment %}
+  บันทึกค่าล้างจานรายเดือนต่อสัญญา (meters/views/dishwash.py)
+  - เลือกรอบบิล (เดือน/ปี พ.ศ.) + ค้นหาสัญญา เป็น GET
+  - ตารางกรอกยอดเป็นฟอร์ม POST เดียว ส่งเฉพาะสัญญาที่แสดงอยู่ (hidden contract_ids)
+  - แถวที่ตั้งหนี้ SAP แล้วไม่มีช่องกรอกและไม่ถูกส่ง (แก้ยอดไม่ได้)
+  - ล้างช่องยอดแล้วบันทึก = ลบรายการของรอบนั้น
+{% endcomment %}
+
+{% block content %}
+<div class="mx-auto w-full max-w-[1400px] space-y-4 sm:space-y-5">
+  <header>
+    <h1 class="text-xl font-bold tracking-tight text-gray-900 sm:text-3xl">ค่าล้างจาน</h1>
+    <p class="mt-1 text-sm text-gray-500">กรอกยอดค่าล้างจานของแต่ละสัญญาในรอบบิล แล้วกดบันทึก ล้างช่องยอดเพื่อลบรายการ</p>
+  </header>
+
+  {% if saved %}
+  <div class="rounded-xl border border-brand-100 bg-brand-50 px-4 py-3 text-sm text-brand-700" role="status">
+    บันทึกค่าล้างจาน {{ month_label }} แล้ว
+    {% if saved.c or saved.u or saved.d %}
+      · เพิ่ม {{ saved.c }} · แก้ {{ saved.u }} · ลบ {{ saved.d }} สัญญา
+    {% else %}
+      · ไม่มีรายการเปลี่ยนแปลง
+    {% endif %}
+  </div>
+  {% if saved.l %}
+  <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">
+    มี {{ saved.l }} สัญญาที่ตั้งหนี้ SAP แล้ว จึงไม่ได้แก้ยอด
+  </div>
+  {% endif %}
+  {% endif %}
+
+  {% if errors %}
+  <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+    <p class="font-semibold">ยังไม่ได้บันทึก กรุณาแก้ไขรายการต่อไปนี้</p>
+    <ul class="mt-1 list-disc space-y-0.5 pl-5">
+      {% for e in errors %}<li>{{ e }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <form method="get" class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+    <div class="grid grid-cols-2 gap-3 lg:grid-cols-[180px_140px_minmax(0,1fr)_auto]">
+      <div>
+        <label for="dw-month" class="mb-1 block text-xs font-medium text-gray-500">เดือน</label>
+        <select id="dw-month" name="month" onchange="this.form.submit()"
+                data-custom-select data-custom-select-label="เดือน"
+                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-base text-gray-700 sm:text-sm">
+          {% for name in thai_months %}
+            <option value="{{ forloop.counter }}" {% if forloop.counter == billing_month %}selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="dw-year" class="mb-1 block text-xs font-medium text-gray-500">ปี (พ.ศ.)</label>
+        <select id="dw-year" name="year" onchange="this.form.submit()"
+                data-custom-select data-custom-select-label="ปี"
+                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-base text-gray-700 sm:text-sm">
+          {% for y in year_options %}
+            <option value="{{ y }}" {% if y == billing_year %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-span-2 lg:col-span-1">
+        <label for="dw-q" class="mb-1 block text-xs font-medium text-gray-500">ค้นหาสัญญา</label>
+        <input id="dw-q" type="search" name="q" value="{{ search }}" autocomplete="off"
+               placeholder="รหัสสัญญา หรือชื่อผู้เช่า"
+               class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:text-sm">
+      </div>
+      <div class="col-span-2 flex items-end lg:col-span-1">
+        <button type="submit" class="w-full rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 lg:w-auto">ค้นหา</button>
+      </div>
+    </div>
+  </form>
+
+  <form method="post" data-confirm-submit
+        data-confirm-message="บันทึกค่าล้างจาน {{ month_label }} ลงฐานข้อมูลทันที -- ช่องที่ล้างว่างจะถูกลบ ต้องการดำเนินการต่อหรือไม่?"
+        class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+    {% csrf_token %}
+    <input type="hidden" name="year" value="{{ billing_year }}">
+    <input type="hidden" name="month" value="{{ billing_month }}">
+    <input type="hidden" name="q" value="{{ search }}">
+
+    <div class="flex flex-col gap-1 border-b border-gray-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+      <h2 class="text-base font-semibold text-gray-900">รอบบิล {{ month_label }}</h2>
+      <p class="text-xs text-gray-500">
+        กรอกแล้ว {{ filled_count }} จาก {{ rows|length }} สัญญา · รวม <span class="font-semibold text-gray-700">{{ total|floatformat:"2g" }}</span> บาท
+      </p>
+    </div>
+
+    {% if rows %}
+    <div class="overflow-x-auto">
+      <table class="w-full min-w-[620px] text-left text-sm md:min-w-[860px]">
+        <thead>
+          <tr class="border-b border-gray-100 bg-gray-50 text-gray-500">
+            <th class="w-[150px] px-4 py-3 font-semibold">รหัสสัญญา</th>
+            <th class="hidden min-w-[180px] px-4 py-3 font-semibold md:table-cell">ผู้เช่า</th>
+            <th class="hidden w-[120px] px-4 py-3 font-semibold lg:table-cell">สถานะสัญญา</th>
+            <th class="w-[170px] px-4 py-3 text-right font-semibold">ค่าล้างจาน (บาท)</th>
+            <th class="w-[220px] px-4 py-3 font-semibold">หมายเหตุ</th>
+            <th class="w-[170px] px-4 py-3 font-semibold">ตั้งหนี้ SAP</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for r in rows %}
+          <tr class="align-top {% if r.locked %}bg-gray-50/60{% endif %}">
+            <td class="px-4 py-3">
+              <div class="whitespace-nowrap font-medium text-gray-800">{{ r.Contract_code|default:r.Contract_id }}</div>
+              {# จอเล็กซ่อนคอลัมน์ผู้เช่า/สถานะ แสดงใต้รหัสสัญญาแทน ช่องกรอกยอดจะได้อยู่ในจอ #}
+              <div class="mt-0.5 text-xs text-gray-500 md:hidden">{{ r.CompanyName|default:"" }}</div>
+            </td>
+            <td class="hidden px-4 py-3 text-gray-700 md:table-cell">{{ r.CompanyName|default:"-" }}</td>
+            <td class="hidden px-4 py-3 text-xs text-gray-500 lg:table-cell">{{ r.Status_contract_Desc|default:"-" }}</td>
+            {% if r.locked %}
+            <td class="px-4 py-3 text-right font-medium text-gray-800">{{ r.Amount|floatformat:"2g" }}</td>
+            <td class="px-4 py-3 text-gray-600">{{ r.Remark|default:"" }}</td>
+            <td class="px-4 py-3">
+              <span class="inline-flex items-center rounded bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">ตั้งหนี้แล้ว</span>
+              <div class="mt-1 text-xs text-gray-500">{{ r.Contract_fi_doc }}</div>
+            </td>
+            {% else %}
+            <td class="px-4 py-2">
+              <input type="hidden" name="contract_ids" value="{{ r.Contract_id }}">
+              <input type="hidden" name="code_{{ r.Contract_id }}" value="{{ r.Contract_code|default:r.Contract_id }}">
+              <label for="amt-{{ r.Contract_id }}" class="sr-only">ค่าล้างจาน สัญญา {{ r.Contract_code }}</label>
+              <input id="amt-{{ r.Contract_id }}" name="amount_{{ r.Contract_id }}" value="{{ r.amount_input }}"
+                     inputmode="decimal" autocomplete="off" placeholder="0.00"
+                     class="w-full rounded-lg border border-gray-200 px-3 py-2 text-right text-base tabular-nums focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:text-sm">
+              {% if r.saved_label %}<div class="mt-1 text-right text-[11px] text-gray-400">{{ r.Saved_by }} · {{ r.saved_label }}</div>{% endif %}
+            </td>
+            <td class="px-4 py-2">
+              <label for="rmk-{{ r.Contract_id }}" class="sr-only">หมายเหตุ สัญญา {{ r.Contract_code }}</label>
+              <input id="rmk-{{ r.Contract_id }}" name="remark_{{ r.Contract_id }}" value="{{ r.remark_input }}"
+                     maxlength="500" autocomplete="off"
+                     class="w-full rounded-lg border border-gray-200 px-3 py-2 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:text-sm">
+            </td>
+            <td class="px-4 py-3 text-xs text-gray-400">{% if r.Dishwash_id %}ยังไม่ตั้งหนี้{% else %}-{% endif %}</td>
+            {% endif %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="sticky bottom-0 flex flex-col gap-2 border-t border-gray-100 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-5">
+      <a href="?year={{ billing_year }}&month={{ billing_month }}{% if search %}&q={{ search|urlencode }}{% endif %}"
+         class="rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-center text-sm font-medium text-gray-600 hover:bg-gray-50">ยกเลิกการแก้ไข</a>
+      <button type="submit" class="rounded-lg bg-brand-500 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-600">บันทึกค่าล้างจาน</button>
+    </div>
+    {% else %}
+    <p class="px-4 py-10 text-center text-sm text-gray-500">ไม่พบสัญญา{% if search %}ที่ตรงกับ "{{ search }}"{% endif %}</p>
+    {% endif %}
+  </form>
+</div>
+{% endblock %}

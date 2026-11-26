@@ -320,6 +320,33 @@ def _export_build(request, kwargs, before, response):
     }
 
 
+def _dishwash_build(request, kwargs, before, response):
+    """บันทึกค่าล้างจาน -- view ฝากผล save_dishwash_month ไว้ (เฉพาะที่เขียนจริง)"""
+    if not _is_redirect(response):
+        return None
+    result = _result(request)
+    saved = result.get('dishwash') or {}
+    parts = []
+    for key, label in (('created', 'เพิ่ม'), ('updated', 'แก้'), ('deleted', 'ลบ')):
+        for item in saved.get(key) or []:
+            amount = item.get('amount')
+            code = item.get('contract_code') or item.get('contract_id')
+            text = f'{code} {amount:,.2f}' if amount is not None else str(code)
+            if key == 'updated' and item.get('old_amount') is not None:
+                text = f"{item.get('contract_code')} {item['old_amount']:,.2f} → {amount:,.2f}"
+            parts.append(f'{label} {text}')
+    if not parts:
+        return None
+    changed = [i for key in ('created', 'updated', 'deleted') for i in saved.get(key) or []]
+    period = f"{result.get('month')}/{result.get('year_be')}"
+    return {
+        'action': activity.ACTION_DISHWASH_SAVE,
+        'ref_text': f'รอบบิล {period} · {len(changed)} สัญญา',
+        'contract_id': changed[0]['contract_id'] if len(changed) == 1 else None,
+        'detail': f'บันทึกค่าล้างจาน รอบบิล {period}\n' + '\n'.join(parts),
+    }
+
+
 def _view_as_build(request, kwargs, before, response):
     """ผู้ดูแลระบบเริ่ม/เลิกดูในมุมมองกลุ่ม -- view ฝากชื่อกลุ่มไว้เมื่อทำสำเร็จ"""
     result = _result(request)
@@ -359,6 +386,7 @@ REGISTRY = {
     'download_excel': {'methods': ('POST',), 'before': None, 'build': _download_build},
     'export_meters':  {'methods': ('GET',),  'before': None, 'build': _export_build},
     'invoice_print':  {'methods': ('GET',),  'before': None, 'build': _invoice_print_build},
+    'dishwash':       {'methods': ('POST',), 'before': None, 'build': _dishwash_build},
     'view_as_start':  {'methods': ('POST',), 'before': None, 'build': _view_as_build},
     'view_as_stop':   {'methods': ('POST',), 'before': None, 'build': _view_as_build},
 }
