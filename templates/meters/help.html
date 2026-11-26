@@ -1,0 +1,344 @@
+{% extends "meters/base.html" %}
+{% load static %}
+
+{% block title %}คู่มือการใช้งาน{% endblock %}
+
+{% comment %}
+  หน้าคู่มือ -- เนื้อหามาจาก meters/views/help.py (แสดงเฉพาะหัวข้อของเมนูที่ผู้ใช้มีสิทธิ์)
+  ภาพสาธิตเป็น CSS animation ล้วน (ไม่มีไฟล์วิดีโอ/รูป) จำลองหน้าจอจริงแบบย่อ พร้อมเคอร์เซอร์คลิก
+  วนทุก 8 วินาที -- ผู้ใช้ที่ตั้งเครื่องให้ลดภาพเคลื่อนไหวจะเห็นภาพนิ่ง
+  ปุ่ม "ลองทำในหน้าจริง" ลิงก์ไปหน้านั้นพร้อม ?tour=1 ให้ static/meters/js/tour.js เปิดทัวร์เอง
+{% endcomment %}
+
+{% block extra_css %}
+<style>
+  .demo { position: relative; aspect-ratio: 16 / 10; overflow: hidden; border-radius: 14px; max-width: 480px; margin: 0 auto;
+          background: #F8FAFC; border: 1px solid #E5E7EB; font-size: 10px; line-height: 1.3; }
+  .demo-bar { position: absolute; inset: 0 0 auto 0; height: 9%; background: #fff; border-bottom: 1px solid #E5E7EB;
+              display: flex; align-items: center; gap: 4px; padding: 0 3%; }
+  .demo-bar i { width: 6px; height: 6px; border-radius: 999px; background: #E5E7EB; display: block; }
+  .demo-bar b { margin-left: 6px; font-weight: 600; color: #006767; font-size: 9px; }
+  .demo-box { position: absolute; background: #fff; border: 1px solid #E5E7EB; border-radius: 8px; }
+  .demo-btn { position: absolute; border-radius: 7px; background: #006767; color: #fff; font-weight: 600;
+              display: flex; align-items: center; justify-content: center; }
+  .demo-line { height: 5px; border-radius: 999px; background: #E5E7EB; }
+  .demo-cursor { position: absolute; width: 18px; height: 18px; z-index: 5; pointer-events: none;
+                 filter: drop-shadow(0 1px 1px rgba(0,0,0,.35)); }
+  .demo-cursor::after { content: ''; position: absolute; left: -6px; top: -6px; width: 14px; height: 14px;
+                        border-radius: 999px; border: 2px solid #0C8F5E; opacity: 0; }
+  .demo-toast { position: absolute; right: 4%; bottom: 5%; background: #111827; color: #fff; border-radius: 7px;
+                padding: 4px 8px; font-weight: 600; opacity: 0; }
+  .demo * { animation-duration: 8s; animation-iteration-count: infinite; animation-timing-function: ease-in-out; }
+  @media (prefers-reduced-motion: reduce) {
+    .demo *, .flow *, [class*="up-cap"] { animation: none !important; }
+    .up-s2, .up-s3, .up-s4, .up-file { opacity: 0; }
+  }
+
+  /* ---------- ภาพรวม: ขั้นตอนนำเข้า 4 ขั้น ---------- */
+  .flow-fill { animation: flowFill 8s ease-in-out infinite; }
+  .flow-dot { animation: flowDot 8s ease-in-out infinite; }
+  .flow-dot.s2 { animation-delay: 1.6s; } .flow-dot.s3 { animation-delay: 3.2s; } .flow-dot.s4 { animation-delay: 4.8s; }
+  @keyframes flowFill { 0%,5% { width: 0 } 70%,100% { width: 100% } }
+  @keyframes flowDot { 0%,10% { background:#fff; color:#9CA3AF; transform:scale(1) }
+                       14% { transform:scale(1.15) } 18%,100% { background:#006767; color:#fff; transform:scale(1) } }
+
+  /* ---------- นำเข้าไฟล์ Excel: 4 ฉาก (อัปโหลด → ตรวจสอบ → ยืนยัน → เสร็จสิ้น) วน 16 วินาที ----------
+     ฉากละประมาณ 4 วินาที: ฉาก 1 = 0-24%, ฉาก 2 = 25-49%, ฉาก 3 = 50-74%, ฉาก 4 = 75-99%
+     เคอร์เซอร์ตัวเดียวเดินต่อเนื่องทั้ง 4 ฉาก จังหวะคลิก (วงกระเพื่อม) ตรงกับปุ่มที่ถูกกดในแต่ละฉาก */
+  .demo.demo-long * { animation-duration: 16s; }
+  .up-s1 { animation-name: upS1; } .up-s2 { animation-name: upS2; }
+  .up-s3 { animation-name: upS3; } .up-s4 { animation-name: upS4; }
+  .up-p1 { animation-name: upP1; } .up-p2 { animation-name: upP2; }
+  .up-p3 { animation-name: upP3; } .up-p4 { animation-name: upP4; }
+  .up-cap1 { animation-name: upCap1; } .up-cap2 { animation-name: upCap2; }
+  .up-cap3 { animation-name: upCap3; } .up-cap4 { animation-name: upCap4; }
+  @keyframes upS1 { 0%,23%{opacity:1} 25%,97%{opacity:0} 100%{opacity:1} }
+  @keyframes upS2 { 0%,24%{opacity:0} 26%,48%{opacity:1} 50%,100%{opacity:0} }
+  @keyframes upS3 { 0%,49%{opacity:0} 51%,73%{opacity:1} 75%,100%{opacity:0} }
+  @keyframes upS4 { 0%,74%{opacity:0} 76%,96%{opacity:1} 99%,100%{opacity:0} }
+  @keyframes upP1 { 0%,24%{background:#006767;color:#fff} 25%,99%{background:#ECFBF5;color:#0A7A4F} 100%{background:#006767;color:#fff} }
+  @keyframes upP2 { 0%,24%{background:#F3F4F6;color:#9CA3AF} 25%,49%{background:#006767;color:#fff} 50%,99%{background:#ECFBF5;color:#0A7A4F} 100%{background:#F3F4F6;color:#9CA3AF} }
+  @keyframes upP3 { 0%,49%{background:#F3F4F6;color:#9CA3AF} 50%,74%{background:#006767;color:#fff} 75%,99%{background:#ECFBF5;color:#0A7A4F} 100%{background:#F3F4F6;color:#9CA3AF} }
+  @keyframes upP4 { 0%,74%{background:#F3F4F6;color:#9CA3AF} 75%,99%{background:#006767;color:#fff} 100%{background:#F3F4F6;color:#9CA3AF} }
+  /* แถบขั้นตอนใต้ภาพ (นอกกรอบ) ไฮไลต์ตามฉาก */
+  .up-cap1, .up-cap2, .up-cap3, .up-cap4 { animation-duration: 16s; animation-iteration-count: infinite; }
+  @keyframes upCap1 { 0%,24%{color:#006767;border-color:#006767} 25%,99%{color:#9CA3AF;border-color:#E5E7EB} 100%{color:#006767;border-color:#006767} }
+  @keyframes upCap2 { 0%,24%{color:#9CA3AF;border-color:#E5E7EB} 25%,49%{color:#006767;border-color:#006767} 50%,100%{color:#9CA3AF;border-color:#E5E7EB} }
+  @keyframes upCap3 { 0%,49%{color:#9CA3AF;border-color:#E5E7EB} 50%,74%{color:#006767;border-color:#006767} 75%,100%{color:#9CA3AF;border-color:#E5E7EB} }
+  @keyframes upCap4 { 0%,74%{color:#9CA3AF;border-color:#E5E7EB} 75%,99%{color:#006767;border-color:#006767} 100%{color:#9CA3AF;border-color:#E5E7EB} }
+
+  .up-cursor { animation-name: upCursor; }
+  .up-cursor::after { animation: upClick 16s infinite; }
+  @keyframes upCursor {
+    0%,3%{left:86%;top:20%} 9%,12%{left:46%;top:60%} 17%,20%{left:78%;top:87%}
+    27%{left:60%;top:60%} 33%,36%{left:39%;top:18%} 43%,46%{left:82%;top:88%}
+    56%,58%{left:10%;top:66%} 64%,67%{left:82%;top:88%}
+    78%{left:60%;top:60%} 85%,90%{left:66%;top:84%} 97%,100%{left:86%;top:20%} }
+  @keyframes upClick {
+    0%,17%{opacity:0;transform:scale(.4)} 18%{opacity:1;transform:scale(1)} 20%{opacity:0;transform:scale(1.6)}
+    33%{opacity:0;transform:scale(.4)} 34%{opacity:1;transform:scale(1)} 36%{opacity:0;transform:scale(1.6)}
+    43%{opacity:0;transform:scale(.4)} 44%{opacity:1;transform:scale(1)} 46%{opacity:0;transform:scale(1.6)}
+    56%{opacity:0;transform:scale(.4)} 57%{opacity:1;transform:scale(1)} 59%{opacity:0;transform:scale(1.6)}
+    64%{opacity:0;transform:scale(.4)} 65%{opacity:1;transform:scale(1)} 67%{opacity:0;transform:scale(1.6)}
+    86%{opacity:0;transform:scale(.4)} 87%{opacity:1;transform:scale(1)} 89%,100%{opacity:0;transform:scale(1.6)} }
+
+  /* ฉาก 1: ลากไฟล์มาวาง แล้วกดตรวจสอบข้อมูล */
+  .up-file { animation-name: upFile; }
+  .up-zone { animation-name: upZone; }
+  .up-name { animation-name: upName; }
+  .up-btn  { animation-name: upBtn; }
+  @keyframes upFile { 0%,3%{left:80%;top:14%;opacity:1;transform:scale(1)} 9%{left:40%;top:54%;opacity:1;transform:scale(1)}
+                      11%,99%{left:40%;top:54%;opacity:0;transform:scale(.6)} 100%{left:80%;top:14%;opacity:1;transform:scale(1)} }
+  @keyframes upZone { 0%,6%{border-color:#D1D5DB;background:#fff} 8%,10%{border-color:#006767;background:#ECFBF5}
+                      12%,100%{border-color:#D1F5E6;background:#fff} }
+  @keyframes upName { 0%,10%{opacity:0} 12%,99%{opacity:1} 100%{opacity:0} }
+  @keyframes upBtn { 0%,17%{transform:scale(1)} 18%{transform:scale(.92)} 19.5%,100%{transform:scale(1)} }
+
+  /* ฉาก 2: แถวขึ้นทีละแถวพร้อมสถานะ ดูแท็บ "มีปัญหา" (0) แล้วกดถัดไป */
+  .up-r1 { animation-name: upR1; } .up-r2 { animation-name: upR2; }
+  .up-r3 { animation-name: upR3; } .up-r4 { animation-name: upR4; }
+  .up-errtab { animation-name: upErrTab; }
+  .up-next { animation-name: upNext; }
+  @keyframes upR1 { 0%,26%{opacity:0;transform:translateX(-6px)} 27.5%,100%{opacity:1;transform:none} }
+  @keyframes upR2 { 0%,28%{opacity:0;transform:translateX(-6px)} 29.5%,100%{opacity:1;transform:none} }
+  @keyframes upR3 { 0%,30%{opacity:0;transform:translateX(-6px)} 31.5%,100%{opacity:1;transform:none} }
+  @keyframes upR4 { 0%,32%{opacity:0;transform:translateX(-6px)} 33.5%,100%{opacity:1;transform:none} }
+  @keyframes upErrTab { 0%,33%{box-shadow:none} 34%,40%{box-shadow:0 0 0 2px #006767} 42%,100%{box-shadow:none} }
+  @keyframes upNext { 0%,43%{transform:scale(1)} 44%{transform:scale(.92)} 45.5%,100%{transform:scale(1)} }
+
+  /* ฉาก 3: ติ๊กยืนยัน ปุ่มเปลี่ยนเป็นกดได้ แล้วกดบันทึก */
+  .up-check { animation-name: upCheck; }
+  .up-save { animation-name: upSave; }
+  .up-savetxt { animation-name: upSaveTxt; }
+  .up-saving { animation-name: upSaving; }
+  .up-spin { animation: upSpin .8s linear infinite !important; }
+  @keyframes upCheck { 0%,56.5%{opacity:0;transform:scale(.4)} 57.5%,100%{opacity:1;transform:none} }
+  @keyframes upSave { 0%,57%{background:#E5E7EB;color:#9CA3AF;transform:scale(1)} 58%,64%{background:#006767;color:#fff;transform:scale(1)}
+                      65%{background:#006767;color:#fff;transform:scale(.92)} 66.5%,100%{background:#006767;color:#fff;transform:scale(1)} }
+  @keyframes upSaveTxt { 0%,65%{opacity:1} 65.5%,100%{opacity:0} }
+  @keyframes upSaving { 0%,65%{opacity:0} 65.5%,100%{opacity:1} }
+  @keyframes upSpin { to { transform: rotate(360deg); } }
+
+  /* ฉาก 4: เครื่องหมายถูกเด้งขึ้น สรุปผล แล้วกดดาวน์โหลดสรุป */
+  .up-tick { animation-name: upTick; }
+  .up-stats { animation-name: upStats; }
+  .up-csv { animation-name: upCsv; }
+  .up-toast { animation-name: upToast; }
+  @keyframes upTick { 0%,75.5%{transform:scale(0)} 78%{transform:scale(1.2)} 79.5%,100%{transform:scale(1)} }
+  @keyframes upStats { 0%,79%{opacity:0;transform:translateY(5px)} 81%,100%{opacity:1;transform:none} }
+  @keyframes upCsv { 0%,86%{transform:scale(1)} 87%{transform:scale(.92)} 88.5%,100%{transform:scale(1)} }
+  @keyframes upToast { 0%,88%{opacity:0;transform:translateY(6px)} 89.5%,95%{opacity:1;transform:none} 97%,100%{opacity:0} }
+
+  /* ---------- แดชบอร์ด: แก้เลขอ่าน ---------- */
+  .db-cursor { animation-name: dbCursor; }
+  .db-cursor::after { animation: dbClick 8s infinite; }
+  .db-row2 { animation-name: dbRow; }
+  .db-panel { animation-name: dbPanel; }
+  .db-type { animation-name: dbType; overflow: hidden; white-space: nowrap; display: inline-block; vertical-align: bottom; }
+  .db-toast { animation-name: dbToast; }
+  @keyframes dbCursor { 0%{left:30%;top:80%} 14%{left:88%;top:47%} 22%,26%{left:88%;top:47%}
+                        48%{left:74%;top:52%} 66%{left:74%;top:52%} 76%,100%{left:82%;top:80%} }
+  @keyframes dbRow { 0%,10%{background:#fff} 14%,26%{background:#ECFBF5} 30%,100%{background:#fff} }
+  @keyframes dbPanel { 0%,24%{transform:translateX(110%)} 32%,94%{transform:none} 100%{transform:translateX(110%)} }
+  @keyframes dbType { 0%,48%{width:0} 62%,100%{width:4.2ch} }
+  @keyframes dbClick { 0%,22%{opacity:0;transform:scale(.4)} 24%{opacity:1;transform:scale(1)} 28%{opacity:0;transform:scale(1.6)}
+                       77%{opacity:0;transform:scale(.4)} 79%{opacity:1;transform:scale(1)} 83%,100%{opacity:0;transform:scale(1.6)} }
+  @keyframes dbToast { 0%,80%{opacity:0;transform:translateY(6px)} 84%,96%{opacity:1;transform:none} 100%{opacity:0} }
+
+  /* ---------- จัดการมิเตอร์: เพิ่มใหม่ ---------- */
+  .mt-cursor { animation-name: mtCursor; }
+  .mt-cursor::after { animation: mtClick 8s infinite; }
+  .mt-form { animation-name: mtForm; }
+  .mt-f1 { animation-name: mtF1; } .mt-f2 { animation-name: mtF2; } .mt-f3 { animation-name: mtF3; }
+  .mt-newrow { animation-name: mtNew; }
+  @keyframes mtCursor { 0%{left:50%;top:70%} 12%,16%{left:84%;top:15%} 30%{left:30%;top:36%} 44%{left:30%;top:52%}
+                        58%{left:30%;top:68%} 72%,100%{left:70%;top:82%} }
+  @keyframes mtClick { 0%,13%{opacity:0;transform:scale(.4)} 15%{opacity:1;transform:scale(1)} 19%{opacity:0;transform:scale(1.6)}
+                       73%{opacity:0;transform:scale(.4)} 75%{opacity:1;transform:scale(1)} 79%,100%{opacity:0;transform:scale(1.6)} }
+  @keyframes mtForm { 0%,16%{opacity:0;transform:scale(.96)} 22%,76%{opacity:1;transform:none} 80%,100%{opacity:0} }
+  @keyframes mtF1 { 0%,30%{opacity:0} 34%,100%{opacity:1} }
+  @keyframes mtF2 { 0%,44%{opacity:0} 48%,100%{opacity:1} }
+  @keyframes mtF3 { 0%,58%{opacity:0} 62%,100%{opacity:1} }
+  @keyframes mtNew { 0%,78%{opacity:0;transform:translateY(-6px);background:#ECFBF5} 84%,94%{opacity:1;transform:none;background:#ECFBF5}
+                     100%{opacity:1;background:#fff} }
+
+  /* ---------- ดาวน์โหลด Excel ---------- */
+  .dl-c1 { animation-name: dlC1; } .dl-c2 { animation-name: dlC2; } .dl-c3 { animation-name: dlC3; }
+  .dl-cursor { animation-name: dlCursor; }
+  .dl-cursor::after { animation: dlClick 8s infinite; }
+  .dl-file { animation-name: dlFile; }
+  @keyframes dlCursor { 0%{left:50%;top:90%} 10%{left:11%;top:37%} 24%{left:11%;top:52%} 38%{left:11%;top:67%}
+                        56%,100%{left:78%;top:86%} }
+  @keyframes dlC1 { 0%,10%{opacity:0;transform:scale(.4)} 13%,94%{opacity:1;transform:none} 100%{opacity:0} }
+  @keyframes dlC2 { 0%,24%{opacity:0;transform:scale(.4)} 27%,94%{opacity:1;transform:none} 100%{opacity:0} }
+  @keyframes dlC3 { 0%,38%{opacity:0;transform:scale(.4)} 41%,94%{opacity:1;transform:none} 100%{opacity:0} }
+  @keyframes dlClick { 0%,9%{opacity:0;transform:scale(.4)} 11%{opacity:1;transform:scale(1)} 14%{opacity:0;transform:scale(1.6)}
+                       23%{opacity:0;transform:scale(.4)} 25%{opacity:1;transform:scale(1)} 28%{opacity:0;transform:scale(1.6)}
+                       37%{opacity:0;transform:scale(.4)} 39%{opacity:1;transform:scale(1)} 42%{opacity:0;transform:scale(1.6)}
+                       57%{opacity:0;transform:scale(.4)} 59%{opacity:1;transform:scale(1)} 63%,100%{opacity:0;transform:scale(1.6)} }
+  @keyframes dlFile { 0%,60%{opacity:0;top:70%} 66%{opacity:1;top:70%} 80%,94%{opacity:1;top:40%} 100%{opacity:0;top:40%} }
+
+  /* ---------- ยกเลิกสัญญา ---------- */
+  .tm-cursor { animation-name: tmCursor; }
+  .tm-cursor::after { animation: tmClick 8s infinite; }
+  .tm-case { animation-name: tmCase; }
+  .tm-date { animation-name: tmDate; }
+  .tm-badge { animation-name: tmBadge; }
+  .tm-i1 { animation-name: tmI1; } .tm-i2 { animation-name: tmI2; }
+  @keyframes tmCursor { 0%{left:60%;top:85%} 12%,16%{left:40%;top:30%} 30%,34%{left:40%;top:47%} 50%,56%{left:30%;top:64%}
+                        72%{left:88%;top:34%} 80%,100%{left:88%;top:45%} }
+  @keyframes tmClick { 0%,13%{opacity:0;transform:scale(.4)} 15%{opacity:1;transform:scale(1)} 18%{opacity:0;transform:scale(1.6)}
+                       51%{opacity:0;transform:scale(.4)} 53%{opacity:1;transform:scale(1)} 57%{opacity:0;transform:scale(1.6)}
+                       71%{opacity:0;transform:scale(.4)} 73%{opacity:1;transform:scale(1)} 76%{opacity:0;transform:scale(1.6)}
+                       79%{opacity:0;transform:scale(.4)} 81%{opacity:1;transform:scale(1)} 84%,100%{opacity:0;transform:scale(1.6)} }
+  @keyframes tmCase { 0%,15%{color:#9CA3AF} 18%,100%{color:#111827} }
+  @keyframes tmDate { 0%,30%{opacity:0} 34%,100%{opacity:1} }
+  @keyframes tmBadge { 0%,54%{opacity:0;transform:scale(.6)} 58%{opacity:1;transform:scale(1.1)} 61%,96%{opacity:1;transform:none} 100%{opacity:0} }
+  @keyframes tmI1 { 0%,72%{opacity:0} 74%,96%{opacity:1} 100%{opacity:0} }
+  @keyframes tmI2 { 0%,80%{opacity:0} 82%,96%{opacity:1} 100%{opacity:0} }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mx-auto w-full max-w-6xl space-y-6 sm:space-y-8">
+
+  <header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <h1 class="text-xl font-bold tracking-tight text-gray-900 sm:text-3xl">คู่มือการใช้งาน</h1>
+      <p class="mt-1 text-sm text-gray-500">ขั้นตอนพร้อมภาพสาธิตของทุกเมนูที่คุณใช้ได้ · กดปุ่ม <b class="font-semibold text-brand-700">พาชมหน้านี้</b> บนแถบด้านบนได้ทุกหน้า</p>
+    </div>
+    <button type="button" onclick="window.cmsStartTour && window.cmsStartTour()"
+            class="inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-600">
+      <span aria-hidden="true">▶</span> เริ่มต้นใช้งาน
+    </button>
+  </header>
+
+  {# --- ภาพรวม: ขั้นตอนนำเข้า (หัวใจของระบบ) --- #}
+  {% if has_upload %}
+  <section class="flow rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-8" aria-labelledby="flow-title">
+    <h2 id="flow-title" class="text-base font-bold text-gray-900">งานประจำเดือน: นำเข้าค่าน้ำ-ค่าไฟใน 4 ขั้น</h2>
+    <p class="mt-1 text-sm text-gray-500">ทุกขั้นก่อนกดบันทึกยังไม่เขียนข้อมูลจริง ย้อนกลับไปแก้ไฟล์ได้เสมอ</p>
+    <div class="relative mt-6 sm:mt-8">
+      <div class="absolute left-[12.5%] right-[12.5%] top-5 h-1 rounded-full bg-gray-100" aria-hidden="true">
+        <div class="flow-fill h-full rounded-full bg-brand-500"></div>
+      </div>
+      <ol class="relative grid grid-cols-4 gap-2 text-center">
+        <li>
+          <div class="flow-dot mx-auto flex h-10 w-10 items-center justify-center rounded-full border-2 border-brand-500 bg-white text-sm font-bold">1</div>
+          <div class="mt-2 text-xs font-semibold text-gray-800 sm:text-sm">อัปโหลดไฟล์</div>
+          <div class="mt-0.5 hidden text-xs text-gray-500 sm:block">เลือกรอบบิล + ไฟล์ .xlsx</div>
+        </li>
+        <li>
+          <div class="flow-dot s2 mx-auto flex h-10 w-10 items-center justify-center rounded-full border-2 border-brand-500 bg-white text-sm font-bold">2</div>
+          <div class="mt-2 text-xs font-semibold text-gray-800 sm:text-sm">ตรวจสอบ</div>
+          <div class="mt-0.5 hidden text-xs text-gray-500 sm:block">แก้แถวที่มีปัญหาในไฟล์</div>
+        </li>
+        <li>
+          <div class="flow-dot s3 mx-auto flex h-10 w-10 items-center justify-center rounded-full border-2 border-brand-500 bg-white text-sm font-bold">3</div>
+          <div class="mt-2 text-xs font-semibold text-gray-800 sm:text-sm">ยืนยัน</div>
+          <div class="mt-0.5 hidden text-xs text-gray-500 sm:block">ติ๊กยืนยันแล้วบันทึก</div>
+        </li>
+        <li>
+          <div class="flow-dot s4 mx-auto flex h-10 w-10 items-center justify-center rounded-full border-2 border-brand-500 bg-white text-sm font-bold">✓</div>
+          <div class="mt-2 text-xs font-semibold text-gray-800 sm:text-sm">เสร็จสิ้น</div>
+          <div class="mt-0.5 hidden text-xs text-gray-500 sm:block">ดาวน์โหลดสรุปผลได้</div>
+        </li>
+      </ol>
+    </div>
+  </section>
+  {% endif %}
+
+  {# --- สารบัญ --- #}
+  <nav class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5" aria-label="หัวข้อคู่มือ" data-tour="help-sections">
+    <h2 class="mb-3 text-sm font-semibold text-gray-500">หัวข้อ</h2>
+    <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      {% for s in sections %}
+        <a href="#{{ s.key }}" class="group flex items-center gap-3 rounded-xl border border-gray-100 px-3 py-2.5 transition hover:-translate-y-0.5 hover:border-brand-100 hover:bg-brand-50/50 hover:shadow-sm">
+          <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-50 text-xs font-bold text-brand-700 group-hover:bg-brand-500 group-hover:text-white">{{ forloop.counter }}</span>
+          <span class="text-sm font-medium text-gray-700 group-hover:text-brand-700">{{ s.title }}</span>
+        </a>
+      {% endfor %}
+      <a href="#legend" class="group flex items-center gap-3 rounded-xl border border-gray-100 px-3 py-2.5 transition hover:-translate-y-0.5 hover:border-brand-100 hover:bg-brand-50/50 hover:shadow-sm">
+        <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs text-gray-500" aria-hidden="true">●</span>
+        <span class="text-sm font-medium text-gray-700 group-hover:text-brand-700">ความหมายของสีและป้าย</span>
+      </a>
+      <a href="#faq" class="group flex items-center gap-3 rounded-xl border border-gray-100 px-3 py-2.5 transition hover:-translate-y-0.5 hover:border-brand-100 hover:bg-brand-50/50 hover:shadow-sm">
+        <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs text-gray-500" aria-hidden="true">?</span>
+        <span class="text-sm font-medium text-gray-700 group-hover:text-brand-700">คำถามที่พบบ่อย</span>
+      </a>
+    </div>
+  </nav>
+
+  {# --- หัวข้อตามสิทธิ์ --- #}
+  {% for s in sections %}
+  <section id="{{ s.key }}" class="scroll-mt-24 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm" aria-labelledby="{{ s.key }}-title">
+    <div class="grid gap-0 {% if s.demo %}xl:grid-cols-[minmax(0,1fr)_minmax(0,420px)]{% endif %}">
+      <div class="p-5 sm:p-7">
+        <span class="text-[11px] font-bold tracking-wide text-brand-600">หัวข้อที่ {{ forloop.counter }}</span>
+        <h2 id="{{ s.key }}-title" class="mt-1 text-lg font-bold text-gray-900">{{ s.title }}</h2>
+        <p class="mt-1 text-sm text-gray-500">{{ s.summary }}</p>
+        <ol class="mt-4 space-y-3">
+          {% for step in s.steps %}
+            <li class="flex gap-3 text-sm leading-6 text-gray-700">
+              <span class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-50 text-xs font-bold text-brand-700">{{ forloop.counter }}</span>
+              <span class="[&_b]:font-semibold [&_b]:text-gray-900">{{ step|safe }}</span>
+            </li>
+          {% endfor %}
+        </ol>
+        <div class="mt-5 flex flex-wrap gap-2">
+          <a href="{{ s.url }}?tour=1"
+             class="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-600">
+            <span aria-hidden="true">▶</span> ลองทำในหน้าจริง (มีทัวร์นำ)
+          </a>
+          <a href="{{ s.url }}" class="inline-flex items-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">ไปที่หน้านี้</a>
+        </div>
+      </div>
+
+      {% if s.demo %}
+      <div class="border-t border-gray-100 bg-gray-50/60 p-4 sm:p-6 xl:border-l xl:border-t-0">
+        <div class="mb-2 flex items-center gap-1.5 text-xs font-medium text-gray-400"><span class="h-1.5 w-1.5 rounded-full bg-red-400" aria-hidden="true"></span>ภาพสาธิต</div>
+        {% include "meters/partials/help_demo.html" with demo=s.demo %}
+      </div>
+      {% endif %}
+    </div>
+  </section>
+  {% endfor %}
+
+  {# --- ความหมายของสีและป้าย --- #}
+  <section id="legend" class="scroll-mt-24 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-7" aria-labelledby="legend-title">
+    <h2 id="legend-title" class="text-lg font-bold text-gray-900">ความหมายของสีและป้าย</h2>
+    <p class="mt-1 text-sm text-gray-500">ใช้สีเดียวกันทุกหน้า ป้ายมีข้อความกำกับเสมอ ไม่ต้องจำสีอย่างเดียว</p>
+    <dl class="mt-4 grid gap-3 sm:grid-cols-2">
+      {% for cls, label, meaning in legend %}
+        <div class="flex items-start gap-3 rounded-xl border border-gray-100 p-3">
+          <dt class="shrink-0"><span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ cls }}">{{ label }}</span></dt>
+          <dd class="text-sm text-gray-600">{{ meaning }}</dd>
+        </div>
+      {% endfor %}
+    </dl>
+    <h3 class="mt-6 text-sm font-semibold text-gray-900">ทางลัด</h3>
+    <ul class="mt-2 grid gap-2 text-sm text-gray-600 sm:grid-cols-3">
+      <li class="flex items-center gap-2"><kbd class="rounded-md border border-gray-300 bg-gray-50 px-2 py-0.5 font-mono text-xs shadow-sm">/</kbd> ไปที่ช่องค้นหา</li>
+      <li class="flex items-center gap-2"><kbd class="rounded-md border border-gray-300 bg-gray-50 px-2 py-0.5 font-mono text-xs shadow-sm">← →</kbd> เลื่อนขั้นในทัวร์</li>
+      <li class="flex items-center gap-2"><kbd class="rounded-md border border-gray-300 bg-gray-50 px-2 py-0.5 font-mono text-xs shadow-sm">Esc</kbd> ปิดทัวร์</li>
+    </ul>
+  </section>
+
+  {# --- FAQ --- #}
+  <section id="faq" class="scroll-mt-24 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-7" aria-labelledby="faq-title">
+    <h2 id="faq-title" class="text-lg font-bold text-gray-900">คำถามที่พบบ่อย</h2>
+    <div class="mt-3 divide-y divide-gray-100">
+      {% for q, a in faq %}
+        <details class="group py-3">
+          <summary class="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-gray-800 hover:text-brand-700">
+            {{ q }}
+            <svg class="h-4 w-4 shrink-0 text-gray-400 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+          </summary>
+          <p class="mt-2 text-sm leading-6 text-gray-600">{{ a }}</p>
+        </details>
+      {% endfor %}
+    </div>
+  </section>
+
+</div>
+{% endblock %}

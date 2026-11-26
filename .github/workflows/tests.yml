@@ -1,0 +1,39 @@
+# ทดสอบอัตโนมัติบน Ubuntu ทุกครั้งที่ push / เปิด PR (GitHub Actions) -- แบบเดียวกับ travel_site
+# - ไม่ใช้ .env, SQL Server หรือ LDAP จริง: test ใน meters/tests/ จำลองฐานข้อมูลและ LDAP ทั้งหมด
+# - unixodbc ติดตั้งไว้ให้ import pyodbc ได้เท่านั้น ไม่มีการต่อฐานข้อมูล
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DJANGO_SECRET_KEY: ci-only-not-secret
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q unixodbc
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Django system check
+        run: python manage.py check
+
+      - name: Run tests
+        run: python manage.py test meters -v 2

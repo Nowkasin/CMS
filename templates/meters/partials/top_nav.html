@@ -18,18 +18,61 @@
     </svg>
   </button>
   <a href="{{ request.session.cms_home_url|default:no_permission_url }}"
-     class="flex shrink-0 items-center gap-3">
+     class="relative flex shrink-0 items-center gap-3">
     <img src="{% static 'meters/images/cms-icon-with-text.png' %}"
          alt="CMS ระบบบริหารสัญญา"
          class="h-10 w-10 shrink-0 object-contain sm:h-12 sm:w-12">
+    {% if cms_environment %}
+    {# มือถือ: แถบบนไม่มีที่ว่าง ติดป้ายเล็กที่มุมโลโก้แทนป้ายเต็มด้านขวา #}
+    <span class="absolute -right-3 -top-1 rounded bg-amber-500 px-1 text-[9px] font-bold leading-4 text-white sm:hidden"
+          data-env-badge-mobile title="สภาพแวดล้อม {{ cms_environment }} · ฐานข้อมูลทดสอบ">{{ cms_environment }}</span>
+    {% endif %}
     <span class="hidden sm:block">
       <span class="block text-sm font-semibold text-gray-900">ระบบบริหารสัญญา</span>
       <span class="block text-xs text-gray-400">Contract Management System</span>
     </span>
   </a>
+  {% if cms_environment %}
+  {# ป้ายสภาพแวดล้อมจาก settings.CMS_ENVIRONMENT (เช่น DEV) -- ว่าง = Production ไม่แสดง (จอ sm ขึ้นไป; มือถือใช้ป้ายเล็กที่โลโก้) #}
+  <span class="ml-3 hidden shrink-0 sm:inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800"
+        data-env-badge title="สภาพแวดล้อม {{ cms_environment }} · ฐานข้อมูลทดสอบ">
+    <span class="rounded bg-amber-500 px-1.5 py-0.5 text-[11px] font-bold text-white">{{ cms_environment }}</span>
+    <span class="hidden md:inline">ฐานข้อมูลทดสอบ</span>
+  </span>
+  {% endif %}
   <div class="ml-auto flex min-w-0 items-center gap-2 pl-3 sm:gap-3 sm:pl-4">
-    <div class="min-w-0 text-right leading-tight">
-      <div class="text-xs text-gray-400">ผู้ใช้งาน</div>
+    {% comment %}
+      ปุ่มทัวร์ -- ซ่อนไว้ก่อน static/meters/js/tour.js เปิดให้เฉพาะหน้าที่มีทัวร์
+      ปุ่มคู่มือ -- ไปหน้า /help/ (ซ่อนเมื่อบัญชีไม่มีสิทธิ์เมนูใดเลย เพราะหน้าคู่มือต้องมีสิทธิ์อย่างน้อยหนึ่งเมนู)
+    {% endcomment %}
+    <button type="button" id="tourStart" data-tour="tour-button" hidden
+            class="inline-flex h-10 items-center gap-1.5 rounded-lg border border-brand-100 bg-brand-50 px-2.5 text-sm font-medium text-brand-700 transition-colors hover:bg-brand-100 sm:px-3"
+            title="พาชมหน้านี้ทีละขั้น" aria-label="พาชมหน้านี้ทีละขั้น">
+      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15.042 21.672 13.684 16.6m0 0-2.51 2.225.569-9.47 5.227 7.917-3.286-.672ZM12 2.25V4.5m5.834.166-1.591 1.591M20.25 10.5H18M7.757 14.743l-1.59 1.59M6 10.5H3.75m4.007-4.243-1.59-1.59" />
+      </svg>
+      <span class="hidden md:inline">พาชมหน้านี้</span>
+    </button>
+    {% if request.session.cms_permissions %}
+    <a href="{% url 'help' %}" data-tour="help-link"
+       class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:bg-gray-50 hover:text-brand-700 {% if request.resolver_match.url_name == 'help' %}border-brand-200 bg-brand-50 text-brand-700{% endif %}"
+       title="คู่มือการใช้งาน" aria-label="คู่มือการใช้งาน">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+      </svg>
+    </a>
+    {% endif %}
+    {# บรรทัดบน: ป้ายบทบาท -- ทอง "ผู้ดูแลระบบ" (กดไปหน้าดูในมุมมองกลุ่ม) เมื่ออยู่ในกลุ่ม CMS_ADMIN_GROUP_IDS นอกนั้นเทา "เจ้าหน้าที่" / ชี้แล้วเห็นชื่อกลุ่มทั้งหมด #}
+    <div class="min-w-0 text-right leading-tight"{% if cms_group_names %} title="กลุ่มผู้ใช้: {{ cms_group_names }}"{% endif %}>
+      {% if cms_is_admin %}
+      {# สีทองไล่เฉด + มงกุฎ = ผู้ดูแลระบบ (ผู้ใช้ขอให้ดูหรูหรา) -- ตั้งใจให้ต่างจากป้าย DEV ที่เป็นส้มทึบ #}
+      <div><a href="{% url 'view_as' %}" class="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-gradient-to-r from-amber-300 via-yellow-100 to-amber-400 px-2 text-[11px] font-bold leading-[18px] tracking-wide text-amber-900 shadow-sm ring-1 ring-amber-500/60 transition hover:brightness-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-600" title="ผู้ดูแลระบบ · กดเพื่อดูในมุมมองกลุ่มอื่น" data-role-badge>
+        <svg class="hidden h-3 w-3 text-amber-700 sm:block" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M3 7.5l4.5 3.75L12 4.5l4.5 6.75L21 7.5l-1.875 10.5H4.875L3 7.5zM4.875 19.5h14.25v1.5H4.875z"/>
+        </svg><span class="sm:hidden">Admin</span><span class="hidden sm:inline">ผู้ดูแลระบบ</span></a></div>
+      {% else %}
+      <div><span class="inline-flex items-center whitespace-nowrap rounded-full bg-slate-100 px-1.5 text-[10px] sm:px-2 sm:text-[11px] font-semibold leading-[18px] text-slate-600 ring-1 ring-slate-200" data-role-badge-staff>เจ้าหน้าที่</span></div>
+      {% endif %}
       <div class="max-w-[90px] truncate text-sm font-semibold text-gray-700 sm:max-w-none">{{ request.session.cms_display_name|default:request.user.username }}</div>
     </div>
     <form method="post" action="{% url 'logout' %}" class="shrink-0">

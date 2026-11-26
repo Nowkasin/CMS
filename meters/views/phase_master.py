@@ -6,7 +6,6 @@
 from django.shortcuts import render, redirect
 
 from .. import services
-from ..services import activity_log as activity
 
 
 def phase_list(request):
@@ -23,41 +22,6 @@ def phase_list(request):
         'status_filter': status_filter,
     }
     return render(request, 'meters/phase_list.html', context)
-
-
-def _log_phase_change(user, old, saved_id, new_type, new_desc, new_use):
-    """
-    บันทึกประวัติหลังบันทึกระบบไฟฟ้าสำเร็จ -- old คือแถวใน DB ก่อนแก้ (None = เพิ่มใหม่)
-
-    ใช้ log_activity_safe: ถ้าเขียน log พลาดจะไม่ทำให้หน้าขึ้นว่า "บันทึกไม่สำเร็จ"
-    ทั้งที่ข้อมูลหลักถูกบันทึกไปแล้ว (error จะไปอยู่ใน logger ของเซิร์ฟเวอร์แทน)
-    """
-    if old is None:
-        activity.log_activity_safe(
-            activity.ACTION_PHASE_CREATE, user, ref_text=new_type,
-            detail=f'เพิ่มระบบไฟฟ้า "{new_type}" (Phase_id {saved_id})',
-        )
-        return
-
-    changes = []
-    if (old.get('Phase_type') or '') != new_type:
-        changes.append(f'ชื่อ "{old.get("Phase_type")}" → "{new_type}"')
-    if (old.get('Phase_desc') or '') != (new_desc or ''):
-        changes.append(f'คำบรรยาย "{old.get("Phase_desc") or "-"}" → "{new_desc or "-"}"')
-    status_changed = bool(old.get('UseOrNot')) != bool(new_use)
-    if status_changed:
-        old_label = 'เปิดใช้งาน' if old.get('UseOrNot') else 'ปิดใช้งาน'
-        new_label = 'เปิดใช้งาน' if new_use else 'ปิดใช้งาน'
-        changes.append(f'การใช้งาน {old_label} → {new_label}')
-
-    if not changes:
-        return   # กดบันทึกโดยไม่ได้เปลี่ยนอะไร ไม่ต้องลง log
-
-    only_status = status_changed and len(changes) == 1
-    activity.log_activity_safe(
-        activity.ACTION_PHASE_TOGGLE if only_status else activity.ACTION_PHASE_UPDATE,
-        user, ref_text=new_type, detail='\n'.join(changes),   # บรรทัดละหนึ่งการเปลี่ยนแปลง
-    )
 
 
 def phase_form(request, phase_id=None):
@@ -97,9 +61,8 @@ def phase_form(request, phase_id=None):
                 phase_type, phase_desc, request.user.get_username(),
                 phase_id=phase_id, use_or_not=use_or_not,
             )
-            # บันทึกประวัติหลังงานหลักสำเร็จ -- phase ตรงนี้ยังเป็นแถวใน DB ก่อนแก้
-            _log_phase_change(request.user.get_username(), phase, saved_id,
-                              phase_type, phase_desc, use_or_not)
+            # ส่ง id ที่บันทึกให้ ActivityLogMiddleware ลงประวัติ (เทียบก่อน-หลังจาก DB เอง)
+            request.activity_result = {'phase_id': saved_id}
             return redirect('phase_list')
         except ValueError as exc:
             # ValueError มาจากการ validate ของ service เอง -- ข้อความปลอดภัย แสดงให้ผู้ใช้ได้

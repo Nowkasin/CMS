@@ -12,14 +12,14 @@
         <p class="mt-1 text-sm text-gray-500">ตรวจสอบรายการจากไฟล์ Excel และแก้ไขข้อผิดพลาดก่อนดำเนินการต่อ</p>
       </div>
       {# ปุ่มนี้ล้างข้อมูลที่อัปโหลดไว้ทั้งหมดจริง (restart) -- ถามยืนยันก่อนกันกดพลาด #}
-      <a href="{% url 'restart' %}"
+      <button type="submit" form="restartForm"
          onclick="return confirm('เริ่มรายการใหม่จะล้างข้อมูลที่อัปโหลดไว้ทั้งหมด ต้องการดำเนินการต่อหรือไม่?')"
-         class="inline-flex items-center gap-1.5 bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+         class="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50">
         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
         </svg>
         สร้างรายการใหม่
-      </a>
+      </button>
     </div>
 
     {% include "meters/stepper.html" %}
@@ -40,7 +40,10 @@
         <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
         </svg>
-        พบ {{ staged.summary.error }} รายการที่มีปัญหา — กรุณาแก้ไขในไฟล์ Excel แล้วอัปโหลดใหม่ ก่อนดำเนินการต่อ
+        <span class="flex-1">พบ {{ staged.summary.error }} รายการที่มีปัญหา — กรุณาแก้ไขในไฟล์ Excel แล้วอัปโหลดใหม่ ก่อนดำเนินการต่อ</span>
+        {% if status_filter != 'error' %}
+          <a href="?status=error" class="shrink-0 font-semibold text-red-700 underline hover:no-underline">ดูรายการที่มีปัญหา</a>
+        {% endif %}
       </div>
       {% endif %}
 
@@ -57,91 +60,112 @@
       </div>
       {% endif %}
 
-      <!-- ค้นหา/กรอง -->
-      <form method="get" class="flex flex-wrap items-center gap-2 mb-4">
-        {% comment %}
-          ต้องใส่ |urlencode ทุกที่ที่เอาคำค้นต่อเข้า URL -- ถ้าผู้ใช้ค้นคำที่มี & หรือ #
-          คำค้นจะถูกตัดกลางทาง เพราะ & เป็นตัวคั่น query string และ # เป็นจุดเริ่ม fragment
-        {% endcomment %}
-        <a href="?type=all{% if search %}&q={{ search|urlencode }}{% endif %}"
-           class="text-xs px-3 py-1.5 rounded-full border {% if active_filter == 'all' %}bg-gray-900 text-white border-gray-900{% else %}border-gray-200 text-gray-600{% endif %}">ทั้งหมด</a>
-        <a href="?type=9{% if search %}&q={{ search|urlencode }}{% endif %}"
-           class="text-xs px-3 py-1.5 rounded-full border {% if active_filter == '9' %}bg-gray-900 text-white border-gray-900{% else %}border-gray-200 text-gray-600{% endif %}">น้ำ</a>
-        <a href="?type=8{% if search %}&q={{ search|urlencode }}{% endif %}"
-           class="text-xs px-3 py-1.5 rounded-full border {% if active_filter == '8' %}bg-gray-900 text-white border-gray-900{% else %}border-gray-200 text-gray-600{% endif %}">ไฟฟ้า</a>
+      {% comment %}
+        แท็บสถานะ + กรองประเภท/ค้นหา -- ลิงก์ทุกอันพก status/type/q ไปด้วย
+        ต้องใส่ |urlencode ทุกที่ที่เอาคำค้นต่อเข้า URL (คำค้นที่มี & หรือ # จะถูกตัดกลางทาง)
+      {% endcomment %}
+      <div class="mb-3 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="สถานะรายการ" data-tour="status-tabs">
+        {% for t in status_tabs %}
+          <a href="?status={{ t.key }}&type={{ active_filter|urlencode }}{% if search %}&q={{ search|urlencode }}{% endif %}"
+             role="tab" aria-selected="{% if t.is_active %}true{% else %}false{% endif %}"
+             class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors
+                    {% if t.is_active %}border-brand-500 bg-brand-500 text-white shadow-sm{% else %}border-gray-200 bg-white text-gray-600 hover:bg-gray-50{% endif %}">
+            {% if t.tone == 'red' %}<span class="h-2 w-2 rounded-full bg-red-500" aria-hidden="true"></span>
+            {% elif t.tone == 'amber' %}<span class="h-2 w-2 rounded-full bg-amber-400" aria-hidden="true"></span>
+            {% elif t.tone == 'brand' %}<span class="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true"></span>{% endif %}
+            {{ t.label }}
+            <span class="rounded-full px-1.5 text-xs {% if t.is_active %}bg-white/20 text-white{% else %}bg-gray-100 text-gray-500{% endif %}">{{ t.count }}</span>
+          </a>
+        {% endfor %}
+      </div>
+
+      <form method="get" class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <input type="hidden" name="status" value="{{ status_filter }}">
+        <div class="flex gap-1.5" role="group" aria-label="ประเภทมิเตอร์">
+          <a href="?status={{ status_filter }}&type=all{% if search %}&q={{ search|urlencode }}{% endif %}"
+             class="rounded-lg border px-3 py-1.5 text-xs font-medium {% if active_filter == 'all' %}border-brand-200 bg-brand-50 text-brand-700{% else %}border-gray-200 text-gray-600 hover:bg-gray-50{% endif %}">ทุกประเภท</a>
+          <a href="?status={{ status_filter }}&type=9{% if search %}&q={{ search|urlencode }}{% endif %}"
+             class="rounded-lg border px-3 py-1.5 text-xs font-medium {% if active_filter == '9' %}border-sky-200 bg-sky-50 text-sky-700{% else %}border-gray-200 text-gray-600 hover:bg-gray-50{% endif %}">💧 น้ำ</a>
+          <a href="?status={{ status_filter }}&type=8{% if search %}&q={{ search|urlencode }}{% endif %}"
+             class="rounded-lg border px-3 py-1.5 text-xs font-medium {% if active_filter == '8' %}border-amber-200 bg-amber-50 text-amber-700{% else %}border-gray-200 text-gray-600 hover:bg-gray-50{% endif %}">⚡ ไฟฟ้า</a>
+        </div>
         <input type="hidden" name="type" value="{{ active_filter }}">
-        <input type="text" name="q" value="{{ search }}" placeholder="ค้นหา รหัสสัญญา / SubArea / เลขมิเตอร์"
-               class="flex-1 min-w-[180px] border border-gray-200 rounded-lg px-3 py-1.5 text-sm">
-        <button type="submit" class="text-xs font-medium border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50">ค้นหา</button>
+        <div class="flex flex-1 gap-2">
+          <input type="search" name="q" value="{{ search }}" placeholder="ค้นหา รหัสสัญญา / SubArea / เลขมิเตอร์"
+                 aria-label="ค้นหารายการ"
+                 class="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200">
+          <button type="submit" class="shrink-0 rounded-lg bg-brand-500 px-4 py-1.5 text-sm font-semibold text-white hover:bg-brand-600">ค้นหา</button>
+        </div>
       </form>
 
-      <!-- ตาราง -->
-      <div class="border border-gray-100 rounded-xl overflow-x-auto">
-        <table class="min-w-[1100px] w-full text-sm">
-          <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
+      {% comment %}
+        ตาราง -- เดิม 11 คอลัมน์ (กว้าง 1,100px) สถานะ/ข้อความผิดพลาดอยู่ขวาสุด ต้องเลื่อนถึงจะเห็น
+        ย้ายสถานะมาซ้ายสุด และรวมข้อมูลเป็นกลุ่ม: สัญญา / พื้นที่+มิเตอร์ / เลขอ่าน
+      {% endcomment %}
+      <div class="border border-gray-100 rounded-xl overflow-x-auto" data-tour="table">
+        <table class="min-w-[600px] w-full text-sm">
+          <thead class="bg-gray-50 text-xs text-gray-500">
             <tr>
-              <th class="text-left px-4 py-2.5">ลำดับ</th>
-              <th class="text-left px-4 py-2.5">ชื่อลูกหนี้</th>
-              <th class="text-left px-4 py-2.5">เลขประจำตัว</th>
-              <th class="text-left px-4 py-2.5">เลขที่สัญญา</th>
-              <th class="text-left px-4 py-2.5">รหัสสัญญา</th>
-              <th class="text-left px-4 py-2.5">SubArea</th>
-              <th class="text-left px-4 py-2.5">ประเภท</th>
-              <th class="text-left px-4 py-2.5">เลขมิเตอร์</th>
-              <th class="text-right px-4 py-2.5">เลขที่อ่านก่อน</th>
-              <th class="text-right px-4 py-2.5">เลขที่อ่านหลัง</th>
-              <th class="text-left px-4 py-2.5">สถานะ</th>
+              <th class="w-[220px] px-4 py-2.5 text-left font-semibold">สถานะ</th>
+              <th class="px-4 py-2.5 text-left font-semibold">สัญญา / ลูกหนี้</th>
+              <th class="px-4 py-2.5 text-left font-semibold">พื้นที่ / มิเตอร์</th>
+              <th class="px-4 py-2.5 text-right font-semibold whitespace-nowrap">เลขอ่าน ก่อน → หลัง</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-50">
+          <tbody class="divide-y divide-gray-100">
             {% for r in page_obj %}
-            <tr class="{% if r.status == 'error' %}bg-red-50{% elif r.status == 'duplicate' %}bg-amber-50{% endif %}">
-              <td class="px-4 py-2.5 text-gray-400 font-mono text-xs">{{ r.idx }}</td>
-              <td class="px-4 py-2.5 text-xs whitespace-nowrap">{{ r.customer_name|default:"—" }}</td>
-              <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap">{{ r.tax_id|default:"—" }}</td>
-              <td class="px-4 py-2.5 font-mono text-xs">{{ r.contract_id|default:"—" }}</td>
-              <td class="px-4 py-2.5 font-mono text-xs">{{ r.contract_code|default:"—" }}</td>
-              <td class="px-4 py-2.5 font-mono text-xs">{{ r.subarea_id }}</td>
-              <td class="px-4 py-2.5">
-                <span class="text-xs font-semibold px-2 py-0.5 rounded-full {% if r.type_cd == 9 %}bg-cyan-50 text-cyan-600{% else %}bg-amber-50 text-amber-600{% endif %}">
-                  {{ r.type_label }}
-                </span>
-              </td>
-              <td class="px-4 py-2.5 font-mono text-xs">{{ r.meter_no|default:"—" }}</td>
-              {# ใช้ is not None แทน |default เพราะเลข 0 เป็นค่าจริงที่ต้องแสดง และ session เก่าที่ไม่มีคีย์นี้จะขึ้น — #}
-              <td class="px-4 py-2.5 font-mono text-xs text-right">
-                {% if r.reading_before is not None %}{{ r.reading_before }}{% else %}<span class="text-gray-300">—</span>{% endif %}
-              </td>
-              <td class="px-4 py-2.5 font-mono text-xs text-right">
-                {% if r.reading_after is not None %}{{ r.reading_after }}{% else %}<span class="text-gray-300">—</span>{% endif %}
-              </td>
-              <td class="px-4 py-2.5">
+            <tr class="align-top {% if r.status == 'error' %}bg-red-50/60{% elif r.status == 'duplicate' %}bg-amber-50/50{% elif r.status == 'skip' %}text-gray-400{% endif %}">
+              <td class="px-4 py-3">
                 {% if r.status == 'ok' %}
-                  <span class="text-xs font-medium text-brand-600">พร้อมนำเข้า</span>
+                  <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                    พร้อมนำเข้า
+                  </span>
                   {% if r.reading_warning %}
-                    <div class="mt-0.5 text-[11px] leading-4 text-amber-600">{{ r.reading_warning }}</div>
+                    <div class="mt-1 text-xs leading-5 text-amber-700">{{ r.reading_warning }}</div>
                   {% endif %}
                 {% elif r.status == 'duplicate' %}
-                  <span class="text-xs font-medium text-amber-600 inline-flex items-center gap-1">
-                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 8.25V6a2.25 2.25 0 00-2.25-2.25H6A2.25 2.25 0 003.75 6v8.25A2.25 2.25 0 006 16.5h2.25m8.25-8.25H18A2.25 2.25 0 0120.25 10.5V18A2.25 2.25 0 0118 20.25h-7.5A2.25 2.25 0 018.25 18v-7.5A2.25 2.25 0 0110.5 8.25h6z" />
-                    </svg>
-                    {{ r.message }}
-                  </span>
+                  <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">มีในระบบแล้ว</span>
+                  <div class="mt-1 text-xs leading-5 text-amber-700">{{ r.message }}</div>
                 {% elif r.status == 'skip' %}
-                  <span class="text-xs font-medium text-gray-400">{{ r.message|default:"ข้าม" }}</span>
+                  <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-500">ข้าม</span>
+                  <div class="mt-1 text-xs leading-5 text-gray-400">{{ r.message }}</div>
                 {% else %}
-                  <span class="text-xs font-medium text-red-500 inline-flex items-center gap-1">
-                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m0 3.75h.007M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    {{ r.message }}
+                  <span class="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m0 3.75h.007" /></svg>
+                    มีปัญหา
                   </span>
+                  <div class="mt-1 text-xs font-medium leading-5 text-red-700">{{ r.message }}</div>
                 {% endif %}
+                <div class="mt-1 font-mono text-[11px] text-gray-400">แถวที่ {{ r.idx }}</div>
+              </td>
+              <td class="px-4 py-3">
+                <div class="font-mono text-sm font-medium text-gray-800">{{ r.contract_code|default:"—" }}</div>
+                <div class="text-xs text-gray-600">{{ r.customer_name|default:"—" }}</div>
+                <div class="font-mono text-[11px] text-gray-400">
+                  เลขที่สัญญา {{ r.contract_id|default:"—" }}{% if r.tax_id %} · {{ r.tax_id }}{% endif %}
+                </div>
+              </td>
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-1.5">
+                  <span class="rounded-full px-2 py-0.5 text-xs font-semibold {% if r.type_cd == 9 %}bg-sky-50 text-sky-700{% else %}bg-amber-50 text-amber-700{% endif %}">
+                    {% if r.type_cd == 9 %}💧{% else %}⚡{% endif %} {{ r.type_label }}
+                  </span>
+                  <span class="font-mono text-xs text-gray-700">{{ r.meter_no|default:"รอ Gen เลข" }}</span>
+                </div>
+                <div class="mt-1 font-mono text-xs text-gray-500">SubArea {{ r.subarea_id }}{% if r.subarea_name %} · <span class="font-sans">{{ r.subarea_name }}</span>{% endif %}</div>
+              </td>
+              {# ใช้ is not None แทน |default เพราะเลข 0 เป็นค่าจริงที่ต้องแสดง และ session เก่าที่ไม่มีคีย์นี้จะขึ้น — #}
+              <td class="px-4 py-3 text-right font-mono text-xs whitespace-nowrap">
+                {% if r.reading_before is not None %}{{ r.reading_before }}{% else %}<span class="text-gray-300">—</span>{% endif %}
+                <span class="text-gray-300" aria-hidden="true">→</span>
+                {% if r.reading_after is not None %}<span class="font-semibold text-gray-800">{{ r.reading_after }}</span>{% else %}<span class="text-gray-300">—</span>{% endif %}
               </td>
             </tr>
             {% empty %}
-            <tr><td colspan="11" class="text-center text-gray-400 text-sm py-10">ไม่พบข้อมูลที่ค้นหา</td></tr>
+            <tr><td colspan="4" class="text-center text-gray-400 text-sm py-10">
+              {% if status_filter == 'error' %}🎉 ไม่มีรายการที่มีปัญหา{% else %}ไม่พบข้อมูลที่ค้นหา{% endif %}
+            </td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -151,13 +175,13 @@
       {% if page_obj.paginator.num_pages > 1 %}
       <div class="flex items-center justify-center gap-1 mt-4">
         {% if page_obj.has_previous %}
-          <a href="?type={{ active_filter|urlencode }}&q={{ search|urlencode }}&page={{ page_obj.previous_page_number }}"
-             class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">‹</a>
+          <a href="?status={{ status_filter }}&type={{ active_filter|urlencode }}&q={{ search|urlencode }}&page={{ page_obj.previous_page_number }}"
+             class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50" aria-label="หน้าก่อนหน้า">‹</a>
         {% endif %}
         <span class="text-xs text-gray-500 px-2">หน้า {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
         {% if page_obj.has_next %}
-          <a href="?type={{ active_filter|urlencode }}&q={{ search|urlencode }}&page={{ page_obj.next_page_number }}"
-             class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">›</a>
+          <a href="?status={{ status_filter }}&type={{ active_filter|urlencode }}&q={{ search|urlencode }}&page={{ page_obj.next_page_number }}"
+             class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50" aria-label="หน้าถัดไป">›</a>
         {% endif %}
       </div>
       {% endif %}
@@ -182,11 +206,11 @@
           ย้อนกลับ
         </a>
         {% if staged.summary.error > 0 %}
-          <span class="inline-flex items-center gap-2 bg-gray-200 text-gray-400 text-sm font-semibold px-5 py-2.5 rounded-lg cursor-not-allowed">
+          <span data-tour="next" class="inline-flex items-center gap-2 bg-gray-200 text-gray-400 text-sm font-semibold px-5 py-2.5 rounded-lg cursor-not-allowed">
             ถัดไป (แก้ไขข้อผิดพลาดก่อน)
           </span>
         {% else %}
-          <a href="{% url 'step3' %}"
+          <a data-tour="next" href="{% url 'step3' %}"
              class="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition">
             ถัดไป
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -198,4 +222,6 @@
     </div>
 
 </div>
+{# restart ล้างข้อมูลใน session จึงต้องเป็น POST + CSRF (เดิมเป็นลิงก์ GET -- เบราว์เซอร์ prefetch หรือรูป/ลิงก์จากที่อื่นล้างงานที่ค้างอยู่ได้) ปุ่มอ้างฟอร์มนี้ด้วย form="restartForm" #}
+<form id="restartForm" method="post" action="{% url 'restart' %}" class="hidden">{% csrf_token %}</form>
 {% endblock %}
