@@ -1,0 +1,73 @@
+{% extends "meters/base.html" %}
+{% block title %}ดูในมุมมองกลุ่ม{% endblock %}
+
+{% comment %}
+  ผู้ดูแลระบบเลือกกลุ่ม K2 เพื่อจำลองสิทธิ์เมนู (meters/views/view_as.py)
+  รายชื่อกลุ่ม = กลุ่มที่เปิดใช้งานและได้รับเมนูย่อยของ CMS อย่างน้อยหนึ่งเมนู
+{% endcomment %}
+
+{% block content %}
+<div class="mx-auto max-w-5xl">
+  <div class="mb-6">
+    <h1 class="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">ดูในมุมมองกลุ่ม</h1>
+    <p class="mt-1 text-sm text-gray-500">
+      จำลองสิทธิ์เมนูของกลุ่มผู้ใช้ เพื่อตรวจว่ากลุ่มนั้นเห็นเมนูและหน้าใดบ้าง
+      ระหว่างจำลองเป็นแบบ<strong class="font-semibold text-gray-700">อ่านอย่างเดียว</strong> บันทึกหรือแก้ไขข้อมูลไม่ได้
+    </p>
+  </div>
+
+  {% if cms_view_as %}
+  <div class="mb-5 flex flex-col gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <p class="text-sm text-violet-800">กำลังดูในมุมมองของ <strong class="font-semibold">{{ cms_view_as.name }}</strong></p>
+    <form method="post" action="{% url 'view_as_stop' %}">
+      {% csrf_token %}
+      <button type="submit" class="w-full rounded-lg border border-violet-300 bg-white px-4 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-100 sm:w-auto">
+        กลับเป็นผู้ดูแลระบบ
+      </button>
+    </form>
+  </div>
+  {% endif %}
+
+  {% if error %}
+  <div class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{{ error }}</div>
+  {% endif %}
+
+  {% if groups %}
+  <div class="grid gap-4 md:grid-cols-2">
+    {% for group in groups %}
+    <section class="flex flex-col rounded-xl border bg-white p-4 shadow-sm {% if group.id == current_id %}border-violet-300 ring-2 ring-violet-100{% else %}border-gray-200{% endif %}">
+      <div class="flex items-start justify-between gap-3">
+        <h2 class="text-sm font-semibold text-gray-900">{{ group.name }}</h2>
+        {% if group.id == current_id %}
+        <span class="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700">กำลังดูอยู่</span>
+        {% endif %}
+      </div>
+      <p class="mt-1 text-xs text-gray-400">{{ group.menu_labels|length }} เมนู</p>
+      <ul class="mt-3 flex flex-wrap gap-1.5" aria-label="เมนูที่กลุ่มนี้เห็น">
+        {% for label in group.menu_labels %}
+        <li class="rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{{ label }}</li>
+        {% endfor %}
+      </ul>
+      <form method="post" action="{% url 'view_as_start' %}" class="mt-4 pt-1 sm:mt-auto">
+        {% csrf_token %}
+        <input type="hidden" name="group_id" value="{{ group.id }}">
+        <button type="submit"
+                class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 sm:w-auto"
+                {% if group.id == current_id %}disabled aria-disabled="true"{% endif %}>
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+          </svg>
+          ดูในมุมมองนี้
+        </button>
+      </form>
+    </section>
+    {% endfor %}
+  </div>
+  {% elif not error %}
+  <div class="rounded-xl border border-gray-200 bg-white px-4 py-10 text-center text-sm text-gray-500 shadow-sm">
+    ไม่พบกลุ่มที่ได้รับเมนู CMS
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

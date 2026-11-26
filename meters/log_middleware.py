@@ -320,6 +320,20 @@ def _export_build(request, kwargs, before, response):
     }
 
 
+def _view_as_build(request, kwargs, before, response):
+    """ผู้ดูแลระบบเริ่ม/เลิกดูในมุมมองกลุ่ม -- view ฝากชื่อกลุ่มไว้เมื่อทำสำเร็จ"""
+    result = _result(request)
+    name = result.get('group_name')
+    if not name or not _is_redirect(response):
+        return None
+    if request.resolver_match.url_name == 'view_as_start':
+        menus = ', '.join(result.get('menu_labels') or []) or '-'
+        return {'action': activity.ACTION_VIEW_AS_START, 'ref_text': name,
+                'detail': f'เริ่มดูในมุมมองกลุ่ม "{name}" (อ่านอย่างเดียว)\nเมนูของกลุ่ม: {menus}'}
+    return {'action': activity.ACTION_VIEW_AS_STOP, 'ref_text': name,
+            'detail': f'เลิกดูในมุมมองกลุ่ม "{name}" กลับเป็นสิทธิ์ผู้ดูแลระบบ'}
+
+
 # --------------------------------------------------------------------------
 # POST ที่ไม่อยู่ในตารางลงทะเบียน -> ลงเป็น "การดำเนินการอื่น" (กันเมนูใหม่หลุดเงียบ)
 # --------------------------------------------------------------------------
@@ -345,6 +359,8 @@ REGISTRY = {
     'download_excel': {'methods': ('POST',), 'before': None, 'build': _download_build},
     'export_meters':  {'methods': ('GET',),  'before': None, 'build': _export_build},
     'invoice_print':  {'methods': ('GET',),  'before': None, 'build': _invoice_print_build},
+    'view_as_start':  {'methods': ('POST',), 'before': None, 'build': _view_as_build},
+    'view_as_stop':   {'methods': ('POST',), 'before': None, 'build': _view_as_build},
 }
 FALLBACK = {'methods': ('POST',), 'before': None, 'build': _fallback_build}
 

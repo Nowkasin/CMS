@@ -60,4 +60,9 @@ urlpatterns = [
     # --- ใบแจ้งหนี้ (แทนฟอร์ม K2 FRM_4019_Invoice_CMS) ---
     path('invoice/', views.invoice_search, name='invoice_search'),
     path('invoice/print/', views.invoice_print, name='invoice_print'),
+
+    # --- ผู้ดูแลระบบ: ดูในมุมมองกลุ่ม (จำลองสิทธิ์เมนู อ่านอย่างเดียว) ---
+    path('admin/view-as/', views.view_as, name='view_as'),
+    path('admin/view-as/start/', views.view_as_start, name='view_as_start'),
+    path('admin/view-as/stop/', views.view_as_stop, name='view_as_stop'),
 ]

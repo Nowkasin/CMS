@@ -60,6 +60,7 @@ TEMPLATES = [
             'context_processors': [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
+                'meters.context_processors.cms_environment',
             ],
         },
     },
@@ -239,6 +240,18 @@ CMS_MAINTENANCE_ALLOW_IPS = [
 
 # ดึงสิทธิ์เมนูจาก K2 ใหม่ทุกกี่วินาทีระหว่างที่ผู้ใช้ยังล็อกอินอยู่ (0 = ไม่ดึงใหม่ ใช้ค่าตอนล็อกอิน)
 CMS_ACCESS_REFRESH_SECONDS = config('CMS_ACCESS_REFRESH_SECONDS', default=600, cast=int)
+
+# ป้ายบอกสภาพแวดล้อมใต้เมนู เช่น CMS_ENVIRONMENT=DEV บนเครื่องที่ต่อ DBDEV
+# ว่าง (ค่าเริ่มต้น) = Production ไม่แสดงป้าย -- ใส่แค่ชื่อสั้น ห้ามใส่ชื่อเครื่องหรือค่าเชื่อมต่อ
+CMS_ENVIRONMENT = config('CMS_ENVIRONMENT', default='').strip()[:12]
+
+# GroupId ใน SysGroup ที่ถือเป็นผู้ดูแลระบบ -- ใช้แสดงป้าย "ผู้ดูแลระบบ" ที่แถบบนเท่านั้น ไม่ได้ให้สิทธิ์เพิ่ม
+# ค่าเริ่มต้น = "ผู้ดูแลระบบ ( Admin )" บน DEV ถ้า PRD ใช้ GroupId ต่างกันให้ตั้งใน .env (คั่นด้วย ,)
+CMS_ADMIN_GROUP_IDS = [
+    g.strip().upper() for g in config(
+        'CMS_ADMIN_GROUP_IDS', default='9B148353-6383-40D7-B3B8-F04FC8C5A4C5',
+    ).split(',') if g.strip()
+]
 
 LDAP_SERVER_URI = config('LDAP_SERVER_URI', default='')
 LDAP_USER_DN_TEMPLATE = config('LDAP_USER_DN_TEMPLATE', default='')

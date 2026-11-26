@@ -9,9 +9,14 @@ from django.shortcuts import redirect, render
 
 from .permissions import (
     ACCESS_CHECKED_AT_KEY,
+    ADMIN_URL_NAMES,
     HOME_URL_NAMES,
     PUBLIC_URL_NAMES,
     URL_PERMISSION_MAP,
+    VIEW_AS_ALLOWED_POST,
+    VIEW_AS_KEY,
+    is_cms_admin,
+    reapply_view_as,
     store_access_in_session,
 )
 from .services.access import fetch_user_access
@@ -65,6 +70,8 @@ class CMSMenuPermissionMiddleware:
         if access['permissions'] != request.session.get('cms_permissions'):
             logger.info('CMS permissions changed user=%s', username)
         store_access_in_session(request.session, access)
+        # ผู้ดูแลที่กำลัง "ดูในมุมมองกลุ่ม" -- ไม่ให้สิทธิ์จริงทับสิทธิ์จำลองกลางคัน
+        reapply_view_as(request.session)
         return True
 
     def process_view(self, request, view_func, view_args, view_kwargs):
@@ -76,6 +83,18 @@ class CMSMenuPermissionMiddleware:
             # ถูกถอนกลุ่ม CMS ทั้งหมด / ไม่พบในข้อมูลบุคลากรแล้ว -> ออกจากระบบทันที
             logout(request)
             return redirect('login')
+
+        if url_name in ADMIN_URL_NAMES:
+            # ตรวจจากกลุ่มจริง ไม่ใช่สิทธิ์เมนู -- คนที่ไม่ใช่ผู้ดูแลเห็นเป็น 404 ไม่รู้ว่ามีหน้านี้
+            if is_cms_admin(request.session):
+                return None
+            return render(request, 'meters/404.html', status=404)
+
+        if request.session.get(VIEW_AS_KEY) and request.method not in ('GET', 'HEAD', 'OPTIONS')                 and url_name not in VIEW_AS_ALLOWED_POST:
+            # โหมดดูในมุมมองกลุ่มเป็นแบบอ่านอย่างเดียว -- ปฏิเสธทุกการบันทึก/แก้ไข
+            logger.info('CMS view-as blocked write user=%s url_name=%s',
+                        request.user.get_username(), url_name)
+            return render(request, 'meters/view_as_readonly.html', status=403)
 
         permissions = request.session.get('cms_permissions', {})
         if url_name in HOME_URL_NAMES:

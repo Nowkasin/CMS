@@ -11,6 +11,12 @@ register = template.Library()
 
 
 @register.filter
+def is_one_of(value, names):
+    """{{ url_name|is_one_of:"meter_list,meter_new" }} -- ใช้บอกว่าเมนูไหนกำลังเปิดอยู่ใน sidebar"""
+    return bool(value) and value in [name.strip() for name in str(names).split(',')]
+
+
+@register.filter
 def highlight(value, term):
     """
     ไฮไลต์คำค้นในข้อความด้วย <mark> (ไม่สนตัวพิมพ์เล็ก/ใหญ่)

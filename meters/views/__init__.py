@@ -53,6 +53,8 @@ from .home import home
 from .help import help_page
 from .invoice import invoice_search, invoice_print
 
+from .view_as import view_as, view_as_start, view_as_stop
+
 __all__ = [
     'step1_upload', 'step2_review', 'step3_confirm',
     'step4_done', 'restart',
@@ -67,4 +69,5 @@ __all__ = [
     'home', 'help_page',
     'invoice_search', 'invoice_print',
     'login_view', 'logout_view', 'no_permission_view',
+    'view_as', 'view_as_start', 'view_as_stop',
 ]
