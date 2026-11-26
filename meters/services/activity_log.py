@@ -55,6 +55,11 @@ ACTION_PHASE_TOGGLE = 'phase_toggle'          # เปิด/ปิดใช้�
 # --- ใหม่: นำข้อมูลออก ---
 ACTION_DOWNLOAD_EXCEL = 'download_excel'      # ดาวน์โหลด Excel (เดือน-ปี + จำนวนรายการ)
 ACTION_EXPORT_METERS = 'export_meters'        # ส่งออก Excel จากแดชบอร์ด
+ACTION_INVOICE_PRINT = 'invoice_print'        # เปิดหน้าพิมพ์ใบแจ้งหนี้ (เลขตั้งหนี้ SAP ที่พิมพ์)
+
+# --- ใหม่: ผู้ดูแลระบบดูในมุมมองกลุ่ม (จำลองสิทธิ์เมนู อ่านอย่างเดียว) ---
+ACTION_VIEW_AS_START = 'view_as_start'
+ACTION_VIEW_AS_STOP = 'view_as_stop'
 
 # --- ใหม่: POST ที่ยังไม่ได้ลงทะเบียนใน middleware ---
 ACTION_OTHER = 'other_action'
@@ -69,6 +74,7 @@ ACTIVITY_ACTIONS = [
     (ACTION_UPLOAD_COMMIT, 'นำเข้าไฟล์ Excel'),
     (ACTION_DOWNLOAD_EXCEL, 'ดาวน์โหลด Excel'),
     (ACTION_EXPORT_METERS, 'ส่งออกมิเตอร์'),
+    (ACTION_INVOICE_PRINT, 'พิมพ์ใบแจ้งหนี้'),
     (ACTION_METER_CREATE, 'เพิ่มมิเตอร์'),
     (ACTION_METER_UPDATE, 'แก้ไขมิเตอร์'),
     (ACTION_METER_TOGGLE, 'เปิด/ปิดมิเตอร์'),
@@ -79,11 +85,40 @@ ACTIVITY_ACTIONS = [
     (ACTION_TERMINATION_SAVE, 'บันทึกยกเลิกสัญญา'),
     (ACTION_TERMINATION_DELETE, 'ลบรายการยกเลิก'),
     (ACTION_TERMINATION_CLOSE_METERS, 'ปิดการตั้งหนี้มิเตอร์'),
+    (ACTION_VIEW_AS_START, 'เริ่มดูในมุมมองกลุ่ม'),
+    (ACTION_VIEW_AS_STOP, 'เลิกดูในมุมมองกลุ่ม'),
     (ACTION_LOGIN, 'เข้าสู่ระบบ'),
     (ACTION_LOGOUT, 'ออกจากระบบ'),
     (ACTION_LOGIN_FAILED, 'เข้าสู่ระบบไม่สำเร็จ'),
     (ACTION_OTHER, 'การดำเนินการอื่น'),
 ]
+
+# เหตุการณ์แต่ละชนิดเป็นของเมนูไหน (key สิทธิ์เมนู K2) -- คนที่ไม่ใช่ผู้ดูแลระบบเห็น log
+# เฉพาะเหตุการณ์ของเมนูที่กลุ่มตัวเองมีสิทธิ์ ส่วนที่ไม่อยู่ในนี้ (เข้า/ออกระบบ ดูในมุมมองกลุ่ม
+# การดำเนินการอื่น และ Action_type ที่ไม่รู้จัก) ผู้ดูแลระบบเห็นคนเดียว
+ACTION_PERMISSIONS = {
+    ACTION_UPLOAD_COMMIT: 'excel_upload',
+    ACTION_DOWNLOAD_EXCEL: 'excel_download',
+    ACTION_EXPORT_METERS: 'dashboard_view',
+    ACTION_READING_SAVE: 'dashboard_view',
+    ACTION_INVOICE_PRINT: 'invoice_print',
+    ACTION_METER_CREATE: 'meter_management',
+    ACTION_METER_UPDATE: 'meter_management',
+    ACTION_METER_TOGGLE: 'meter_management',
+    ACTION_PHASE_CREATE: 'phase_management',
+    ACTION_PHASE_UPDATE: 'phase_management',
+    ACTION_PHASE_TOGGLE: 'phase_management',
+    ACTION_TERMINATION_SAVE: 'contract_termination',
+    ACTION_TERMINATION_DELETE: 'contract_termination',
+    ACTION_TERMINATION_CLOSE_METERS: 'contract_termination',
+}
+
+
+def allowed_actions_for(permissions):
+    """รายการ Action_type ที่ผู้ใช้ที่มีสิทธิ์เมนู permissions เห็นได้ (ตามลำดับแท็บ)"""
+    permissions = permissions or {}
+    return [key for key, _ in ACTIVITY_ACTIONS if permissions.get(ACTION_PERMISSIONS.get(key))]
+
 
 # ชื่อเหตุการณ์ที่ไม่รู้จัก (เผื่อมี Action_type ในฐานข้อมูลที่ยังไม่ได้ลงทะเบียนที่นี่
 # เช่นถูกเขียนจาก SP ที่เพิ่มภายหลัง) -- แสดงค่าดิบดีกว่าซ่อนแถวนั้นไป
@@ -198,8 +233,21 @@ _LOG_FROM = """
 """
 
 
+def _actions_in(allowed_actions, column='g.Action_type'):
+    """
+    เงื่อนไขจำกัดชนิดเหตุการณ์ -- None = ไม่จำกัด (ผู้ดูแลระบบ), [] = ไม่เห็นอะไรเลย
+    ค่าใน allowed_actions มาจาก ACTION_PERMISSIONS เท่านั้น แต่ก็ยังส่งเป็นพารามิเตอร์
+    """
+    if allowed_actions is None:
+        return '', []
+    allowed_actions = list(allowed_actions)
+    if not allowed_actions:
+        return ' AND 1 = 0', []
+    return f" AND {column} IN ({', '.join('?' * len(allowed_actions))})", allowed_actions
+
+
 def _log_where(search='', action='all', contract_id=None, user=None,
-               date_from=None, date_to=None):
+               date_from=None, date_to=None, allowed_actions=None):
     """
     ประกอบ WHERE ของหน้า log -- ทุกตัวกรองทำใน SQL
 
@@ -208,8 +256,8 @@ def _log_where(search='', action='all', contract_id=None, user=None,
 
     date_to รวมทั้งวัน -- เทียบ DateEntry < วันถัดไป แทน <= date_to (ไม่งั้นตัดเวลาหลังเที่ยงคืนทิ้ง)
     """
-    sql = ' WHERE 1 = 1'
-    params = []
+    sql, params = _actions_in(allowed_actions)
+    sql = ' WHERE 1 = 1' + sql
     if action and action != 'all':
         sql += ' AND g.Action_type = ?'
         params.append(action)
@@ -252,7 +300,7 @@ def fetch_activity_log(offset=0, limit=None, **filters):
     """
     ดึง log เหตุการณ์ เรียงเวลาล่าสุดก่อน เฉพาะช่วง offset/limit (แบ่งหน้าใน SQL)
 
-    ตัวกรอง (ดู _log_where): search, action, contract_id, user, date_from, date_to
+    ตัวกรอง (ดู _log_where): search, action, contract_id, user, date_from, date_to, allowed_actions
       search -- รหัสสัญญา / ชื่อลูกค้า / ชื่อผู้ทำรายการ / ข้อความอ้างอิง
 
     join Contract_hrd_tr เพื่อเอารหัสสัญญามาแสดง (log เก็บแค่ Contract_id)
@@ -282,12 +330,13 @@ def fetch_activity_log(offset=0, limit=None, **filters):
         conn.close()
 
 
-def fetch_activity_users(search='', action='all', contract_id=None):
+def fetch_activity_users(search='', action='all', contract_id=None, allowed_actions=None):
     """
     รายชื่อผู้ทำรายการสำหรับ dropdown -- กรองด้วยตัวกรองอื่นยกเว้นผู้ใช้/วันที่
     (เหมือนพฤติกรรมเดิม: เปลี่ยนผู้ใช้ได้ต่อเนื่องโดยรายชื่อไม่หดตามตัวที่เลือกอยู่)
     """
-    where, params = _log_where(search=search, action=action, contract_id=contract_id)
+    where, params = _log_where(search=search, action=action, contract_id=contract_id,
+                               allowed_actions=allowed_actions)
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -301,11 +350,13 @@ def fetch_activity_users(search='', action='all', contract_id=None):
         conn.close()
 
 
-def fetch_log_head(after_id=0):
+def fetch_log_head(after_id=0, allowed_actions=None):
     """
     ใช้กับการเช็ครายการใหม่ของหน้า log (polling) -- query เบา ไม่ join ไม่ดึงแถว
     คืน (Log_id ล่าสุด, จำนวนรายการที่ Log_id > after_id)
+    allowed_actions จำกัดชนิดเหตุการณ์เหมือนหน้ารายการ (ไม่งั้นแถบ "รายการใหม่" นับของเมนูอื่นด้วย)
     """
+    limit_sql, limit_params = _actions_in(allowed_actions, column='Action_type')
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -314,8 +365,8 @@ def fetch_log_head(after_id=0):
             SELECT ISNULL(MAX(Log_id), 0),
                    ISNULL(SUM(CASE WHEN Log_id > ? THEN 1 ELSE 0 END), 0)
             FROM dbo.Contract_activity_log
-            """,
-            int(after_id or 0),
+            WHERE 1 = 1""" + limit_sql,
+            int(after_id or 0), *limit_params,
         )
         latest, new = cursor.fetchone()
         return int(latest), int(new)

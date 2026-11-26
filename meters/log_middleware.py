@@ -286,6 +286,24 @@ def _download_build(request, kwargs, before, response):
     }
 
 
+def _invoice_print_build(request, kwargs, before, response):
+    """เปิดหน้าพิมพ์ใบแจ้งหนี้สำเร็จ -- view ฝากเลขตั้งหนี้ SAP ที่แสดงไว้ใน activity_result"""
+    if response.status_code != 200:
+        return None
+    result = _result(request)
+    docs = result.get('invoice_docs') or []
+    if not docs:
+        return None
+    # ใบแจ้งหนี้หนึ่งใบรวมได้หลายเลขเอกสาร SAP (สัญญา + วันที่ตั้งหนี้)
+    count = result.get('invoice_count') or len(docs)
+    shown = ', '.join(docs[:20]) + (f' และอีก {len(docs) - 20} เลข' if len(docs) > 20 else '')
+    return {
+        'action': activity.ACTION_INVOICE_PRINT,
+        'ref_text': docs[0] if len(docs) == 1 else f'{count} ใบ',
+        'detail': f'พิมพ์ใบแจ้งหนี้ {count} ใบ\nเลขเอกสาร SAP {shown}',
+    }
+
+
 def _export_build(request, kwargs, before, response):
     if not _is_attachment(response):
         return None
@@ -300,6 +318,20 @@ def _export_build(request, kwargs, before, response):
         'ref_text': search or None,
         'detail': detail,
     }
+
+
+def _view_as_build(request, kwargs, before, response):
+    """ผู้ดูแลระบบเริ่ม/เลิกดูในมุมมองกลุ่ม -- view ฝากชื่อกลุ่มไว้เมื่อทำสำเร็จ"""
+    result = _result(request)
+    name = result.get('group_name')
+    if not name or not _is_redirect(response):
+        return None
+    if request.resolver_match.url_name == 'view_as_start':
+        menus = ', '.join(result.get('menu_labels') or []) or '-'
+        return {'action': activity.ACTION_VIEW_AS_START, 'ref_text': name,
+                'detail': f'เริ่มดูในมุมมองกลุ่ม "{name}" (อ่านอย่างเดียว)\nเมนูของกลุ่ม: {menus}'}
+    return {'action': activity.ACTION_VIEW_AS_STOP, 'ref_text': name,
+            'detail': f'เลิกดูในมุมมองกลุ่ม "{name}" กลับเป็นสิทธิ์ผู้ดูแลระบบ'}
 
 
 # --------------------------------------------------------------------------
@@ -326,6 +358,9 @@ REGISTRY = {
     'phase_edit':     {'methods': ('POST',), 'before': _phase_before,      'build': _phase_build},
     'download_excel': {'methods': ('POST',), 'before': None, 'build': _download_build},
     'export_meters':  {'methods': ('GET',),  'before': None, 'build': _export_build},
+    'invoice_print':  {'methods': ('GET',),  'before': None, 'build': _invoice_print_build},
+    'view_as_start':  {'methods': ('POST',), 'before': None, 'build': _view_as_build},
+    'view_as_stop':   {'methods': ('POST',), 'before': None, 'build': _view_as_build},
 }
 FALLBACK = {'methods': ('POST',), 'before': None, 'build': _fallback_build}
 
